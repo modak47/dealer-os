@@ -1,0 +1,3 @@
+import Link from "next/link";
+import { dealership } from "@/config/dealership";
+export default function Admin(){return <div className="admin-login"><div><p className="admin-kicker">DEALEROS</p><h1>WELCOME BACK</h1><p>Powered dealership platform for {dealership.dealerName}. Sign in to manage stock, customers and sales channels.</p><label>Email address<input type="email" defaultValue={`admin@${dealership.domain}`}/></label><label>Password<input type="password" defaultValue="password"/></label><Link href="/admin/dashboard" className="btn green">Sign in to DealerOS</Link><small>Demo mode — authentication will be connected later.</small></div></div>}
