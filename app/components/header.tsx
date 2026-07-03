@@ -38,7 +38,7 @@ export function Header(){
     <header><div className="wide header-row">
       <DealerLogo/>
       <nav>{nav.map(([name,href])=><Link href={href} onClick={closeMenus} key={name}>{name}{name==="Used Bikes"&&<small>⌄</small>}</Link>)}
-        <div ref={dropdownRef} className={`nav-dropdown ${moreOpen?"open":""}`} onMouseEnter={()=>setMoreOpen(true)} onMouseLeave={()=>setMoreOpen(false)}>
+        <div ref={dropdownRef} className={`nav-dropdown ${moreOpen?"open":""}`}>
           <button type="button" aria-haspopup="menu" aria-expanded={moreOpen} onClick={()=>setMoreOpen(open=>!open)}>More <small>⌄</small></button>
           {moreOpen&&<div role="menu">{moreLinks.map(item=><Link role="menuitem" href={item.href} onClick={closeMenus} key={item.href}><b>{item.name}</b><span>{item.description}</span></Link>)}</div>}
         </div>
