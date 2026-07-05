@@ -8,6 +8,8 @@ import { BikeGallery } from "./bike-gallery";
 import { VehicleEnquiryForm } from "./vehicle-enquiry-form";
 import { VehicleSpecIcon, type IconType } from "./vehicle-spec-icon";
 
+export const dynamic="force-dynamic";
+
 type SpecItem={label:string;value:string;icon:IconType};
 type DescriptionSection={key:string;title:string;content:string[]};
 const clean=(value:unknown)=>typeof value==="string"?value.trim():typeof value==="number"?String(value):"";

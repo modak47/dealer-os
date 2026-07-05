@@ -19,6 +19,7 @@ export async function getSupabaseStockBikes():Promise<StockApiResponse>{
 const cleanText=(value:unknown)=>typeof value==="string"?value.trim():typeof value==="number"?String(value):"";
 const empty=(value:unknown)=>value===null||value===undefined||cleanText(value)==="";
 const numberValue=(value:unknown)=>{if(typeof value==="number"&&Number.isFinite(value))return value;const parsed=Number(cleanText(value).replace(/[^0-9.-]/g,""));return Number.isFinite(parsed)?parsed:null};
+const internalVariant=(value:unknown)=>{const text=cleanText(value);return !text||/^[a-f0-9]{20,}$/i.test(text)||/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(text)||/derivative|stock.?id|uuid/i.test(text)};
 
 export function normalizeSupabaseStockBike(bike:SupabaseStockBike):SupabaseStockBike{
   const dealer5=bike.dealer5_data&&typeof bike.dealer5_data==="object"?bike.dealer5_data:{};
@@ -37,19 +38,31 @@ export function normalizeSupabaseStockBike(bike:SupabaseStockBike):SupabaseStock
     ...bike,
     image_urls:displayImages,
     primary_image_url:primaryImage,
-    description:empty(bike.description)?cleanText(field("Confirm Spec"))||null:bike.description,
+    variant:internalVariant(bike.variant)?cleanText(field("Variant","Trim"))||null:bike.variant,
+    description:empty(bike.description)?cleanText(field("Confirm Spec","Advert Description","Full Description","Description"))||null:bike.description,
     mot_expiry:empty(bike.mot_expiry)?cleanText(field("MOT Expiry Date"))||null:bike.mot_expiry,
     body_style:empty(bike.body_style)?cleanText(field("Body Type"))||null:bike.body_style,
     fuel:empty(bike.fuel)?cleanText(field("Fuel"))||null:bike.fuel,
     transmission:empty(bike.transmission)?cleanText(field("Transmission"))||null:bike.transmission,
     colour:empty(bike.colour)?cleanText(field("Colour"))||null:bike.colour,
     engine_cc:empty(bike.engine_cc)?numberValue(field("Engine Size")):bike.engine_cc,
-    registration_date:cleanText(field("Registration Date"))||null,
+    plate:empty(bike.plate)?cleanText(field("Plate"))||null:bike.plate,
+    registration_date:empty(bike.registration_date)?cleanText(field("Registration Date"))||null:bike.registration_date,
     previous_owners:empty(bike.previous_owners)?numberValue(field("Previous Owners")):bike.previous_owners,
-    engine_number:cleanText(field("Engine Number"))||null,
-    derivative_id:cleanText(field("Derivative ID"))||null,
-    display_status:cleanText(field("Display Status"))||null,
-    attention_grabber:cleanText(field("Attention Grabber (30 Chars - Autotrader/Website)","Attention Grabber"))||null,
+    engine_number:empty(bike.engine_number)?cleanText(field("Engine Number"))||null:bike.engine_number,
+    number_of_gears:empty(bike.number_of_gears)?numberValue(field("Number of Gears","Gears")):bike.number_of_gears,
+    derivative_id:empty(bike.derivative_id)?cleanText(field("Derivative ID"))||null:bike.derivative_id,
+    display_status:empty(bike.display_status)?cleanText(field("Display Status"))||null:bike.display_status,
+    attention_grabber:empty(bike.attention_grabber)?cleanText(field("Attention Grabber (30 Chars - Autotrader/Website)","Attention Grabber"))||null:bike.attention_grabber,
+    bhp:empty(bike.bhp)?numberValue(field("BHP","Max Power","Power")):bike.bhp,
+    torque:empty(bike.torque)?cleanText(field("Max Torque","Torque"))||null:bike.torque,
+    co2:empty(bike.co2)?cleanText(field("CO2","CO2 Emissions"))||null:bike.co2,
+    road_tax:empty(bike.road_tax)?cleanText(field("Road Tax","Tax"))||null:bike.road_tax,
+    top_speed:empty(bike.top_speed)?cleanText(field("Top Speed"))||null:bike.top_speed,
+    length_mm:empty(bike.length_mm)?numberValue(field("Length")):bike.length_mm,
+    width_mm:empty(bike.width_mm)?numberValue(field("Width")):bike.width_mm,
+    weight_kg:empty(bike.weight_kg)?numberValue(field("Weight","Kerb Weight","Dry Weight")):bike.weight_kg,
+    euro_emissions:empty(bike.euro_emissions)?cleanText(field("Euro Emissions","Euro Status","Emission Class"))||null:bike.euro_emissions,
   };
 }
 
