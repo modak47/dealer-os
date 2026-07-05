@@ -54,6 +54,7 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
   const mapped=normalizeSupabaseStockBike(bike);
   const images=mapped.image_urls;
   const primaryImage=mapped.primary_image_url||images[0]||"/bike-placeholder.svg";
+  const dealer5Fields=mapped.dealer5_data&&typeof mapped.dealer5_data==="object"&&typeof (mapped.dealer5_data as {fields?:unknown}).fields==="object"?(mapped.dealer5_data as {fields:Record<string,unknown>}).fields:{};
   return {
     id:bike.id,
     createdTime:bike.created_at,
@@ -88,5 +89,7 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
     transmission:mapped.transmission??"",
     variant:mapped.variant??"",
     category:mapped.category??"",
+    specifications:mapped.specifications??{},
+    dealer5Fields,
   };
 }
