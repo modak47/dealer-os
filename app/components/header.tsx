@@ -7,7 +7,7 @@ import { dealership, phoneHref } from "@/config/dealership";
 import { DealerLogo } from "./dealer-logo";
 import { Heart, Menu, Phone, Search } from "./icons";
 
-const nav=[["Used Bikes","/used-bikes"],["Finance","/finance"],["Part Exchange","/part-exchange"],["Sell My Bike","/sell-my-bike"],["Trade","/contact"],["About Us","/about"]];
+const nav=[["Used Bikes","/used-bikes"],["Stock","/stock"],["Finance","/finance"],["Part Exchange","/part-exchange"],["Sell My Bike","/sell-my-bike"],["Trade","/contact"],["About Us","/about"]];
 const moreLinks=[
   {name:"Reserve Online",href:"/reserve-online",description:"Secure your bike for £99"},
   {name:"Nationwide Delivery",href:"/nationwide-delivery",description:"Delivery throughout the UK"},

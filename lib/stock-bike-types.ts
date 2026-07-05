@@ -1,0 +1,49 @@
+export interface SupabaseStockBike {
+  id:string;
+  dealer5_id:string|null;
+  registration:string|null;
+  vin:string|null;
+  make:string|null;
+  model:string|null;
+  variant:string|null;
+  year:number|null;
+  mileage:number|null;
+  colour:string|null;
+  engine_cc:number|null;
+  price:number|null;
+  status:string;
+  advert_title:string|null;
+  stock_number:string|null;
+  category:string|null;
+  body_style:string|null;
+  fuel:string|null;
+  transmission:string|null;
+  description:string|null;
+  service_history:string|null;
+  vat_status:string|null;
+  specifications:Record<string,unknown>;
+  features:unknown[];
+  pricing:Record<string,unknown>;
+  dealer5_data:Record<string,unknown>;
+  dealer5_updated_at:string|null;
+  source_url:string|null;
+  image_urls:string[];
+  primary_image_url:string|null;
+  date_in_stock:string|null;
+  sold_date:string|null;
+  mot_expiry:string|null;
+  mot_status:string|null;
+  workshop_status:string|null;
+  valeting_status:string|null;
+  photo_status:string|null;
+  location:string|null;
+  notes:string|null;
+  created_at:string;
+  updated_at:string;
+}
+
+export interface StockApiResponse {
+  stock:SupabaseStockBike[];
+  configured:boolean;
+  error?:string;
+}

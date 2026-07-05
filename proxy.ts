@@ -3,12 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
 
 const protectedApiPaths=new Set(["/api/vrm-lookup","/api/hpi-test"]);
+const protectedApiPrefixes=["/api/opportunities","/api/retail-check","/api/retail-history","/api/scanner-status","/api/run-opportunity-scan","/api/makes","/api/models"];
 
 export async function proxy(request:NextRequest){
   const pathname=request.nextUrl.pathname;
   const isLogin=pathname==="/admin";
   const isAdmin=pathname.startsWith("/admin/");
-  const isProtectedApi=protectedApiPaths.has(pathname);
+  const isProtectedApi=protectedApiPaths.has(pathname)||protectedApiPrefixes.some(prefix=>pathname===prefix||pathname.startsWith(`${prefix}/`));
   if(!isLogin&&!isAdmin&&!isProtectedApi)return NextResponse.next();
 
   if(!isSupabaseConfigured){
@@ -32,4 +33,4 @@ export async function proxy(request:NextRequest){
   return response;
 }
 
-export const config={matcher:["/admin/:path*","/api/vrm-lookup","/api/hpi-test"]};
+export const config={matcher:["/admin/:path*","/api/vrm-lookup","/api/hpi-test","/api/opportunities/:path*","/api/retail-check/:path*","/api/retail-history/:path*","/api/scanner-status/:path*","/api/run-opportunity-scan/:path*","/api/makes/:path*","/api/models/:path*"]};
