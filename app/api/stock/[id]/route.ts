@@ -19,7 +19,7 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
     const updates=sanitiseStockPayload(body);
     if(Object.keys(updates).length===0)return NextResponse.json({error:"No editable fields supplied."},{status:400});
     const {data,error}=await getSupabaseAdmin().from("stock_bikes").update(updates).eq("id",id).select("*").maybeSingle();
-    if(error){console.error("Unable to update stock bike",error);const migrationMissing=/column|schema cache|advert_sections|show_on_website|reservation_amount/i.test(`${error.message} ${error.details??""}`);return NextResponse.json({error:migrationMissing?"Stock advert migration is not installed. Run 20260705000300_stock_advert_builder.sql in Supabase, then try again.":"Unable to update stock bike."},{status:500})}
+    if(error){console.error("Unable to update stock bike",error);const migrationMissing=/column|schema cache|advert_sections|show_on_website|reservation_amount/i.test(`${error.message} ${error.details??""}`);return NextResponse.json({error:migrationMissing?"Stock advert migration is not installed. Run 20260705000300_stock_advert_builder.sql in Supabase, then try again.":`Unable to update stock bike: ${error.message}`},{status:500})}
     if(!data)return NextResponse.json({error:"Stock bike not found."},{status:404});
     return NextResponse.json({stock:normalizeSupabaseStockBike(data as SupabaseStockBike)});
   }catch(error){console.error("Invalid stock update request",error);return NextResponse.json({error:"Invalid stock data."},{status:400})}
