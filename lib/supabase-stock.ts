@@ -45,7 +45,7 @@ export function normalizeSupabaseStockBike(bike:SupabaseStockBike):SupabaseStock
     colour:empty(bike.colour)?cleanText(field("Colour"))||null:bike.colour,
     engine_cc:empty(bike.engine_cc)?numberValue(field("Engine Size")):bike.engine_cc,
     registration_date:cleanText(field("Registration Date"))||null,
-    previous_owners:cleanText(field("Previous Owners"))||null,
+    previous_owners:empty(bike.previous_owners)?numberValue(field("Previous Owners")):bike.previous_owners,
     engine_number:cleanText(field("Engine Number"))||null,
     derivative_id:cleanText(field("Derivative ID"))||null,
     display_status:cleanText(field("Display Status"))||null,
@@ -84,7 +84,7 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
     engineCc:mapped.engine_cc??0,
     motExpiry:mapped.mot_expiry??"",
     registrationDate:mapped.registration_date??"",
-    previousOwners:mapped.previous_owners??"",
+    previousOwners:mapped.previous_owners==null?"":String(mapped.previous_owners),
     engineNumber:mapped.engine_number??"",
     derivativeId:mapped.derivative_id??"",
     displayStatus:mapped.display_status??"",
@@ -94,7 +94,8 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
     transmission:mapped.transmission??"",
     variant:mapped.variant??"",
     category:mapped.category??"",
-    specifications:mapped.specifications??{},
+    specifications:{...(mapped.specifications??{}),BHP:mapped.bhp,Torque:mapped.torque,CO2:mapped.co2,"Road Tax":mapped.road_tax,"Top Speed":mapped.top_speed,Length:mapped.length_mm,Width:mapped.width_mm,Weight:mapped.weight_kg,"Euro Emissions":mapped.euro_emissions,"HPI Category":mapped.hpi_category},
     dealer5Fields,
+    advertSections:mapped.advert_sections??{},
   };
 }

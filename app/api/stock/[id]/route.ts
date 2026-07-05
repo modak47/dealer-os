@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeSupabaseStockBike } from "@/lib/supabase-stock";
 import type { SupabaseStockBike } from "@/lib/stock-bike-types";
-
-const editableFields=new Set(["registration","make","model","variant","year","mileage","colour","engine_cc","vin","status","location","notes","primary_image_url","price","vat_status","pricing","description","service_history","features","mot_expiry","body_style","fuel","transmission"]);
-const numericFields=new Set(["year","mileage","engine_cc","price"]);
-const jsonFields=new Set(["pricing","features"]);
+import { sanitiseStockPayload } from "@/lib/stock-payload";
 
 export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}){
   const {id}=await params;
@@ -19,13 +16,7 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
   try{
     const {id}=await params;
     const body=await request.json() as Record<string,unknown>;
-    const updates:Record<string,unknown>={};
-    for(const [key,value] of Object.entries(body)){
-      if(!editableFields.has(key))continue;
-      if(numericFields.has(key)){updates[key]=value===""||value===null?null:Number(value);if(updates[key]!==null&&!Number.isFinite(updates[key] as number))return NextResponse.json({error:`${key} must be a valid number.`},{status:400});continue}
-      if(jsonFields.has(key)){if(key==="features"&&!Array.isArray(value))return NextResponse.json({error:"Features must be an array."},{status:400});if(key==="pricing"&&(typeof value!=="object"||value===null||Array.isArray(value)))return NextResponse.json({error:"Pricing must be an object."},{status:400});updates[key]=value;continue}
-      updates[key]=typeof value==="string"?(value.trim()||null):value;
-    }
+    const updates=sanitiseStockPayload(body);
     if(Object.keys(updates).length===0)return NextResponse.json({error:"No editable fields supplied."},{status:400});
     const {data,error}=await getSupabaseAdmin().from("stock_bikes").update(updates).eq("id",id).select("*").maybeSingle();
     if(error){console.error("Unable to update stock bike",error);return NextResponse.json({error:"Unable to update stock bike."},{status:500})}

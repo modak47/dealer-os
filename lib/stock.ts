@@ -13,7 +13,7 @@ export interface PublicStockBike {
   bodyStyle:string; fuel:string; transmission:string;
   variant:string; category:string;
 }
-export interface PublicStockDetailBike extends PublicStockBike {specifications:Record<string,unknown>;dealer5Fields:Record<string,unknown>}
+export interface PublicStockDetailBike extends PublicStockBike {specifications:Record<string,unknown>;dealer5Fields:Record<string,unknown>;advertSections:Record<string,unknown>}
 export type StockStats={totalStock:number;liveStock:number;reserved:number;sold:number;prep:number;totalRetailValue:number};
 
 export const normaliseStockStatus=(value:string)=>value.trim().toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ");
@@ -63,7 +63,7 @@ export async function getFeaturedBikes(limit=4):Promise<PublicStockBike[]>{
 }
 export async function getBikeBySlugOrId(value:string):Promise<PublicStockDetailBike|null>{
   const stock=(await getAllStockBikes()).filter(isPublic);
-  const bike=stock.find(b=>b.id===value||toPublicBike(b).slug===value);return bike?{...toPublicBike(bike),specifications:bike.specifications??{},dealer5Fields:bike.dealer5Fields??{}}:null
+  const bike=stock.find(b=>b.id===value||toPublicBike(b).slug===value);return bike?{...toPublicBike(bike),specifications:bike.specifications??{},dealer5Fields:bike.dealer5Fields??{},advertSections:bike.advertSections??{}}:null
 }
 export async function getStockStats():Promise<StockStats>{const all=await getAllStockBikes();const active=all.filter(isActive);return{
   totalStock:active.length,liveStock:active.filter(b=>["in stock","on forecourt"].includes(normaliseStockStatus(b.status))).length,

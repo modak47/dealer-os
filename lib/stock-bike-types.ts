@@ -40,12 +40,28 @@ export interface SupabaseStockBike {
   notes:string|null;
   created_at:string;
   updated_at:string;
-  registration_date?:string|null;
-  previous_owners?:string|null;
-  engine_number?:string|null;
   derivative_id?:string|null;
-  display_status?:string|null;
   attention_grabber?:string|null;
+  plate:string|null;
+  engine_number:string|null;
+  number_of_gears:number|null;
+  previous_owners:number|null;
+  registration_date:string|null;
+  display_status:string|null;
+  show_on_website:boolean;
+  reserve_enabled:boolean;
+  reservation_amount:number;
+  advert_sections:Record<string,unknown>;
+  bhp:number|null;
+  torque:string|null;
+  co2:string|null;
+  road_tax:string|null;
+  top_speed:string|null;
+  length_mm:number|null;
+  width_mm:number|null;
+  weight_kg:number|null;
+  euro_emissions:string|null;
+  hpi_category:string|null;
 }
 
 export interface StockApiResponse {

@@ -14,6 +14,7 @@ const moreLinks=[
   {name:"Motorcycle Preparation",href:"/motorcycle-preparation",description:"How every bike is prepared"},
   {name:"Why Buy From Us",href:"/why-buy-from-yesmoto",description:"The YesMoto difference"},
   {name:"Used Bike Warranty",href:"/used-motorcycle-warranty",description:"Ride away with confidence"},
+  {name:"Dealer Portal",href:"/admin",description:"Staff login to DealerOS"},
 ];
 
 export function Header(){
