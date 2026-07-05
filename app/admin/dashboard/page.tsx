@@ -3,6 +3,8 @@ import { dealership } from "@/config/dealership";
 import { leads, money } from "@/lib/mock-data";
 import { getActiveStockBikes, getStockStats, isPublic, toPublicBike } from "@/lib/stock";
 
+export const revalidate=60;
+
 export default async function Dashboard(){
   const [bikes,stock]=await Promise.all([getActiveStockBikes(),getStockStats()]);
   const newLeads=leads.filter(lead=>lead.status==="New").length;

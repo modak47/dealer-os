@@ -5,6 +5,8 @@ import { BikeCard } from "./components/bike-card";
 import { Arrow } from "./components/icons";
 import { CategoryTile } from "./components/category-tile";
 
+export const revalidate=60;
+
 const cats=["Scooters","125cc","Super Sports","Roadster","Adventure","Custom"];
 const trustItems=["Excellent Reviews","Finance Available","Nationwide Delivery","Part Exchange Welcome","Reserve Online"];
 

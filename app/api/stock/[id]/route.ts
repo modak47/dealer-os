@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeSupabaseStockBike } from "@/lib/supabase-stock";
+import type { SupabaseStockBike } from "@/lib/stock-bike-types";
 
-const editableFields=new Set(["registration","make","model","variant","year","mileage","colour","engine_cc","vin","status","location","notes","primary_image_url","price","vat_status","pricing","description","service_history","features"]);
+const editableFields=new Set(["registration","make","model","variant","year","mileage","colour","engine_cc","vin","status","location","notes","primary_image_url","price","vat_status","pricing","description","service_history","features","mot_expiry","body_style","fuel","transmission"]);
 const numericFields=new Set(["year","mileage","engine_cc","price"]);
 const jsonFields=new Set(["pricing","features"]);
 
@@ -10,7 +12,7 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
   const {data,error}=await getSupabaseAdmin().from("stock_bikes").select("*").eq("id",id).maybeSingle();
   if(error){console.error("Unable to load stock bike",error);return NextResponse.json({error:"Unable to load stock bike."},{status:500})}
   if(!data)return NextResponse.json({error:"Stock bike not found."},{status:404});
-  return NextResponse.json({stock:data});
+  return NextResponse.json({stock:normalizeSupabaseStockBike(data as SupabaseStockBike)});
 }
 
 export async function PATCH(request:Request,{params}:{params:Promise<{id:string}>}){
@@ -28,6 +30,6 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
     const {data,error}=await getSupabaseAdmin().from("stock_bikes").update(updates).eq("id",id).select("*").maybeSingle();
     if(error){console.error("Unable to update stock bike",error);return NextResponse.json({error:"Unable to update stock bike."},{status:500})}
     if(!data)return NextResponse.json({error:"Stock bike not found."},{status:404});
-    return NextResponse.json({stock:data});
+    return NextResponse.json({stock:normalizeSupabaseStockBike(data as SupabaseStockBike)});
   }catch(error){console.error("Invalid stock update request",error);return NextResponse.json({error:"Invalid stock data."},{status:400})}
 }

@@ -19,6 +19,19 @@ export interface StockBike {
   notes: string;
   image: string;
   imageUrls: string[];
+  description?: string;
+  colour?: string;
+  engineCc?: number;
+  motExpiry?: string;
+  registrationDate?: string;
+  previousOwners?: string;
+  engineNumber?: string;
+  derivativeId?: string;
+  displayStatus?: string;
+  attentionGrabber?: string;
+  bodyStyle?: string;
+  fuel?: string;
+  transmission?: string;
 }
 
 type AirtableRecord = { id:string; createdTime?:string; fields?:Record<string,unknown> };

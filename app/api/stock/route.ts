@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { StockApiResponse } from "@/lib/stock-bike-types";
 import { getSupabaseStockBikes } from "@/lib/supabase-stock";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeSupabaseStockBike } from "@/lib/supabase-stock";
+import type { SupabaseStockBike } from "@/lib/stock-bike-types";
 
 export async function GET(){
   const result=await getSupabaseStockBikes();
@@ -16,7 +18,7 @@ export async function POST(request:Request){
     const payload={registration:cleanText(body.registration),make,model,year:cleanNumber(body.year),mileage:cleanNumber(body.mileage),price:cleanNumber(body.price),status:cleanText(body.status)||"In Stock"};
     const {data,error}=await getSupabaseAdmin().from("stock_bikes").insert(payload).select("*").single();
     if(error){console.error("Unable to create stock bike",error);return NextResponse.json({error:"Unable to create stock bike."},{status:500})}
-    return NextResponse.json({stock:data},{status:201});
+    return NextResponse.json({stock:normalizeSupabaseStockBike(data as SupabaseStockBike)},{status:201});
   }catch(error){console.error("Invalid stock create request",error);return NextResponse.json({error:"Invalid stock data."},{status:400})}
 }
 

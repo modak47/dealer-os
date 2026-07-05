@@ -40,6 +40,12 @@ export interface SupabaseStockBike {
   notes:string|null;
   created_at:string;
   updated_at:string;
+  registration_date?:string|null;
+  previous_owners?:string|null;
+  engine_number?:string|null;
+  derivative_id?:string|null;
+  display_status?:string|null;
+  attention_grabber?:string|null;
 }
 
 export interface StockApiResponse {

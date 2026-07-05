@@ -2,6 +2,7 @@ import { getPublicStockBikes } from "@/lib/stock";
 import { UsedBikesClient } from "./used-bikes-client";
 
 export const metadata={title:"Used Motorcycles"};
+export const revalidate=60;
 
 export default async function Used(){
   const bikes=await getPublicStockBikes();
