@@ -44,15 +44,15 @@ export async function getAllStockBikes():Promise<StockBike[]>{
   catch(error){console.error("Unable to load Motorcycle Stock fallback; using mock stock.",error);return mockStock()}
 }
 
-export function toPublicBike(bike:StockBike):PublicStockBike{const images=Array.from(new Set((bike.imageUrls??[]).filter(value=>value&&value!=="/bike-placeholder.svg")));const image=(bike.image&&bike.image!=="/bike-placeholder.svg"?bike.image:images[0])||"/bike-placeholder.svg";const confirmSpec=text(bike.dealer5Fields?.["Confirm Spec"]);const safeVariant=customerText(bike.variant,bike.derivativeId);return{
+export function toPublicBike(bike:StockBike):PublicStockBike{const fields=bike.dealer5Fields??{};const field=(...names:string[])=>{for(const name of names){const value=text(fields[name]);if(value)return value}return ""};const numeric=(value:unknown,fallback=0)=>{const raw=String(value??"").replace(/[^0-9.-]/g,"");if(!raw)return fallback;const parsed=Number(raw);return Number.isFinite(parsed)?parsed:fallback};const detailedYear=numeric(field("Year of Manufacture","Year"),bike.year);const detailedMileage=numeric(field("Mileage"),bike.mileage);const detailedPrice=numeric(field("Price"),bike.price);const images=Array.from(new Set((bike.imageUrls??[]).filter(value=>value&&value!=="/bike-placeholder.svg")));const image=(bike.image&&bike.image!=="/bike-placeholder.svg"?bike.image:images[0])||"/bike-placeholder.svg";const confirmSpec=field("Confirm Spec","Advert Description","Full Description","Description");const safeVariant=customerText(bike.variant,bike.derivativeId);return{
   id:bike.id,slug:slugify([bike.make,bike.model,bike.registration].filter(Boolean).join("-"))||bike.id,createdTime:bike.createdTime,
-  make:customerText(bike.make)||"Unknown",model:customerText(bike.model)||"Motorcycle",year:bike.year,
-  mileage:bike.mileage?`${bike.mileage.toLocaleString("en-GB")} miles`:"Mileage unavailable",mileageValue:bike.mileage,
-  price:bike.price,status:customerStatus(bike),image,imageUrls:images.length?images:[image],
-  monthly:Math.max(0,Math.round(bike.price/53)),description:confirmSpec||bike.description||bike.notes,
-  colour:bike.colour??"",engineCc:bike.engineCc??0,motExpiry:bike.motExpiry??"",registrationDate:bike.registrationDate??"",previousOwners:bike.previousOwners??"",
-  attentionGrabber:customerText(bike.attentionGrabber),
-  bodyStyle:customerText(bike.bodyStyle),fuel:customerText(bike.fuel),transmission:customerText(bike.transmission),variant:safeVariant,category:customerText(bike.category)
+  make:customerText(field("Make")||bike.make)||"Unknown",model:customerText(field("Model")||bike.model)||"Motorcycle",year:detailedYear,
+  mileage:detailedMileage?`${detailedMileage.toLocaleString("en-GB")} miles`:"Mileage unavailable",mileageValue:detailedMileage,
+  price:detailedPrice,status:customerStatus(bike),image,imageUrls:images.length?images:[image],
+  monthly:Math.max(0,Math.round(detailedPrice/53)),description:confirmSpec||bike.description||bike.notes,
+  colour:field("Colour")||bike.colour||"",engineCc:numeric(field("Engine Size"),bike.engineCc??0),motExpiry:field("MOT Expiry Date")||bike.motExpiry||"",registrationDate:field("Registration Date")||bike.registrationDate||"",previousOwners:field("Previous Owners")||bike.previousOwners||"",
+  attentionGrabber:customerText(field("Attention Grabber (30 Chars - Autotrader/Website)","Attention Grabber")||bike.attentionGrabber),
+  bodyStyle:customerText(field("Body Type")||bike.bodyStyle),fuel:customerText(field("Fuel")||bike.fuel),transmission:customerText(field("Transmission")||bike.transmission),variant:safeVariant,category:customerText(bike.category)
 }}
 export async function getActiveStockBikes():Promise<StockBike[]>{return(await getAllStockBikes()).filter(isActive)}
 export async function getPublicStockBikes():Promise<PublicStockBike[]>{return(await getAllStockBikes()).filter(isPublic).map(toPublicBike)}
@@ -63,7 +63,7 @@ export async function getFeaturedBikes(limit=4):Promise<PublicStockBike[]>{
 }
 export async function getBikeBySlugOrId(value:string):Promise<PublicStockDetailBike|null>{
   const stock=(await getAllStockBikes()).filter(isPublic);
-  const bike=stock.find(b=>b.id===value||toPublicBike(b).slug===value);return bike?{...toPublicBike(bike),specifications:bike.specifications??{},dealer5Fields:bike.dealer5Fields??{},advertSections:bike.advertSections??{}}:null
+  const bike=stock.find(b=>b.id===value||toPublicBike(b).slug===value);if(!bike)return null;const raw=bike.advertSections??{};const section=(...keys:string[])=>{for(const key of keys){const value=text(raw[key]);if(value)return value}return ""};const advertSections={headline:section("headline","advert_headline"),intro:section("intro","intro_description"),key_details:section("key_details","details"),fitted_extras:section("fitted_extras","extras"),preparation:section("preparation","preparation_work"),included:section("included","included_before_delivery"),why_buy:section("why_buy","why_buy_from_yesmoto"),finance:section("finance","finance_options")};return {...toPublicBike(bike),specifications:bike.specifications??{},dealer5Fields:bike.dealer5Fields??{},advertSections}
 }
 export async function getStockStats():Promise<StockStats>{const all=await getAllStockBikes();const active=all.filter(isActive);return{
   totalStock:active.length,liveStock:active.filter(b=>["in stock","on forecourt"].includes(normaliseStockStatus(b.status))).length,
