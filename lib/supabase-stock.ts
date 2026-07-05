@@ -26,11 +26,16 @@ export function normalizeSupabaseStockBike(bike:SupabaseStockBike):SupabaseStock
   const fields=nested&&typeof nested==="object"&&!Array.isArray(nested)?nested as Record<string,unknown>:{};
   const field=(...names:string[])=>{for(const name of names){const value=fields[name];if(!empty(value))return value}return null};
   const imageUrls=Array.from(new Set((Array.isArray(bike.image_urls)?bike.image_urls:[]).filter((value):value is string=>typeof value==="string").map(value=>value.trim()).filter(Boolean)));
+  const genuineImages=imageUrls.filter(value=>!/awaiting.?preparation|awaiting.?prep|placeholder|coming.?soon|no.?image/i.test(value));
+  const displayImages=genuineImages.length?genuineImages:imageUrls;
   const requestedPrimary=cleanText(bike.primary_image_url);
-  const primaryImage=requestedPrimary||imageUrls[0]||null;
+  const primaryIsPreparation=/awaiting.?preparation|awaiting.?prep|placeholder|coming.?soon|no.?image/i.test(requestedPrimary);
+  const cd5Image=displayImages.find(value=>/cd5/i.test(value));
+  const durableImage=displayImages.find(value=>!/airtableusercontent\.com/i.test(value));
+  const primaryImage=(/cd5/i.test(requestedPrimary)&&!primaryIsPreparation?requestedPrimary:cd5Image)||(requestedPrimary&&!primaryIsPreparation&&!/airtableusercontent\.com/i.test(requestedPrimary)?requestedPrimary:durableImage)||(!primaryIsPreparation?requestedPrimary:"")||displayImages[0]||null;
   return {
     ...bike,
-    image_urls:imageUrls,
+    image_urls:displayImages,
     primary_image_url:primaryImage,
     description:empty(bike.description)?cleanText(field("Confirm Spec"))||null:bike.description,
     mot_expiry:empty(bike.mot_expiry)?cleanText(field("MOT Expiry Date"))||null:bike.mot_expiry,

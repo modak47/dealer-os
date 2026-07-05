@@ -25,3 +25,4 @@ export const dealership = {
 } as const;
 
 export const phoneHref = `tel:${dealership.phone.replace(/\s/g, "")}`;
+export const whatsappHref = `https://wa.me/${dealership.phone.replace(/^0/, "44").replace(/\D/g, "")}`;
