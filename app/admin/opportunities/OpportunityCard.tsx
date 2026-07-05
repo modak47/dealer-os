@@ -188,7 +188,7 @@ export default function OpportunityCard({ opportunity, onOpen, onUpdate }: Oppor
   );
 }
 
-const OpportunityNotes = memo(function OpportunityNotes({
+export const OpportunityNotes = memo(function OpportunityNotes({
   listingId,
   initialNotes,
   onSave,

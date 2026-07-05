@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import OpportunityCard, { AdvertLink } from "./OpportunityCard";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import OpportunityCard, { AdvertLink, OpportunityNotes } from "./OpportunityCard";
 import {
   formatMoney,
   formatRelativeConfirmed,
@@ -389,6 +389,7 @@ export default function OpportunitiesTracker({
             comparablesError={comparablesError}
             activeSection={drawerSection}
             onSectionChange={selectDrawerSection}
+            onUpdate={updateOpportunity}
             onClose={() => setSelectedListingId(null)}
           />
         )}
@@ -435,6 +436,7 @@ function OpportunityModal({
   comparablesError,
   activeSection,
   onSectionChange,
+  onUpdate,
   onClose,
 }: {
   opportunity: Opportunity;
@@ -445,38 +447,73 @@ function OpportunityModal({
   comparablesError: string | null;
   activeSection: OpportunityDrawerSection;
   onSectionChange: (section: OpportunityDrawerSection) => void;
+  onUpdate: (listingId: number, patch: OpportunityPatch) => Promise<boolean>;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose]);
+
   const details = [
-    ["Score", String(opportunity["Score"])],
-    ["Potential Margin", opportunity["Potential Margin"]],
-    ["Margin %", opportunity["Margin %"]],
-    ["Asking Price", opportunity["Asking Price"]],
-    ["Dealer Median", opportunity["Dealer Median"]],
     ["Year", String(opportunity["Year"])],
     ["Mileage", `${opportunity["Mileage"]?.toLocaleString()} miles`],
     ["Seller Type", opportunity["Seller Type"]],
-    ["Days Live", String(opportunity["Days Live"])],
     ["First Seen", opportunity["First Seen Date"]],
     ["Last Confirmed Live", formatRelativeConfirmed(opportunity.last_seen)],
     ["Derivative ID", opportunity["Derivative ID"]],
   ];
+  const imageUrl = getValidAdvertUrl(opportunity.primary_image_url);
+  const listingId = opportunity["Listing ID"];
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="opportunity-title" className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm" onMouseDown={onClose}>
-      <aside className="h-full w-full max-w-2xl overflow-auto border-l border-gray-800 bg-[#111111] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between border-b border-gray-800 p-6">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="opportunity-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-0 backdrop-blur-md sm:p-5"
+      onMouseDown={onClose}
+    >
+      <section
+        className="h-full w-full max-w-7xl overflow-y-auto border-gray-800 bg-[#111111] shadow-2xl motion-safe:animate-[vehicle-in_.25s_ease-out] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:border"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-gray-800 bg-[#111111]/95 p-5 backdrop-blur-md sm:p-6">
           <div>
             <h2 id="opportunity-title" className="text-2xl font-bold">{opportunity["Make"]} {opportunity["Model"]}</h2>
             <p className="text-gray-400">Listing ID: {opportunity["Listing ID"]}</p>
           </div>
           <div className="flex items-center gap-3">
-            <AdvertLink url={opportunity["Advert URL"]} className="px-3 py-2 text-sm" />
             <button type="button" onClick={onClose} className="text-2xl text-gray-400 hover:text-white" aria-label="Close details">×</button>
           </div>
         </div>
 
-        <nav className="flex border-b border-gray-800 px-4 sm:px-6" aria-label="Opportunity details">
+        <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.85fr)_minmax(310px,1fr)]">
+          <div className="min-w-0 border-gray-800 lg:border-r">
+            <div className="relative aspect-[16/8] overflow-hidden border-b border-gray-800 bg-black">
+              {imageUrl ? (
+                // Advert image hosts vary, so this intentionally bypasses next/image host allowlists.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imageUrl} alt={`${opportunity["Make"]} ${opportunity["Model"]}`} className="h-full w-full object-contain" />
+              ) : (
+                <div className="grid h-full place-items-center bg-[radial-gradient(circle_at_center,#173d20,transparent_38%)] text-center text-gray-500">
+                  <div><span className="block text-5xl font-black text-white/10">YM</span><small>No advert image available</small></div>
+                </div>
+              )}
+              <span className="absolute left-4 top-4 rounded bg-[#00E51D] px-3 py-1 text-xs font-black uppercase text-black">Score {opportunity["Score"]}</span>
+            </div>
+
+        <nav className="flex overflow-x-auto border-b border-gray-800 px-2 sm:px-6" aria-label="Opportunity details">
           {(["overview", "comparables", "activity"] as const).map((section) => (
             <button
               key={section}
@@ -494,9 +531,14 @@ function OpportunityModal({
           ))}
         </nav>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {activeSection === "overview" && (
             <section aria-label="Opportunity overview">
+              <div className="mb-5">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#00E51D]">Opportunity summary</p>
+                <h3 className="mt-2 text-xl font-bold">{opportunity["Year"]} {opportunity["Make"]} {opportunity["Model"]}</h3>
+                <p className="mt-2 text-sm leading-6 text-gray-400">Review the advert details, research notes and market position before progressing this buying opportunity.</p>
+              </div>
               <div className="grid gap-4 md:grid-cols-2">
                 {details.map(([label, value]) => <DetailItem key={label} label={label} value={value} />)}
                 <button
@@ -509,6 +551,9 @@ function OpportunityModal({
                     {opportunity["Comparable Count"] ?? 0} comparable adverts
                   </span>
                 </button>
+              </div>
+              <div className="mt-6">
+                <OpportunityNotes listingId={listingId} initialNotes={opportunity.notes ?? ""} onSave={onUpdate} />
               </div>
             </section>
           )}
@@ -571,7 +616,55 @@ function OpportunityModal({
             </section>
           )}
         </div>
-      </aside>
+          </div>
+
+          <aside className="self-start bg-[#0d1317] p-5 lg:sticky lg:top-[89px] lg:p-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#00E51D]">Deal assessment</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <ModalMetric label="Score" value={String(opportunity["Score"])} accent />
+              <ModalMetric label="Potential Profit" value={opportunity["Potential Margin"]} accent />
+              <ModalMetric label="Dealer Median" value={opportunity["Dealer Median"]} />
+              <ModalMetric label="Asking Price" value={opportunity["Asking Price"]} />
+              <ModalMetric label="Margin %" value={opportunity["Margin %"]} />
+              <ModalMetric label="Comparables" value={String(opportunity["Comparable Count"] ?? 0)} />
+              <ModalMetric label="Days Live" value={String(opportunity["Days Live"])} />
+              <ModalMetric label="Listing ID" value={String(listingId)} />
+            </div>
+
+            <label className="mt-5 block text-xs font-bold uppercase tracking-wider text-gray-400">
+              Workflow status
+              <select
+                value={opportunity.status ?? "New"}
+                onChange={(event) => void onUpdate(listingId, { status: event.target.value as OpportunityStatus })}
+                className="mt-2 w-full rounded border border-gray-700 bg-black px-3 py-3 text-sm font-semibold text-white outline-none focus:border-[#00E51D]"
+              >
+                {OPPORTUNITY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </label>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                aria-pressed={opportunity.favourite}
+                onClick={() => void onUpdate(listingId, { favourite: !opportunity.favourite })}
+                className={`rounded border px-3 py-3 text-sm font-bold ${opportunity.favourite ? "border-[#00E51D] bg-[#00E51D]/15 text-[#00E51D]" : "border-gray-700 bg-black text-gray-300 hover:border-gray-500"}`}
+              >
+                {opportunity.favourite ? "★ Favourite" : "☆ Favourite"}
+              </button>
+              <button
+                type="button"
+                aria-pressed={opportunity.hidden}
+                onClick={() => void onUpdate(listingId, { hidden: !opportunity.hidden })}
+                className={`rounded border px-3 py-3 text-sm font-bold ${opportunity.hidden ? "border-red-500/60 bg-red-500/10 text-red-300" : "border-gray-700 bg-black text-gray-300 hover:border-gray-500"}`}
+              >
+                {opportunity.hidden ? "Hidden" : "Hide"}
+              </button>
+            </div>
+
+            <AdvertLink url={opportunity["Advert URL"]} className="mt-4 w-full" />
+          </aside>
+        </div>
+      </section>
     </div>
   );
 }
@@ -633,6 +726,15 @@ function DetailItem({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-gray-800 bg-black p-4">
       <p className="text-xs uppercase text-gray-500">{label}</p>
       <p className="mt-2 break-words font-medium">{value}</p>
+    </div>
+  );
+}
+
+function ModalMetric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="rounded border border-gray-800 bg-black p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">{label}</p>
+      <p className={`mt-1 break-words text-base font-bold ${accent ? "text-[#00E51D]" : "text-white"}`}>{value || "—"}</p>
     </div>
   );
 }
