@@ -32,6 +32,8 @@ export interface StockBike {
   bodyStyle?: string;
   fuel?: string;
   transmission?: string;
+  variant?: string;
+  category?: string;
 }
 
 type AirtableRecord = { id:string; createdTime?:string; fields?:Record<string,unknown> };

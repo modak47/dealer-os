@@ -86,5 +86,7 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
     bodyStyle:mapped.body_style??"",
     fuel:mapped.fuel??"",
     transmission:mapped.transmission??"",
+    variant:mapped.variant??"",
+    category:mapped.category??"",
   };
 }

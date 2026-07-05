@@ -11,6 +11,7 @@ export interface PublicStockBike {
   colour:string; engineCc:number; motExpiry:string; registrationDate:string; previousOwners:string;
   engineNumber:string; derivativeId:string; displayStatus:string; attentionGrabber:string;
   bodyStyle:string; fuel:string; transmission:string;
+  variant:string; category:string;
 }
 export type StockStats={totalStock:number;liveStock:number;reserved:number;sold:number;prep:number;totalRetailValue:number};
 
@@ -47,7 +48,7 @@ export function toPublicBike(bike:StockBike):PublicStockBike{const images=Array.
   monthly:Math.max(0,Math.round(bike.price/53)),description:bike.description||bike.notes,
   colour:bike.colour??"",engineCc:bike.engineCc??0,motExpiry:bike.motExpiry??"",registrationDate:bike.registrationDate??"",previousOwners:bike.previousOwners??"",
   engineNumber:bike.engineNumber??"",derivativeId:bike.derivativeId??"",displayStatus:bike.displayStatus??"",attentionGrabber:bike.attentionGrabber??"",
-  bodyStyle:bike.bodyStyle??"",fuel:bike.fuel??"",transmission:bike.transmission??""
+  bodyStyle:bike.bodyStyle??"",fuel:bike.fuel??"",transmission:bike.transmission??"",variant:bike.variant??"",category:bike.category??""
 }}
 export async function getActiveStockBikes():Promise<StockBike[]>{return(await getAllStockBikes()).filter(isActive)}
 export async function getPublicStockBikes():Promise<PublicStockBike[]>{return(await getAllStockBikes()).filter(isPublic).map(toPublicBike)}
