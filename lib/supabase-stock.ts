@@ -23,13 +23,17 @@ const internalVariant=(value:unknown)=>{const text=cleanText(value);return !text
 
 export function normalizeSupabaseStockBike(bike:SupabaseStockBike):SupabaseStockBike{
   const dealer5=bike.dealer5_data&&typeof bike.dealer5_data==="object"?bike.dealer5_data:{};
+  const advertSections=bike.advert_sections&&typeof bike.advert_sections==="object"&&!Array.isArray(bike.advert_sections)?bike.advert_sections:{};
   const nested=(dealer5 as {fields?:unknown}).fields;
   const fields=nested&&typeof nested==="object"&&!Array.isArray(nested)?nested as Record<string,unknown>:{};
   const field=(...names:string[])=>{for(const name of names){const value=fields[name];if(!empty(value))return value}return null};
-  const imageUrls=Array.from(new Set((Array.isArray(bike.image_urls)?bike.image_urls:[]).filter((value):value is string=>typeof value==="string").map(value=>value.trim()).filter(Boolean)));
+  const sourceImages=Array.from(new Set((Array.isArray(bike.image_urls)?bike.image_urls:[]).filter((value):value is string=>typeof value==="string").map(value=>value.trim()).filter(Boolean)));
+  const savedOrder=Array.isArray(advertSections._manual_image_order)?advertSections._manual_image_order.filter((value):value is string=>typeof value==="string"&&Boolean(value.trim())).map(value=>value.trim()):[];
+  const imageUrls=savedOrder.length?[...savedOrder.filter(value=>sourceImages.includes(value)),...sourceImages.filter(value=>!savedOrder.includes(value))]:sourceImages;
   const genuineImages=imageUrls.filter(value=>!/awaiting.?preparation|awaiting.?prep|placeholder|coming.?soon|no.?image/i.test(value));
   const displayImages=genuineImages.length?genuineImages:imageUrls;
-  const requestedPrimary=cleanText(bike.primary_image_url);
+  const savedPrimary=cleanText(advertSections._manual_primary_image_url);
+  const requestedPrimary=savedPrimary&&displayImages.includes(savedPrimary)?savedPrimary:cleanText(bike.primary_image_url);
   const primaryIsPreparation=/awaiting.?preparation|awaiting.?prep|placeholder|coming.?soon|no.?image/i.test(requestedPrimary);
   const cd5Image=displayImages.find(value=>/cd5/i.test(value));
   const durableImage=displayImages.find(value=>!/airtableusercontent\.com/i.test(value));
