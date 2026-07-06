@@ -1,3 +1,15 @@
-import {notFound} from "next/navigation";import Link from "next/link";import {AdminPage} from "../../dashboard/page";import {getCrmLead} from "@/lib/crm";
-export const dynamic="force-dynamic";
-export default async function LeadDetail({params}:{params:Promise<{id:string}>}){const {id}=await params;const result=await getCrmLead(id);if(!result.data)notFound();const lead=result.data;const customer=lead.customer;return <AdminPage title={customer?`${customer.first_name} ${customer.last_name}`:"Lead details"} sub={`${lead.source} lead · ${lead.status}`} actions={<div className="quick-actions">{customer&&<Link href={`/admin/customers/${customer.id}`}>View customer</Link>}<Link href="/admin/leads">Back to pipeline</Link></div>}><div className="crm-detail-grid"><section className="stock-editor-panel crm-summary"><h2>Opportunity</h2><dl><div><dt>Status</dt><dd>{lead.status}</dd></div><div><dt>Interest</dt><dd>{lead.interest_level||"—"}</dd></div><div><dt>Budget</dt><dd>{lead.budget_max?`Up to £${Number(lead.budget_max).toLocaleString("en-GB")}`:"—"}</dd></div><div><dt>Trade-in</dt><dd>{lead.trade_in?"Yes":"No"}</dd></div><div><dt>Bike</dt><dd>{lead.bike?`${lead.bike.make} ${lead.bike.model}`:lead.preferred_bike_notes||"—"}</dd></div></dl></section><section className="stock-editor-panel crm-summary"><h2>Notes</h2><p>{lead.notes||"No notes recorded."}</p><h2>Next actions</h2><div className="quick-actions">{customer&&<Link href={`/admin/customers/${customer.id}`}>Customer timeline</Link>}<Link href="/admin/stock">Select stock</Link></div></section></div></AdminPage>}
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { AdminPage } from "../../dashboard/page";
+import { getCrmLead } from "@/lib/crm";
+import { LeadEditor } from "./lead-editor";
+
+export const dynamic = "force-dynamic";
+export default async function LeadDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params; const result = await getCrmLead(id); if (!result.data) notFound();
+  const lead = result.data, customer = lead.customer;
+  return <AdminPage title={customer ? `${customer.first_name} ${customer.last_name}` : "Lead details"} sub={`${lead.source} lead · ${lead.status}`} actions={<div className="quick-actions">{customer && <Link href={`/admin/customers/${customer.id}`}>View customer</Link>}<Link href="/admin/leads">Back to pipeline</Link></div>}>
+    <div className="crm-detail-grid"><section className="stock-editor-panel crm-summary"><h2>Opportunity</h2><dl><div><dt>Status</dt><dd>{lead.status}</dd></div><div><dt>Interest</dt><dd>{lead.interest_level || "—"}</dd></div><div><dt>Budget</dt><dd>{lead.budget_max ? `Up to £${Number(lead.budget_max).toLocaleString("en-GB")}` : "—"}</dd></div><div><dt>Trade-in</dt><dd>{lead.trade_in ? "Yes" : "No"}</dd></div><div><dt>Bike</dt><dd>{lead.bike ? `${lead.bike.make} ${lead.bike.model}` : lead.preferred_bike_notes || "—"}</dd></div>{lead.lost_reason && <div><dt>Lost reason</dt><dd>{lead.lost_reason}</dd></div>}</dl></section><section className="stock-editor-panel crm-summary"><h2>Notes</h2><p>{lead.notes || "No notes recorded."}</p><h2>Next actions</h2><div className="quick-actions">{customer && <Link href={`/admin/sales/new?customer=${customer.id}`}>Start sale</Link>}<Link href="/admin/stock">Select stock</Link></div></section></div>
+    <LeadEditor lead={lead} />
+  </AdminPage>;
+}

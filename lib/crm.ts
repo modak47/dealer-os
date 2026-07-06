@@ -8,7 +8,7 @@ export interface CrmCustomer {
 }
 export interface CrmLead {
   id:string; customer_id:string|null; source:string; status:string; interest_level:string|null; budget_min:number|null; budget_max:number|null;
-  preferred_bike_id:string|null; preferred_bike_notes:string|null; trade_in:boolean; notes:string|null; assigned_user_id:string|null;
+  preferred_bike_id:string|null; preferred_bike_notes:string|null; trade_in:boolean; trade_in_registration:string|null; lost_reason:string|null; notes:string|null; assigned_user_id:string|null;
   created_at:string; updated_at:string; customer?:Pick<CrmCustomer,"id"|"first_name"|"last_name"|"email"|"phone">|null;
   bike?:{id:string;make:string|null;model:string|null;registration:string|null}|null;
 }
