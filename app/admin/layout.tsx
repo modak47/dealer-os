@@ -1,2 +1,3 @@
 import {AdminShell} from "./admin-shell";
-export default function AdminLayout({children}:{children:React.ReactNode}){return <AdminShell>{children}</AdminShell>}
+import {getAdminIdentity} from "@/lib/admin-identity";
+export default async function AdminLayout({children}:{children:React.ReactNode}){const identity=await getAdminIdentity();return <AdminShell identity={identity}>{children}</AdminShell>}
