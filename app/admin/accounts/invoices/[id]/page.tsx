@@ -1,0 +1,2 @@
+import {notFound} from "next/navigation";import {AdminPage} from "../../../dashboard/page";import {getInvoice} from "@/lib/accounts";import {InvoiceEditor} from "./invoice-editor";
+export const dynamic="force-dynamic";export default async function InvoiceDetail({params}:{params:Promise<{id:string}>}){try{const data=await getInvoice((await params).id);return <AdminPage title={data.invoice.invoice_number} sub="Invoice details, line items and payment history."><InvoiceEditor initial={data as never}/></AdminPage>}catch{return notFound()}}

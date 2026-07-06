@@ -1,0 +1,2 @@
+import {AdminPage} from "../../../dashboard/page";import {getInvoiceableReservations} from "@/lib/accounts";import {InvoiceCreateForm} from "./invoice-create-form";
+export const dynamic="force-dynamic";export default async function NewInvoice(){const reservations=await getInvoiceableReservations();return <AdminPage title="Create invoice" sub="Choose a reservation and confirm the delivery charge and due date."><InvoiceCreateForm reservations={reservations as never[]}/></AdminPage>}
