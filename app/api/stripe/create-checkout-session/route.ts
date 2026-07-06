@@ -7,8 +7,15 @@ export async function POST(request: Request) {
   let checkoutId: string | null = null; let bikeId: number | null = null; let stripeSessionId: string | null = null;
   try {
     const body = await request.json() as Record<string, unknown>;
-    bikeId = stockId(body.stock_bike_id); const firstName = cleanText(body.first_name, 100), lastName = cleanText(body.last_name, 100), email = cleanEmail(body.email), phone = cleanPhone(body.phone);
-    if (!bikeId || !firstName || !lastName || !email || !phone || body.consent !== true) throw new Error("Please complete all reservation details and accept the reservation terms.");
+    bikeId = stockId(body.stock_bike_id); const firstName = cleanText(body.first_name ?? body.firstName, 100), lastName = cleanText(body.last_name ?? body.lastName, 100), email = cleanEmail(body.email), phone = cleanPhone(body.phone), acceptedTerms = body.consent === true || body.acceptedTerms === true;
+    const validation={bikeIdValid:Boolean(bikeId),firstNameValid:Boolean(firstName),lastNameValid:Boolean(lastName),emailValid:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),phoneValid:/^\+?[0-9 ()-]{7,20}$/.test(phone),acceptedTerms};
+    console.info("[Stripe checkout] validation",validation);
+    if(!validation.bikeIdValid)throw new Error("This motorcycle could not be identified. Please refresh the page.");
+    if(!validation.firstNameValid)throw new Error("Enter your first name.");
+    if(!validation.lastNameValid)throw new Error("Enter your last name.");
+    if(!validation.emailValid)throw new Error("Enter a valid email address.");
+    if(!validation.phoneValid)throw new Error("Enter a valid phone number, for example +447904443965.");
+    if(!validation.acceptedTerms)throw new Error("Please accept the reservation terms.");
     const db = getSupabaseAdmin();
     const { data: bike, error: bikeError } = await db.from("stock_bikes").select("id,make,model,variant,year,registration,status,price,reserve_enabled,show_on_website").eq("id", bikeId).maybeSingle();
     if (bikeError) throw bikeError; if (!bike) throw new Error("Motorcycle not found.");

@@ -1,0 +1,1 @@
+export default function BikeDetailLoading(){return <main className="public-bike-loading" role="status" aria-live="polite"><div><i/><p>OPENING MOTORCYCLE</p><h1>Loading bike details…</h1><span>Preparing photographs, specification and advert information.</span></div></main>}

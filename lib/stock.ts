@@ -1,7 +1,7 @@
 import "server-only";
 import { getAirtableStock, type StockBike } from "@/lib/airtable";
 import { bikes as mockBikes } from "@/lib/mock-data";
-import { getSupabaseStockBikes, toAdminStockBike } from "@/lib/supabase-stock";
+import { getSupabasePublicStockBikes, getSupabaseStockBikeByPublicIdentifier, getSupabaseStockBikes, toAdminStockBike } from "@/lib/supabase-stock";
 
 export type { StockBike } from "@/lib/airtable";
 export type CustomerStatus="In Stock"|"Reserved";
@@ -55,15 +55,19 @@ export function toPublicBike(bike:StockBike):PublicStockBike{const fields=bike.d
   bodyStyle:customerText(field("Body Type")||bike.bodyStyle),fuel:customerText(field("Fuel")||bike.fuel),transmission:customerText(field("Transmission")||bike.transmission),variant:safeVariant,category:customerText(bike.category)
 }}
 export async function getActiveStockBikes():Promise<StockBike[]>{return(await getAllStockBikes()).filter(isActive)}
-export async function getPublicStockBikes():Promise<PublicStockBike[]>{return(await getAllStockBikes()).filter(isPublic).map(toPublicBike)}
+export async function getPublicStockBikes():Promise<PublicStockBike[]>{try{const result=await getSupabasePublicStockBikes();if(result.stock.length)return result.stock.map(toAdminStockBike).filter(isPublic).map(toPublicBike)}catch(error){console.error("Unable to load optimised public stock",error)}return(await getAllStockBikes()).filter(isPublic).map(toPublicBike)}
 export async function getSoldStockBikes():Promise<StockBike[]>{return(await getAllStockBikes()).filter(isSold)}
 export async function getFeaturedBikes(limit=4):Promise<PublicStockBike[]>{
-  const stock=(await getAllStockBikes()).filter(isPublic).sort((a,b)=>Date.parse(b.createdTime||"0")-Date.parse(a.createdTime||"0"));
-  return stock.slice(0,limit).map(toPublicBike)
+  const stock=(await getPublicStockBikes()).sort((a,b)=>Date.parse(b.createdTime||"0")-Date.parse(a.createdTime||"0"));
+  return stock.slice(0,limit)
 }
+const toPublicDetail=(bike:StockBike):PublicStockDetailBike=>{const raw=bike.advertSections??{};const section=(...keys:string[])=>{for(const key of keys){const value=text(raw[key]);if(value)return value}return ""};const advertSections={...raw,headline:section("headline","advert_headline"),intro:section("intro","intro_description"),key_details:section("key_details"),fitted_extras:section("fitted_extras"),preparation:section("preparation","preparation_work"),included:section("included","included_before_delivery"),why_buy:section("why_buy","why_buy_from_yesmoto"),finance:section("finance","finance_options")};return {...toPublicBike(bike),specifications:bike.specifications??{},dealer5Fields:bike.dealer5Fields??{},advertSections}};
 export async function getBikeBySlugOrId(value:string):Promise<PublicStockDetailBike|null>{
-  const stock=(await getAllStockBikes()).filter(isPublic);
-  const bike=stock.find(b=>b.id===value||toPublicBike(b).slug===value);if(!bike)return null;const raw=bike.advertSections??{};const section=(...keys:string[])=>{for(const key of keys){const value=text(raw[key]);if(value)return value}return ""};const advertSections={...raw,headline:section("headline","advert_headline"),intro:section("intro","intro_description"),key_details:section("key_details"),fitted_extras:section("fitted_extras"),preparation:section("preparation","preparation_work"),included:section("included","included_before_delivery"),why_buy:section("why_buy","why_buy_from_yesmoto"),finance:section("finance","finance_options")};return {...toPublicBike(bike),specifications:bike.specifications??{},dealer5Fields:bike.dealer5Fields??{},advertSections}
+  const direct=await getSupabaseStockBikeByPublicIdentifier(value);console.info("[Public bike lookup]",{requestedSlug:value,lookupMethod:direct.method,found:Boolean(direct.bike)});
+  if(direct.bike){const mapped=toAdminStockBike(direct.bike);if(isPublic(mapped))return toPublicDetail(mapped)}
+  if(!["supabase-not-configured","index-error"].includes(direct.method)){console.info("[Public bike lookup] all lookup methods exhausted",{requestedSlug:value});return null}
+  const fallback=(await getAllStockBikes()).filter(isPublic).find(b=>b.id===value||toPublicBike(b).slug===value);
+  console.info("[Public bike lookup fallback]",{requestedSlug:value,found:Boolean(fallback)});return fallback?toPublicDetail(fallback):null;
 }
 export async function getStockStats():Promise<StockStats>{const all=await getAllStockBikes();const active=all.filter(isActive);return{
   totalStock:active.length,liveStock:active.filter(b=>["in stock","on forecourt"].includes(normaliseStockStatus(b.status))).length,
