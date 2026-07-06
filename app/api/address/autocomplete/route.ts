@@ -1,0 +1,2 @@
+import {NextResponse} from "next/server";import {AddressServiceError,searchAddresses} from "@/lib/services/addressService";
+export async function GET(request:Request){const query=new URL(request.url).searchParams.get("q")?.trim()??"";if(query.length<2)return NextResponse.json({suggestions:[]});try{return NextResponse.json({suggestions:await searchAddresses(query)})}catch(error){const status=error instanceof AddressServiceError?error.status:500;return NextResponse.json({error:error instanceof Error?error.message:"Unable to search addresses."},{status})}}

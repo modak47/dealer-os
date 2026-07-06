@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export interface CrmCustomer {
   id:string; title:string|null; first_name:string; last_name:string; email:string|null; phone:string|null;
-  postcode:string|null; tags:string[]; notes:string|null; assigned_user_id:string|null; created_at:string; updated_at:string;
+  house_name_number?:string|null;address_line_1?:string|null;address_line_2?:string|null;address_line_3?:string|null;city?:string|null;county?:string|null;postcode:string|null;country?:string|null;latitude?:number|null;longitude?:number|null; tags:string[]; notes:string|null; assigned_user_id:string|null; created_at:string; updated_at:string;
 }
 export interface CrmLead {
   id:string; customer_id:string|null; source:string; status:string; interest_level:string|null; budget_min:number|null; budget_max:number|null;
@@ -20,8 +20,8 @@ export type CrmResult<T>={data:T;migrationReady:boolean;error?:string};
 const missing=(error:{message?:string}|null)=>Boolean(error&&/does not exist|schema cache|relation .*crm_/i.test(error.message??""));
 
 export async function getCrmCustomers(query=""):Promise<CrmResult<CrmCustomer[]>>{
-  let request=getSupabaseAdmin().from("crm_customers").select("id,title,first_name,last_name,email,phone,postcode,tags,notes,assigned_user_id,created_at,updated_at").is("archived_at",null).order("updated_at",{ascending:false}).limit(100);
-  if(query.trim())request=request.or(`first_name.ilike.%${query.trim()}%,last_name.ilike.%${query.trim()}%,email.ilike.%${query.trim()}%,phone.ilike.%${query.trim()}%,postcode.ilike.%${query.trim()}%`);
+  let request=getSupabaseAdmin().from("crm_customers").select("*").is("archived_at",null).order("updated_at",{ascending:false}).limit(100);
+  if(query.trim())request=request.or(`first_name.ilike.%${query.trim()}%,last_name.ilike.%${query.trim()}%,email.ilike.%${query.trim()}%,phone.ilike.%${query.trim()}%,house_name_number.ilike.%${query.trim()}%,address_line_1.ilike.%${query.trim()}%,address_line_2.ilike.%${query.trim()}%,address_line_3.ilike.%${query.trim()}%,city.ilike.%${query.trim()}%,county.ilike.%${query.trim()}%,postcode.ilike.%${query.trim()}%`);
   const {data,error}=await request;if(error)return {data:[],migrationReady:!missing(error),error:error.message};return {data:(data??[]) as CrmCustomer[],migrationReady:true};
 }
 export async function getCrmCustomer(id:string){

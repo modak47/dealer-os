@@ -1,0 +1,2 @@
+import {NextResponse} from "next/server";import {AddressServiceError,getAddress} from "@/lib/services/addressService";
+export async function GET(request:Request){const id=new URL(request.url).searchParams.get("id")?.trim()??"";if(!id)return NextResponse.json({error:"Address ID is required."},{status:400});try{return NextResponse.json({address:await getAddress(id)})}catch(error){const status=error instanceof AddressServiceError?error.status:500;return NextResponse.json({error:error instanceof Error?error.message:"Unable to retrieve address."},{status})}}
