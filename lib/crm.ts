@@ -36,13 +36,14 @@ export async function getCrmLeads(status=""):Promise<CrmResult<CrmLead[]>>{
 }
 export async function getCrmLead(id:string){const {data,error}=await getSupabaseAdmin().from("crm_leads").select("*,customer:crm_customers(*),bike:stock_bikes(id,make,model,variant,registration,primary_image_url,price)").eq("id",id).maybeSingle();return {data:data as unknown as CrmLead|null,migrationReady:!missing(error),error:error?.message};}
 export async function getCustomerTimeline(customerId:string){
-  const db=getSupabaseAdmin();const [activities,enquiries,reservations,leads]=await Promise.all([
+  const db=getSupabaseAdmin();const [activities,enquiries,reservations,leads,sales]=await Promise.all([
     db.from("crm_activities").select("*").eq("customer_id",customerId).order("created_at",{ascending:false}).limit(100),
     db.from("crm_enquiries").select("*,bike:stock_bikes(id,make,model)").eq("customer_id",customerId).order("created_at",{ascending:false}),
     db.from("crm_reservations").select("*,bike:stock_bikes(id,make,model,registration)").eq("customer_id",customerId).order("created_at",{ascending:false}),
     db.from("crm_leads").select("*").eq("customer_id",customerId).order("created_at",{ascending:false}),
+    db.from("crm_sales").select("id,status,invoice_number,sale_price,created_at,bike:stock_bikes(id,make,model,registration)").eq("customer_id",customerId).order("created_at",{ascending:false}),
   ]);
-  return {activities:(activities.data??[]) as CrmActivity[],enquiries:(enquiries.data??[]) as unknown as CrmEnquiry[],reservations:(reservations.data??[]) as unknown as CrmReservation[],leads:(leads.data??[]) as CrmLead[]};
+  return {activities:(activities.data??[]) as CrmActivity[],enquiries:(enquiries.data??[]) as unknown as CrmEnquiry[],reservations:(reservations.data??[]) as unknown as CrmReservation[],leads:(leads.data??[]) as CrmLead[],sales:(sales.data??[]) as unknown as Array<{id:string;status:string;invoice_number:string|null;sale_price:number|null;created_at:string;bike?:{make:string|null;model:string|null;registration:string|null}|null}>};
 }
 export async function getCrmDashboard(){
   const db=getSupabaseAdmin();await db.rpc("crm_expire_reservations");const today=new Date();today.setHours(0,0,0,0);const month=new Date(today.getFullYear(),today.getMonth(),1).toISOString();
