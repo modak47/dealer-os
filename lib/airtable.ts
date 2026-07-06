@@ -95,3 +95,15 @@ export async function getAirtableStock():Promise<StockBike[]|null> {
   } while(offset);
   return records.map(mapRecord);
 }
+
+export async function syncAirtableStockImageOrder(registration:string,imageUrls:string[]):Promise<"updated"|"not-configured"|"not-found">{
+  const apiKey=process.env.AIRTABLE_API_KEY;const baseId=process.env.AIRTABLE_BASE_ID;const tableName=process.env.AIRTABLE_STOCK_TABLE_NAME||"Motorcycle Stock";
+  if(!apiKey||!baseId)return "not-configured";
+  const endpoint=`https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}`;
+  const headers={Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"};
+  const lookup=new URL(endpoint);lookup.searchParams.set("maxRecords","1");lookup.searchParams.set("filterByFormula",`UPPER({Registration Number})='${registration.trim().toUpperCase().replace(/'/g,"\\'")}'`);lookup.searchParams.append("fields[]","Registration Number");
+  const found=await fetch(lookup,{headers,cache:"no-store"});if(!found.ok)throw new Error(`Airtable image-order lookup failed (${found.status}).`);
+  const record=(await found.json() as AirtablePage).records?.[0];if(!record)return "not-found";
+  const saved=await fetch(`${endpoint}/${record.id}`,{method:"PATCH",headers,body:JSON.stringify({fields:{"Stock Image":imageUrls.map(url=>({url}))}}),cache:"no-store"});
+  if(!saved.ok)throw new Error(`Airtable image-order update failed (${saved.status}).`);return "updated";
+}

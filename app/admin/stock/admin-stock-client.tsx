@@ -29,7 +29,7 @@ export function AdminStockTable({bikes,initialFilter="active",initialQuery="",wa
 function StockManagerCard({bike}:{bike:SupabaseStockBike}){
   const router=useRouter();
   const href=`/admin/stock/${bike.id}`;
-  const images=Array.from(new Set([bike.primary_image_url,...bike.image_urls].filter((value):value is string=>Boolean(value))));
+  const images=Array.from(new Set(bike.image_urls.filter((value):value is string=>Boolean(value))));
   const image=images[0];
   const statusClass=normal(bike.status).replaceAll(" ","-");
   return <article className="admin-stock-card" role="link" tabIndex={0} onClick={()=>router.push(href)} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();router.push(href)}}}>

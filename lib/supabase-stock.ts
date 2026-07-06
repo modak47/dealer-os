@@ -53,24 +53,15 @@ const internalVariant=(value:unknown)=>{const text=cleanText(value);return !text
 
 export function normalizeSupabaseStockBike(bike:SupabaseStockBike):SupabaseStockBike{
   const dealer5=bike.dealer5_data&&typeof bike.dealer5_data==="object"?bike.dealer5_data:{};
-  const advertSections=bike.advert_sections&&typeof bike.advert_sections==="object"&&!Array.isArray(bike.advert_sections)?bike.advert_sections:{};
   const nested=(dealer5 as {fields?:unknown}).fields;
   const fields=nested&&typeof nested==="object"&&!Array.isArray(nested)?nested as Record<string,unknown>:{};
   const field=(...names:string[])=>{for(const name of names){const value=fields[name];if(!empty(value))return value}return null};
   const sourceImages=dedupeImages((Array.isArray(bike.image_urls)?bike.image_urls:[]).filter((value):value is string=>typeof value==="string").map(value=>value.trim()).filter(Boolean));
-  const savedOrder=Array.isArray(advertSections._manual_image_order)?advertSections._manual_image_order.filter((value):value is string=>typeof value==="string"&&Boolean(value.trim())).map(value=>value.trim()):[];
-  const imageUrls=dedupeImages(savedOrder.length?[...savedOrder.filter(value=>sourceImages.includes(value)),...sourceImages.filter(value=>!savedOrder.includes(value))]:sourceImages);
-  const genuineImages=imageUrls.filter(value=>!/awaiting.?preparation|awaiting.?prep|placeholder|coming.?soon|no.?image/i.test(value));
-  const displayImages=genuineImages.length?genuineImages:imageUrls;
-  const savedPrimary=cleanText(advertSections._manual_primary_image_url);
-  const requestedPrimary=savedPrimary&&displayImages.includes(savedPrimary)?savedPrimary:cleanText(bike.primary_image_url);
-  const primaryIsPreparation=/awaiting.?preparation|awaiting.?prep|placeholder|coming.?soon|no.?image/i.test(requestedPrimary);
-  const cd5Image=displayImages.find(value=>/cd5/i.test(value));
-  const durableImage=displayImages.find(value=>!/airtableusercontent\.com/i.test(value));
-  const primaryImage=(/cd5/i.test(requestedPrimary)&&!primaryIsPreparation?requestedPrimary:cd5Image)||(requestedPrimary&&!primaryIsPreparation&&!/airtableusercontent\.com/i.test(requestedPrimary)?requestedPrimary:durableImage)||(!primaryIsPreparation?requestedPrimary:"")||displayImages[0]||null;
+  const imageUrls=sourceImages;
+  const primaryImage=imageUrls[0]||null;
   return {
     ...bike,
-    image_urls:displayImages,
+    image_urls:imageUrls,
     primary_image_url:primaryImage,
     variant:internalVariant(bike.variant)?cleanText(field("Variant","Trim"))||null:bike.variant,
     description:empty(bike.description)?cleanText(field("Confirm Spec","Advert Description","Full Description","Description"))||null:bike.description,
@@ -105,7 +96,7 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
   const normalizedStatus=status.trim().toLowerCase().replace(/[_-]+/g," ");
   const mapped=normalizeSupabaseStockBike(bike);
   const images=mapped.image_urls;
-  const primaryImage=mapped.primary_image_url||images[0]||"/bike-placeholder.svg";
+  const primaryImage=images[0]||"/bike-placeholder.svg";
   const dealer5Fields=mapped.dealer5_data&&typeof mapped.dealer5_data==="object"&&typeof (mapped.dealer5_data as {fields?:unknown}).fields==="object"?(mapped.dealer5_data as {fields:Record<string,unknown>}).fields:{};
   return {
     id:bike.id,

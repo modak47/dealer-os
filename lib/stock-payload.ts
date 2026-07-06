@@ -14,7 +14,7 @@ export function sanitiseStockPayload(body:Record<string,unknown>){
   for(const key of booleanFields)if(key in body)payload[key]=Boolean(body[key]);
   for(const key of objectFields)if(key in body){const value=body[key];if(!value||typeof value!=="object"||Array.isArray(value))throw new Error(`${key} must be an object.`);payload[key]=value}
   if("features" in body){if(!Array.isArray(body.features))throw new Error("features must be an array.");payload.features=body.features}
-  if("image_urls" in body){if(!Array.isArray(body.image_urls))throw new Error("image_urls must be an array.");payload.image_urls=Array.from(new Set(body.image_urls.filter((value):value is string=>typeof value==="string").map(value=>value.trim()).filter(Boolean)))}
+  if("image_urls" in body){if(!Array.isArray(body.image_urls))throw new Error("image_urls must be an array.");const seen=new Set<string>();const images=body.image_urls.filter((value):value is string=>typeof value==="string").map(value=>value.trim()).filter(value=>{if(!value)return false;let key=value.toLowerCase();try{const url=new URL(value);key=`${url.origin}${url.pathname}`.toLowerCase().replace("/w200/","/")}catch{key=key.split("?")[0].replace("/w200/","/")}if(seen.has(key))return false;seen.add(key);return true});payload.image_urls=images;payload.primary_image_url=images[0]??null}
   return payload;
 }
 
