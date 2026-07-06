@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
 
 const protectedApiPaths=new Set(["/api/vrm-lookup","/api/hpi-test","/api/postcode-lookup"]);
-const protectedApiPrefixes=["/api/opportunities","/api/retail-check","/api/retail-history","/api/scanner-status","/api/run-opportunity-scan","/api/makes","/api/models","/api/crm","/api/address"];
+const protectedApiPrefixes=["/api/opportunities","/api/retail-check","/api/retail-history","/api/scanner-status","/api/run-opportunity-scan","/api/makes","/api/models","/api/crm"];
 
 export async function proxy(request:NextRequest){
   const pathname=request.nextUrl.pathname;
@@ -33,4 +33,4 @@ export async function proxy(request:NextRequest){
   return response;
 }
 
-export const config={matcher:["/admin/:path*","/api/vrm-lookup","/api/hpi-test","/api/postcode-lookup","/api/opportunities/:path*","/api/retail-check/:path*","/api/retail-history/:path*","/api/scanner-status/:path*","/api/run-opportunity-scan","/api/makes/:path*","/api/models/:path*","/api/stock/:path*","/api/crm/:path*","/api/address/:path*"]};
+export const config={matcher:["/admin/:path*","/api/vrm-lookup","/api/hpi-test","/api/postcode-lookup","/api/opportunities/:path*","/api/retail-check/:path*","/api/retail-history/:path*","/api/scanner-status/:path*","/api/run-opportunity-scan","/api/makes/:path*","/api/models/:path*","/api/stock/:path*","/api/crm/:path*"]};
