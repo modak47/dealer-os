@@ -14,7 +14,6 @@ const moreLinks=[
   {name:"Motorcycle Preparation",href:"/motorcycle-preparation",description:"How every bike is prepared"},
   {name:"Why Buy From Us",href:"/why-buy-from-yesmoto",description:"The YesMoto difference"},
   {name:"Used Bike Warranty",href:"/used-motorcycle-warranty",description:"Ride away with confidence"},
-  {name:"Dealer Portal",href:"/admin",description:"Staff login to DealerOS"},
 ];
 
 export function Header(){
@@ -22,7 +21,6 @@ export function Header(){
   const [moreOpen,setMoreOpen]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
   const dropdownRef=useRef<HTMLDivElement>(null);
-
   const closeMenus=()=>{setMoreOpen(false);setMobileOpen(false)};
 
   useEffect(()=>{closeMenus()},[pathname]);
@@ -44,8 +42,8 @@ export function Header(){
           {moreOpen&&<div role="menu">{moreLinks.map(item=><Link role="menuitem" href={item.href} onClick={closeMenus} key={item.href}><b>{item.name}</b><span>{item.description}</span></Link>)}</div>}
         </div>
       </nav>
-      <div className="head-actions"><Link href="/used-bikes" onClick={closeMenus} aria-label="Search"><Search/></Link><Link href="/used-bikes?favourites=true" onClick={closeMenus} aria-label="Favourites"><Heart/></Link><a href={phoneHref} className="phone"><Phone/><span><b>{dealership.phone}</b><small>{dealership.openingHours}</small></span></a></div>
-      <div className={`mobile-nav ${mobileOpen?"open":""}`}><button type="button" onClick={()=>setMobileOpen(open=>!open)} aria-label="Open navigation" aria-expanded={mobileOpen}><Menu/></button>{mobileOpen&&<div>{nav.map(([name,href])=><Link href={href} onClick={closeMenus} key={name}>{name}<span>→</span></Link>)}<p>MORE</p>{moreLinks.map(item=><Link href={item.href} onClick={closeMenus} key={item.href}>{item.name}<span>→</span></Link>)}</div>}</div>
+      <div className="head-actions"><Link href="/admin" className="staff-login" onClick={closeMenus}>Staff Login</Link><Link href="/used-bikes" onClick={closeMenus} aria-label="Search"><Search/></Link><Link href="/used-bikes?favourites=true" onClick={closeMenus} aria-label="Favourites"><Heart/></Link><a href={phoneHref} className="phone"><Phone/><span><b>{dealership.phone}</b><small>{dealership.openingHours}</small></span></a></div>
+      <div className={`mobile-nav ${mobileOpen?"open":""}`}><button type="button" onClick={()=>setMobileOpen(open=>!open)} aria-label="Open navigation" aria-expanded={mobileOpen}><Menu/></button>{mobileOpen&&<div><Link href="/admin" className="mobile-staff-login" onClick={closeMenus}>Staff Login<span>→</span></Link>{nav.map(([name,href])=><Link href={href} onClick={closeMenus} key={name}>{name}<span>→</span></Link>)}<p>MORE</p>{moreLinks.map(item=><Link href={item.href} onClick={closeMenus} key={item.href}>{item.name}<span>→</span></Link>)}</div>}</div>
     </div></header>
   </>;
 }
