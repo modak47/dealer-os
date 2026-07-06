@@ -63,17 +63,17 @@ function parseDescription(text:string,attention:string):DescriptionSection[]{
 }
 
 function DescriptionContent({text,attention,structured}:{text:string;attention:string;structured:Record<string,unknown>}){
-  const canonicalSections:[string,string,string][]=[
-    ["headline","headline","YESMOTO"],
-    ["intro","Overview","ADVERT OVERVIEW"],
-    ["key_details","Key details","AT A GLANCE"],
-    ["fitted_extras","Fitted extras","EQUIPMENT"],
-    ["preparation","Preparation","WORKSHOP"],
-    ["included","Included before delivery","HANDOVER"],
-    ["why_buy","Why buy from YesMoto","WHY YESMOTO"],
-    ["finance","Finance options","FINANCE"],
+  const canonicalSections:[string,string,string,string[]][]=[
+    ["headline","Headline","YESMOTO",["headline","advert_headline"]],
+    ["intro","Overview","ADVERT OVERVIEW",["intro","intro_description"]],
+    ["key_details","Key Details","AT A GLANCE",["key_details"]],
+    ["fitted_extras","Fitted Extras","EQUIPMENT",["fitted_extras"]],
+    ["preparation","Preparation","WORKSHOP",["preparation","preparation_work"]],
+    ["included","Included Before Delivery","HANDOVER",["included","included_before_delivery"]],
+    ["why_buy","Why Buy From YesMoto","WHY YESMOTO",["why_buy","why_buy_from_yesmoto"]],
+    ["finance","Finance Options","FINANCE",["finance","finance_options"]],
   ];
-  const structuredSections:DescriptionSection[]=canonicalSections.map(([key,title])=>({key,title,content:typeof structured[key]==="string"?(structured[key] as string).replace(/[•●▪◦]\s*/g,"\n• ").split(/\n+/).map(line=>line.trim()).filter(Boolean):[]})).filter(section=>section.content.length);
+  const structuredSections:DescriptionSection[]=canonicalSections.map(([key,title,,aliases])=>{const value=aliases.map(alias=>structured[alias]).find(candidate=>typeof candidate==="string"&&candidate.trim()) as string|undefined;return {key,title,content:value?value.replace(/[•●▪◦]\s*/g,"\n• ").split(/\n+/).map(line=>line.trim()).filter(Boolean):[]}}).filter(section=>section.content.length);
   const sections=structuredSections.length?structuredSections:parseDescription(text,attention);
   return <div className="advert-sections">{sections.map(section=>{const bullets=section.content.filter(line=>/^[•*\-✓✔]/.test(line));const prose=section.content.filter(line=>!/^[•*\-✓✔]/.test(line));const eyebrow=canonicalSections.find(([key])=>key===section.key)?.[2]??"ADVERT DETAILS";return <article className={`advert-section ${section.key}`} key={`${section.key}-${section.title}`}><header><span>{eyebrow}</span><h3>{section.title}</h3></header><div>{prose.map((line,index)=>{const pieces=line.length>420?line.split(/(?<=[.!?])\s+(?=[A-Z])/).reduce<string[]>((groups,sentence)=>{const last=groups.at(-1)??"";if(last.length<240){groups[groups.length-1]=`${last} ${sentence}`.trim()}else groups.push(sentence);return groups},[""]).filter(Boolean):[line];return pieces.map((piece,pieceIndex)=><p key={`${index}-${pieceIndex}`}>{piece}</p>)})}{bullets.length>0&&<ul>{bullets.map((line,index)=><li key={index}>{line.replace(/^[•*\-✓✔]\s*/,"")}</li>)}</ul>}</div></article>})}</div>;
 }
@@ -82,7 +82,8 @@ export default async function Detail({params}:{params:Promise<{id:string}>}){
   const {id}=await params;const bike=await getBikeBySlugOrId(id);if(!bike)notFound();
   const related=await getPublicStockBikes();const gallery=bike.imageUrls.length?bike.imageUrls:[bike.image];const specs=makeSpecs(bike);
   const title=[bike.year,bike.make,bike.model,bike.variant].filter(Boolean).join(" ");const subtitle=[bike.mileage,bike.engineCc>0?`${bike.engineCc.toLocaleString("en-GB")}cc`:"",bike.bodyStyle||bike.category,bike.transmission].filter(Boolean).join(" · ");
-  const description=bike.description||`A superb example of the ${bike.make} ${bike.model}, professionally inspected and prepared by YesMoto.`;
+  const hasAdvertSections=Object.values(bike.advertSections).some(value=>typeof value==="string"&&Boolean(value.trim()));
+  const description=hasAdvertSections?"":bike.description||`A superb example of the ${bike.make} ${bike.model}, professionally inspected and prepared by YesMoto.`;
   const whatsappNumber=dealership.phone.replace(/^0/,"44").replace(/\D/g,"");const whatsapp=`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hi YesMoto, I'm interested in the ${title}.`)}`;
   const benefits:[string,string,IconType][]=[["Nationwide delivery","Specialist insured delivery throughout mainland UK.","bike"],["Finance available","Flexible options through trusted finance partners.","tax"],["Reserve for £99","Secure this motorcycle online at any time.","shield"],["HPI checked","Vehicle history checked before it is advertised.","shield"],["Warranty included","Nationwide cover on qualifying motorcycles.","shield"],["Prepared properly","Individually inspected before handover.","gear"]];
   return <main className="vehicle-detail premium-advert">
