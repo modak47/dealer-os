@@ -40,7 +40,7 @@ export async function getSupabaseStockBikes():Promise<StockApiResponse>{
 export async function getSupabasePublicStockBikes():Promise<StockApiResponse>{
   if(!isSupabaseConfigured)return {stock:[],configured:false,error:"Supabase is not configured."};
   const supabase=createClient(supabaseUrl,supabaseAnonKey,{auth:{persistSession:false,autoRefreshToken:false}});
-  const fields="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,category,body_style,fuel,transmission,primary_image_url,created_at,show_on_website,reserve_enabled,reservation_amount";
+  const fields="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,category,body_style,fuel,transmission,image_urls,primary_image_url,created_at,show_on_website,reserve_enabled,reservation_amount";
   const {data,error}=await supabase.from("stock_bikes").select(fields).in("status",["In Stock","ON FORECOURT","Available","Reserved"]).order("created_at",{ascending:false});
   if(error){console.error("Unable to load public Supabase stock",{code:error.code,message:error.message});return {stock:[],configured:true,error:"Unable to load stock."}}
   return {stock:(data??[]).map(row=>normalizeSupabaseStockBike(row as unknown as SupabaseStockBike)),configured:true};
@@ -57,6 +57,9 @@ export function normalizeSupabaseStockBike(bike:SupabaseStockBike):SupabaseStock
   const fields=nested&&typeof nested==="object"&&!Array.isArray(nested)?nested as Record<string,unknown>:{};
   const field=(...names:string[])=>{for(const name of names){const value=fields[name];if(!empty(value))return value}return null};
   const sourceImages=dedupeImages((Array.isArray(bike.image_urls)?bike.image_urls:[]).filter((value):value is string=>typeof value==="string").map(value=>value.trim()).filter(Boolean));
+  // image_urls is the ordered source of truth. Keep a legacy fallback so records
+  // created before ordered arrays were introduced do not lose their only photo.
+  if(!sourceImages.length&&typeof bike.primary_image_url==="string"&&bike.primary_image_url.trim())sourceImages.push(bike.primary_image_url.trim());
   const imageUrls=sourceImages;
   const primaryImage=imageUrls[0]||null;
   return {
