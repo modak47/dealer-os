@@ -87,7 +87,10 @@ export async function getAirtableStock():Promise<StockBike[]|null> {
     url.searchParams.set("pageSize","25");
     STOCK_FIELDS.forEach(field=>url.searchParams.append("fields[]",field));
     if(offset)url.searchParams.set("offset",offset);
-    const response=await fetch(url,{headers:{Authorization:`Bearer ${apiKey}`},next:{revalidate:60}});
+    // Airtable attachment metadata can exceed Next's 2 MB data-cache entry limit.
+    // Fetch it server-side without the Next data cache; public pages themselves are
+    // still ISR-cached, while every regeneration receives fresh signed image URLs.
+    const response=await fetch(url,{headers:{Authorization:`Bearer ${apiKey}`},cache:"no-store"});
     if(!response.ok)throw new Error(`Airtable Motorcycle Stock request failed (${response.status})`);
     const page=await response.json() as AirtablePage;
     records.push(...(page.records??[]));
