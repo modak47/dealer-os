@@ -1,0 +1,3 @@
+"use client";
+import Link from "next/link";import {useEffect,useState} from "react";
+export function InvoiceDocumentActions({id}:{id:string}){const [busy,setBusy]=useState(false);useEffect(()=>{if(new URLSearchParams(window.location.search).get("print")==="1"){const timer=window.setTimeout(()=>window.print(),250);return()=>window.clearTimeout(timer)}},[]);function download(){setBusy(true);window.location.href=`/api/crm/invoices/${id}/pdf`;window.setTimeout(()=>setBusy(false),1500)}return <nav className="invoice-document-actions"><Link href={`/admin/accounts/invoices/${id}`}>← Back to invoice</Link><button onClick={()=>window.print()}>Print invoice</button><button onClick={download} disabled={busy}>{busy?"Generating PDF...":"Download PDF"}</button></nav>}

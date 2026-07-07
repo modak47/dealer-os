@@ -21,12 +21,13 @@ export async function getInvoice(id:string){
   const supabase=getSupabaseAdmin();
   const {data,error}=await supabase.from("crm_invoices").select("*,customer:crm_customers(*),bike:stock_bikes(id,make,model,variant,registration,year,price,primary_image_url),reservation:crm_reservations(*)").eq("id",id).is("deleted_at",null).single();
   if(error)throw error;
-  const [{data:items,error:itemsError},{data:payments,error:paymentsError}]=await Promise.all([
+  const [{data:items,error:itemsError},{data:payments,error:paymentsError},{data:emails,error:emailsError}]=await Promise.all([
     supabase.from("crm_invoice_items").select("*").eq("invoice_id",id).order("sort_order"),
-    supabase.from("crm_payments").select("id,amount,method,payment_type,receipt_number,paid_at,status,notes").eq("invoice_id",id).is("deleted_at",null).order("paid_at",{ascending:false})
+    supabase.from("crm_payments").select("id,amount,method,payment_type,receipt_number,paid_at,status,notes").eq("invoice_id",id).is("deleted_at",null).order("paid_at",{ascending:false}),
+    supabase.from("crm_email_logs").select("id,to_email,subject,status,provider,sent_at,created_at").eq("invoice_id",id).order("created_at",{ascending:false}).limit(10)
   ]);
-  if(itemsError)throw itemsError;if(paymentsError)throw paymentsError;
-  return {invoice:data as InvoiceRow&Record<string,unknown>,items:(items??[]) as InvoiceItem[],payments:(payments??[]) as InvoicePayment[]};
+  if(itemsError)throw itemsError;if(paymentsError)throw paymentsError;if(emailsError&&emailsError.code!=="42P01")throw emailsError;
+  return {invoice:data as InvoiceRow&Record<string,unknown>,items:(items??[]) as InvoiceItem[],payments:(payments??[]) as InvoicePayment[],emails:emails??[]};
 }
 
 export async function getInvoiceableReservations(){

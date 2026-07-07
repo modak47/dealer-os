@@ -2,7 +2,7 @@ import {NextResponse} from "next/server";
 import {getSupabaseAdmin} from "@/lib/supabase/admin";
 import {getInvoices} from "@/lib/accounts";
 
-export async function GET(request:Request){try{const url=new URL(request.url);return NextResponse.json(await getInvoices(url.searchParams.get("status")??"all",url.searchParams.get("q")??""))}catch(error){return NextResponse.json({error:error instanceof Error?error.message:"Unable to load invoices."},{status:500})}}
+export async function GET(request:Request){try{const url=new URL(request.url),saleId=url.searchParams.get("sale_id");if(saleId){const {data,error}=await getSupabaseAdmin().from("crm_invoices").select("id").eq("sale_id",saleId).is("deleted_at",null).maybeSingle();if(error)throw error;if(!data)return NextResponse.json({error:"Invoice not found for this sale."},{status:404});const {getInvoice}=await import("@/lib/accounts");return NextResponse.json(await getInvoice(data.id))}return NextResponse.json(await getInvoices(url.searchParams.get("status")??"all",url.searchParams.get("q")??""))}catch(error){return NextResponse.json({error:error instanceof Error?error.message:"Unable to load invoices."},{status:500})}}
 export async function POST(request:Request){try{
   const body=await request.json() as {reservation_id?:string;delivery_charge?:number;due_at?:string};
   if(!body.reservation_id)return NextResponse.json({error:"A reservation is required."},{status:400});
