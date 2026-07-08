@@ -3,7 +3,6 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeSupabaseStockBike } from "@/lib/supabase-stock";
 import type { SupabaseStockBike } from "@/lib/stock-bike-types";
 import { sanitiseStockPayload } from "@/lib/stock-payload";
-import { syncAirtableStockImageOrder } from "@/lib/airtable";
 
 export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}){
   const {id}=await params;
@@ -22,7 +21,6 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
     const {data,error}=await getSupabaseAdmin().from("stock_bikes").update(updates).eq("id",id).select("*").maybeSingle();
     if(error){console.error("Unable to update stock bike",error);const migrationMissing=/column|schema cache|advert_sections|show_on_website|reservation_amount/i.test(`${error.message} ${error.details??""}`);return NextResponse.json({error:migrationMissing?"Stock advert migration is not installed. Run 20260705000300_stock_advert_builder.sql in Supabase, then try again.":`Unable to update stock bike: ${error.message}`},{status:500})}
     if(!data)return NextResponse.json({error:"Stock bike not found."},{status:404});
-    if("image_urls" in updates&&data.registration){try{const result=await syncAirtableStockImageOrder(data.registration,(updates.image_urls as string[])??[]);console.info("Stock photo order Airtable sync",{stockId:id,registration:data.registration,result})}catch(syncError){console.error("Supabase photo order saved but Airtable sync failed",{stockId:id,message:syncError instanceof Error?syncError.message:"Unknown error"})}}
     return NextResponse.json({stock:normalizeSupabaseStockBike(data as SupabaseStockBike)});
   }catch(error){console.error("Invalid stock update request",error);return NextResponse.json({error:"Invalid stock data."},{status:400})}
 }

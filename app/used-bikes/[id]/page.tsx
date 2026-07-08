@@ -71,8 +71,10 @@ function DescriptionContent({text,attention,structured}:{text:string;attention:s
     ["fitted_extras","Fitted Extras","EQUIPMENT",["fitted_extras"]],
     ["preparation","Preparation","WORKSHOP",["preparation","preparation_work"]],
     ["included","Included Before Delivery","HANDOVER",["included","included_before_delivery"]],
+    ["warranty","Warranty","WARRANTY",["warranty"]],
     ["why_buy","Why Buy From YesMoto","WHY YESMOTO",["why_buy","why_buy_from_yesmoto"]],
     ["finance","Finance Options","FINANCE",["finance","finance_options"]],
+    ["delivery","Delivery","DELIVERY",["delivery"]],
   ];
   const structuredSections:DescriptionSection[]=canonicalSections.map(([key,title,,aliases])=>{const value=aliases.map(alias=>structured[alias]).find(candidate=>typeof candidate==="string"&&candidate.trim()) as string|undefined;return {key,title,content:value?value.replace(/[•●▪◦]\s*/g,"\n• ").split(/\n+/).map(line=>line.trim()).filter(Boolean):[]}}).filter(section=>section.content.length);
   const sections=structuredSections.length?structuredSections:parseDescription(text,attention);

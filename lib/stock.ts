@@ -54,23 +54,8 @@ export function toPublicBike(bike:StockBike):PublicStockBike{const fields=bike.d
   attentionGrabber:customerText(field("Attention Grabber (30 Chars - Autotrader/Website)","Attention Grabber")||bike.attentionGrabber),
   bodyStyle:customerText(field("Body Type")||bike.bodyStyle),fuel:customerText(field("Fuel")||bike.fuel),transmission:customerText(field("Transmission")||bike.transmission),variant:safeVariant,category:customerText(bike.category)
 }}
-const stableImage=(value:string)=>/cd5\.uk|supabase\.co\/storage|cloudinary|amazonaws/i.test(value);
-async function refreshTemporaryImages(bikes:StockBike[]):Promise<StockBike[]>{
-  const needsRefresh=bikes.some(bike=>!(bike.imageUrls??[]).some(stableImage)&&(bike.imageUrls??[]).some(url=>/airtableusercontent\.com/i.test(url)));
-  if(!needsRefresh)return bikes;
-  try{
-    const airtable=await getAirtableStock();if(!airtable?.length)return bikes;
-    const byRegistration=new Map(airtable.map(bike=>[bike.registration.replace(/\s/g,"").toUpperCase(),bike]));
-    return bikes.map(bike=>{
-      if((bike.imageUrls??[]).some(stableImage))return bike;
-      const fresh=byRegistration.get(bike.registration.replace(/\s/g,"").toUpperCase());
-      const freshImages=(fresh?.imageUrls??[]).filter(url=>url&&url!=="/bike-placeholder.svg");
-      return freshImages.length?{...bike,image:freshImages[0],imageUrls:freshImages}:bike;
-    });
-  }catch(error){console.error("Unable to refresh temporary Airtable stock images",error instanceof Error?error.message:error);return bikes}
-}
 export async function getActiveStockBikes():Promise<StockBike[]>{return(await getAllStockBikes()).filter(isActive)}
-export async function getPublicStockBikes():Promise<PublicStockBike[]>{try{const result=await getSupabasePublicStockBikes();if(result.stock.length)return (await refreshTemporaryImages(result.stock.map(toAdminStockBike))).filter(isPublic).map(toPublicBike)}catch(error){console.error("Unable to load optimised public stock",error)}return(await refreshTemporaryImages(await getAllStockBikes())).filter(isPublic).map(toPublicBike)}
+export async function getPublicStockBikes():Promise<PublicStockBike[]>{try{const result=await getSupabasePublicStockBikes();if(result.stock.length)return result.stock.map(toAdminStockBike).filter(isPublic).map(toPublicBike)}catch(error){console.error("Unable to load optimised public stock",error)}return(await getAllStockBikes()).filter(isPublic).map(toPublicBike)}
 export async function getSoldStockBikes():Promise<StockBike[]>{return(await getAllStockBikes()).filter(isSold)}
 export async function getFeaturedBikes(limit=4):Promise<PublicStockBike[]>{
   const stock=(await getPublicStockBikes()).sort((a,b)=>Date.parse(b.createdTime||"0")-Date.parse(a.createdTime||"0"));
@@ -79,7 +64,7 @@ export async function getFeaturedBikes(limit=4):Promise<PublicStockBike[]>{
 const toPublicDetail=(bike:StockBike):PublicStockDetailBike=>{const raw=bike.advertSections??{};const section=(...keys:string[])=>{for(const key of keys){const value=text(raw[key]);if(value)return value}return ""};const advertSections={...raw,headline:section("headline","advert_headline"),intro:section("intro","intro_description"),key_details:section("key_details"),fitted_extras:section("fitted_extras"),preparation:section("preparation","preparation_work"),included:section("included","included_before_delivery"),why_buy:section("why_buy","why_buy_from_yesmoto"),finance:section("finance","finance_options")};return {...toPublicBike(bike),specifications:bike.specifications??{},dealer5Fields:bike.dealer5Fields??{},advertSections}};
 export async function getBikeBySlugOrId(value:string):Promise<PublicStockDetailBike|null>{
   const direct=await getSupabaseStockBikeByPublicIdentifier(value);console.info("[Public bike lookup]",{requestedSlug:value,lookupMethod:direct.method,found:Boolean(direct.bike)});
-  if(direct.bike){const [mapped]=await refreshTemporaryImages([toAdminStockBike(direct.bike)]);if(isPublic(mapped))return toPublicDetail(mapped)}
+  if(direct.bike){const mapped=toAdminStockBike(direct.bike);if(isPublic(mapped))return toPublicDetail(mapped)}
   if(!["supabase-not-configured","index-error"].includes(direct.method)){console.info("[Public bike lookup] all lookup methods exhausted",{requestedSlug:value});return null}
   const fallback=(await getAllStockBikes()).filter(isPublic).find(b=>b.id===value||toPublicBike(b).slug===value);
   console.info("[Public bike lookup fallback]",{requestedSlug:value,found:Boolean(fallback)});return fallback?toPublicDetail(fallback):null;
