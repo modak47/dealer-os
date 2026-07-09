@@ -126,6 +126,21 @@ export function WorkflowBoard({ initialTasks, mode, migrationReady, initialError
 
 function WorkflowCard({ task, busy, saveNotes, act }: { task: StockWorkflowRow; busy: boolean; saveNotes: (task: StockWorkflowRow, notes: string) => Promise<void>; act: (task: StockWorkflowRow, action: "start" | "complete" | "block" | "reopen") => Promise<void> }) {
   const bikeHref = task.bike ? `/admin/stock/${task.bike.id}` : "/admin/stock";
+  const [pdiFile,setPdiFile]=useState<File|null>(null);
+  const [uploading,setUploading]=useState(false);
+  async function uploadPdi(){
+    if(!task.bike||!pdiFile)return;
+    setUploading(true);
+    const form=new FormData();
+    form.set("stock_bike_id",task.bike.id);
+    form.set("attachment_type","PDI Form");
+    form.set("workflow_task_id",task.id);
+    form.set("notes","Uploaded from workshop workflow");
+    form.set("file",pdiFile);
+    await fetch("/api/stock-attachments",{method:"POST",body:form});
+    setUploading(false);
+    await act(task,"complete");
+  }
   return <article className="workflow-card">
     <Link href={bikeHref} className="workflow-bike">
       <img src={task.bike?.image || "/bike-placeholder.svg"} alt={task.bike ? `${task.bike.make} ${task.bike.model}` : "Stock motorcycle"} />
@@ -133,6 +148,7 @@ function WorkflowCard({ task, busy, saveNotes, act }: { task: StockWorkflowRow; 
     </Link>
     <div className="workflow-meta"><span>{statusLabel(task.status)}</span><small>Started {dateTime(task.started_at)}</small><small>Completed {dateTime(task.completed_at)}</small></div>
     <label className="workflow-notes"><span>Notes</span><textarea defaultValue={task.notes || ""} onBlur={(event) => void saveNotes(task, event.target.value)} placeholder="Add preparation notes..." /></label>
+    {task.department==="Workshop Preparation"&&task.bike&&<div className="workflow-pdi-upload"><Link href={`/admin/stock/${task.bike.id}/pdi`}>Open digital PDI</Link><label><span>Upload completed PDI</span><input type="file" accept="application/pdf,image/*" onChange={event=>setPdiFile(event.target.files?.[0]||null)}/></label><button type="button" onClick={()=>void uploadPdi()} disabled={!pdiFile||uploading}>{uploading?"Uploading...":"Upload PDI"}</button></div>}
     <div className="workflow-actions">
       <button onClick={() => void act(task, "start")} disabled={busy || task.status === "in_progress" || task.status === "completed"}>Start</button>
       <button onClick={() => void act(task, "complete")} disabled={busy || task.status === "completed"}>Complete</button>
