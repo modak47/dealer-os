@@ -9,6 +9,10 @@ function validChecklist(value: PdiChecklistItem[]) {
   return value.length && value.every((item) => typeof item.number === "number" && pdiSections.includes(item.section));
 }
 
+function editableChecklist(value: PdiChecklistItem[]) {
+  return value.filter((item) => !/dealer stamp/i.test(item.label));
+}
+
 function SignaturePad({ label, onChange }: { label: string; onChange: (value: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
@@ -52,7 +56,7 @@ function SignaturePad({ label, onChange }: { label: string; onChange: (value: st
 }
 
 export function PdiForm({ bike, initialChecklist = defaultPdiChecklist }: { bike: SupabaseStockBike; initialChecklist?: PdiChecklistItem[] }) {
-  const [checklist, setChecklist] = useState<PdiChecklistItem[]>(validChecklist(initialChecklist) ? initialChecklist : defaultPdiChecklist);
+  const [checklist, setChecklist] = useState<PdiChecklistItem[]>(editableChecklist(validChecklist(initialChecklist) ? initialChecklist : defaultPdiChecklist));
   const [technicianName, setTechnicianName] = useState("");
   const [technicianSignature, setTechnicianSignature] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -64,6 +68,10 @@ export function PdiForm({ bike, initialChecklist = defaultPdiChecklist }: { bike
 
   function update(id: string, values: Partial<PdiChecklistItem>) {
     setChecklist((rows) => rows.map((row) => row.id === id ? { ...row, ...values } : row));
+  }
+
+  function tickAllChecks() {
+    setChecklist((rows) => rows.map((row) => ({ ...row, checked: true, result: "pass" })));
   }
 
   async function completePdi() {
@@ -82,13 +90,13 @@ export function PdiForm({ bike, initialChecklist = defaultPdiChecklist }: { bike
   const rows = Math.max(...pdiSections.map((section) => checklist.filter((item) => item.section === section).length));
 
   return <div className="admin-page pdi-page yesmoto-pdi-page">
-    <div className="stock-editor-heading"><div><Link href={`/admin/stock/${bike.id}`}>← Back to stock bike</Link><h1>Used bike PDI sheet</h1><p>{[bike.year, bike.make, bike.model, bike.registration].filter(Boolean).join(" · ")}</p></div><button className="admin-primary" onClick={() => void completePdi()} disabled={busy}>{busy ? "Generating PDI..." : "Complete PDI"}</button></div>
+    <div className="stock-editor-heading pdi-editor-heading"><div><Link href={`/admin/stock/${bike.id}`}>← Back to stock bike</Link><h1>Used bike PDI sheet</h1><p>{[bike.year, bike.make, bike.model, bike.registration].filter(Boolean).join(" · ")}</p></div><div className="pdi-actions"><button type="button" onClick={() => window.print()}>Print form</button><button type="button" onClick={tickAllChecks}>Tick all checks</button><button className="admin-primary" onClick={() => void completePdi()} disabled={busy}>{busy ? "Generating PDI..." : "Complete PDI"}</button></div></div>
     {error && <p className="invoice-error">{error}</p>}{message && <p className="invoice-success">{message}</p>}
 
     <section className="pdi-paper">
       <header className="pdi-paper-head"><div><b>SELL YOUR MOTORBIKE LTD T/A YES MOTO</b><span>72 Brentwood Road</span><span>Brighton BN1 7ES</span><span>Tel: 07984 763470</span><span>www.yesmoto.co.uk</span></div><img src="/yesmoto-logo.png" alt="YesMoto" /></header>
       <h2>USED BIKE PRE-DELIVERY INSPECTION [PDI] SHEET</h2>
-      <div className="pdi-details-grid"><b>BIKE MAKE & MODEL</b><span>{[bike.make, bike.model, bike.variant].filter(Boolean).join(" ") || "—"}</span><b>VEHICLE ID. [VIN]</b><span>{bike.vin || "—"}</span><b>ENGINE NO.</b><span>{bike.engine_number || "—"}</span><b>REG NO.</b><span>{bike.registration || "—"}</span><b>DATE.</b><span>{new Date().toLocaleDateString("en-GB")}</span></div>
+      <div className="pdi-details-grid"><b>BIKE MAKE & MODEL</b><span>{[bike.make, bike.model, bike.variant].filter(Boolean).join(" ") || "—"}</span><b>VEHICLE ID. [VIN]</b><span>{bike.vin || "—"}</span><b>ENGINE NO.</b><span>{bike.engine_number || "—"}</span><b>REG NO.</b><span>{bike.registration || "—"}</span><b>DATE.</b><span>{new Date().toLocaleDateString("en-GB")}</span><b>MILEAGE</b><span>{bike.mileage?.toLocaleString("en-GB") || "—"}</span></div>
       <p className="pdi-warning">VISUALLY INSPECT THE BIKE FOR MISSING PARTS. CHECK TYRES, CHAIN & SPROCKETS AND BRAKE PAD CONDITION BEFORE CARRYING OUT PDI, REPORT IF ANYTHING NEEDS REPLACING TO PARTS DEPARTMENT</p>
       <p className="pdi-tts">TTS = TORQUE TO SPEC</p>
       <div className="pdi-four-column" style={{ ["--pdi-rows" as string]: rows }}>{pdiSections.map((section) => <section key={section}><h3>{section}</h3>{checklist.filter((item) => item.section === section).map((item) => <article key={item.id} className={/dealer stamp/i.test(item.label) ? "stamp-row" : ""}><label><input type="checkbox" checked={item.checked} onChange={(event) => update(item.id, { checked: event.target.checked })} /><strong>{item.number}</strong><span>{item.label}</span></label><select value={item.result} onChange={(event) => update(item.id, { result: event.target.value as PdiResult })}><option value="pass">Pass</option><option value="fail">Fail</option><option value="na">N/A</option></select><input value={item.notes} onChange={(event) => update(item.id, { notes: event.target.value })} placeholder="Notes" /></article>)}</section>)}</div>

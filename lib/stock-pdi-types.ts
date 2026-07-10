@@ -65,9 +65,6 @@ export const defaultPdiChecklist: PdiChecklistItem[] = [
   item("RAMP DOWN [2]", 9, "Check/adjust headlamp aim/height"),
   item("RAMP DOWN [2]", 10, "Check steering lock and ignition switch"),
   item("RAMP DOWN [2]", 11, "Switch off bike and re-check oil level"),
-  item("RAMP DOWN [2]", 12, "Dealer stamp"),
-  item("RAMP DOWN [2]", 13, "Dealer stamp"),
-  item("RAMP DOWN [2]", 13, "Dealer stamp"),
 
   item("ROAD TEST & FINAL CHECKS", 1, "Check acceleration/deceleration"),
   item("ROAD TEST & FINAL CHECKS", 2, "Check smooth & effective braking"),
@@ -76,7 +73,4 @@ export const defaultPdiChecklist: PdiChecklistItem[] = [
   item("ROAD TEST & FINAL CHECKS", 5, "Check easy hot restart & smooth idling"),
   item("ROAD TEST & FINAL CHECKS", 6, "Re-check oil level & visual check for leaks"),
   item("ROAD TEST & FINAL CHECKS", 7, "Re-check final drive tension & alignment"),
-  item("ROAD TEST & FINAL CHECKS", 12, "Dealer stamp"),
-  item("ROAD TEST & FINAL CHECKS", 13, "Dealer stamp"),
-  item("ROAD TEST & FINAL CHECKS", 13, "Dealer stamp"),
 ];
