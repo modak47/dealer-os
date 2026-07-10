@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 function KPI({
   title,
@@ -24,19 +25,21 @@ function KPI({
 }
 
 export default function RetailCheckPage() {
+  const searchParams = useSearchParams();
   const [makes, setMakes] = useState<any[]>([]);
   const [models, setModels] = useState<any[]>([]);
   const [selectedMake, setSelectedMake] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
   const [registration, setRegistration] =
-    useState("");
+    useState(searchParams.get("reg")?.toUpperCase() ?? "");
   const [year, setYear] = useState("");
   const [mileage, setMileage] = useState("");
   const [askingPrice, setAskingPrice] = useState("");
   const [offerPrice, setOfferPrice] = useState("");
   const [loading, setLoading] = useState(false);
   const [showManualSearch, setShowManualSearch] = useState(false);
-  const [recordId, setRecordId] = useState("");
+  const [recordId, setRecordId] = useState(searchParams.get("recordId") ?? "");
+  const [websiteLeadId] = useState(searchParams.get("leadId") ?? "");
   const [valuation, setValuation] = useState<any>(null);
   const [status, setStatus] = useState("");
   const [activeTab, setActiveTab] = useState("valuation");
@@ -52,6 +55,27 @@ export default function RetailCheckPage() {
   const [selectedHistoryRecord, setSelectedHistoryRecord] =
     useState<any>(null);
 
+  async function syncWebsiteLeadValuation(leadId:string, retailCheckId:string, data:Record<string, unknown>) {
+    const retail = Number(data["Market Retail"]) || null;
+    const offer = Number(data["Suggested Offer"]) || null;
+    const margin = Number(data["Available Margin"]) || (retail && offer ? retail - offer : null);
+    await fetch(`/api/website-leads/${leadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        retail_check_id: retailCheckId,
+        valuation_status: "completed",
+        valuation_completed_at: new Date().toISOString(),
+        valuation_error: null,
+        retail_estimate: retail,
+        suggested_offer: offer,
+        estimated_margin: margin,
+        valuation_notes: [data["Buy Decision"] && `Buy decision: ${data["Buy Decision"]}`, data["Confidence"] && `Confidence: ${data["Confidence"]}`, data["Opportunity Score"] && `Opportunity score: ${data["Opportunity Score"]}`].filter(Boolean).join("\n"),
+        similar_bikes: data["Comparable Summary"] || null,
+      }),
+    });
+  }
+
   useEffect(() => {
     async function loadData() {
       const makesResponse = await fetch("/api/makes");
@@ -62,6 +86,18 @@ export default function RetailCheckPage() {
     }
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (recordId) {
+      fetch(`/api/retail-check/${recordId}`).then(response => response.json()).then(data => {
+        if (!data.error) {
+          setValuation(data);
+          setStatus(data.Status === "Checked" ? "Valuation Complete" : "Waiting for market analysis...");
+          setActiveTab("valuation");
+        }
+      });
+    }
+  }, [recordId]);
 
   useEffect(() => {
 
@@ -90,12 +126,13 @@ export default function RetailCheckPage() {
     if (data.Status === "Checked") {
       setValuation(data);
       setStatus("Valuation Complete");
+      if (websiteLeadId) await syncWebsiteLeadValuation(websiteLeadId, recordId, data);
       clearInterval(interval);
     } 
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [recordId]);
+  }, [recordId, websiteLeadId]);
 
   const filteredModels = models
     .filter((m: any) => m.make === selectedMake && m.model)
@@ -146,6 +183,7 @@ export default function RetailCheckPage() {
           year,
           mileage,
           askingPrice,
+          leadId: websiteLeadId || undefined,
         }),
       });
 

@@ -1,8 +1,16 @@
+import { createRetailCheck } from "@/lib/retail-checks";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function POST(request:Request){
-  const body=await request.json();
-  const {data,error}=await getSupabaseAdmin().from("retail_checks").insert([{Registration:body.registration,Make:body.make,Model:body.model,Year:String(body.year),Mileage:String(body.mileage),"Asking Price":String(body.askingPrice),Status:"Pending"}]).select().single();
-  if(error){console.error(error);return Response.json({error:error.message},{status:500})}
-  return Response.json({recordId:data.id});
+  try{
+    const body=await request.json();
+    const data=await createRetailCheck({registration:body.registration,make:body.make,model:body.model,year:body.year,mileage:body.mileage,askingPrice:body.askingPrice});
+    if(body.leadId){
+      await getSupabaseAdmin().from("website_leads").update({retail_check_id:String(data.id),valuation_status:"processing",valuation_started_at:new Date().toISOString(),valuation_error:null,updated_at:new Date().toISOString()}).eq("id",body.leadId);
+    }
+    return Response.json({recordId:data.id});
+  }catch(error){
+    console.error(error);
+    return Response.json({error:error instanceof Error?error.message:"Unable to create Retail Check"},{status:500});
+  }
 }

@@ -7,7 +7,7 @@ import { AdminSidebar } from "./admin-sidebar";
 import { LogoutButton } from "./logout-button";
 import type { AdminIdentity } from "@/lib/admin-identity";
 
-const mobileItems = [["Home", "/admin/dashboard", "⌂"], ["Stock", "/admin/stock", "M"], ["Leads", "/admin/leads", "L"], ["Customers", "/admin/customers", "C"]];
+const mobileItems = [["Home", "/admin/dashboard", "⌂"], ["Stock", "/admin/stock", "M"], ["Web Leads", "/website-leads", "W"], ["Customers", "/admin/customers", "C"]];
 
 export function AdminShell({ children, identity }: { children: React.ReactNode; identity: AdminIdentity | null }) {
   const pathname = usePathname();
