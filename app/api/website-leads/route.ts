@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { leadLocationUpdate, lookupLeadLocation } from "@/lib/location";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText, combineLeadImages, isValidLeadStatus, safeNumber } from "@/lib/website-leads";
 import type { WebsiteLead, WebsiteLeadStatus } from "@/types/website-lead";
@@ -6,7 +7,7 @@ import type { WebsiteLead, WebsiteLeadStatus } from "@/types/website-lead";
 export const dynamic = "force-dynamic";
 
 const defaultSelect = "*";
-const listSelect = "id,reg,make,model,price,website,status,valuation_status,date,created_at,images,Images,image1,image2,image3,image4,image5,image6,image7,image8,image9,image10,retail_check_id,retail_estimate,suggested_offer,estimated_margin";
+const listSelect = "id,reg,make,model,price,website,status,valuation_status,date,created_at,images,Images,image1,image2,image3,image4,image5,image6,image7,image8,image9,image10,retail_check_id,stock_bike_id,purchase_agreed_at,latest_referral_id,latest_referred_dealer_id,latest_referred_dealer_name,latest_referred_at,referral_count,retail_estimate,suggested_offer,estimated_margin,postcode,normalised_postcode,latitude,longitude,location_display_name,location_town,geocoding_status,geocoding_provider,location_checked_at,location_lookup_error,distance_from_yesmoto_miles,driving_distance_miles,estimated_drive_minutes";
 const sourceLabels: Record<string, string> = { bikebuyeruk: "Bike Buyer UK", sellyourmotorbike: "Sell Your Motorbike", motorcyclebuyer: "Motorcycle Buyer" };
 
 type LeadQueryResult = { data?: unknown; error?: { message?: string; code?: string } | null; count?: number | null };
@@ -163,9 +164,21 @@ export async function POST(request: Request) {
     }
     const body = await request.json() as Record<string, unknown>;
     const payload = cleanPayload(body);
+    let locationFields: Record<string, unknown> = {};
+    if (payload.postcode) {
+      try {
+        locationFields = leadLocationUpdate(await lookupLeadLocation({ postcode: payload.postcode }));
+      } catch (locationError) {
+        locationFields = {
+          geocoding_status: "failed",
+          location_checked_at: new Date().toISOString(),
+          location_lookup_error: locationError instanceof Error ? locationError.message : "Location lookup failed.",
+        };
+      }
+    }
     const meaningfulDetails = [payload.reg, payload.make, payload.model, payload.email, payload.phone, payload.postcode, payload.fname, payload.lname].filter(Boolean).length;
     if (!payload.reg && meaningfulDetails < 2) return NextResponse.json({ error: "Lead must include a registration or meaningful bike/customer details." }, { status: 400 });
-    const { data, error } = await getSupabaseAdminClient().from("website_leads").insert(payload).select("id").single();
+    const { data, error } = await getSupabaseAdminClient().from("website_leads").insert({ ...payload, ...locationFields }).select("id").single();
     if (error) {
       console.error("Website leads webhook insert failed.", { code: error.code, message: error.message });
       return NextResponse.json({ error: "Unable to save website lead." }, { status: 500 });

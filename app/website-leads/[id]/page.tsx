@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { directionsUrl, formatDriveMinutes, formatMiles, googleMapsUrl, leadLocationStatus, leadLocationTitle, staticMapUrl } from "@/lib/location-ui";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusBadgeClass, statusLabel } from "@/lib/website-leads";
 import { WEBSITE_LEAD_STATUSES, type WebsiteLead } from "@/types/website-lead";
+import type { LeadReferral } from "@/types/referral";
 
 const valuationFields = ["valuation_status", "retail_estimate", "suggested_offer", "estimated_margin", "similar_bikes", "auto_trader_search", "valuation_notes", "Motorway output", "internal_notes", "status", "assigned_to"] as const;
 
@@ -19,8 +21,10 @@ export default function WebsiteLeadDetailPage() {
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
   const [valuing, setValuing] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [referrals, setReferrals] = useState<LeadReferral[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -35,8 +39,16 @@ export default function WebsiteLeadDetailPage() {
     return () => { active = false; };
   }, [params.id]);
 
+  useEffect(() => {
+    fetch(`/api/website-leads/${params.id}/referrals`).then(async response => {
+      const payload = await response.json();
+      if (response.ok) setReferrals(payload.referrals ?? []);
+    }).catch(() => undefined);
+  }, [params.id]);
+
   const images = useMemo(() => lead ? lead.resolved_images ?? combineLeadImages(lead) : [], [lead]);
   const mainImage = images[selectedImage];
+  const mapUrl = lead ? staticMapUrl(lead) : null;
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -48,6 +60,11 @@ export default function WebsiteLeadDetailPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [images.length, lightboxOpen]);
+
+  useEffect(() => {
+    if (!lead || locating || lead.latitude != null || !lead.postcode || lead.location_checked_at) return;
+    void refreshLocation(false);
+  }, [lead, locating]);
 
   function updateField(field: keyof FormState, value: string) {
     setForm(current => {
@@ -120,6 +137,24 @@ export default function WebsiteLeadDetailPage() {
     }
   }
 
+  async function refreshLocation(showSuccess = true) {
+    if (!lead) return;
+    setLocating(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/website-leads/${params.id}/location`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postcode: lead.postcode, town: lead.location_town }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Unable to refresh location.");
+      setLead(payload.lead);
+      if (showSuccess) setSuccess("Location refreshed.");
+    } catch (locationError) {
+      setError(locationError instanceof Error ? locationError.message : "Unable to refresh location.");
+    } finally {
+      setLocating(false);
+    }
+  }
+
   if (loading) return <main className="admin-page website-leads-page"><div className="website-state">Loading lead...</div></main>;
   if (error && !lead) return <main className="admin-page website-leads-page"><div className="website-state error">{error}</div></main>;
   if (!lead) return <main className="admin-page website-leads-page"><div className="website-state">Lead not found.</div></main>;
@@ -135,6 +170,7 @@ export default function WebsiteLeadDetailPage() {
       </div>
       <InfoCard title="Bike Details" rows={[["Registration", lead.reg], ["Make", lead.make], ["Model", lead.model], ["Year", lead.year], ["Engine", lead.engine], ["Colour", lead.colour], ["Mileage", formatMileage(lead.mileage)], ["Owners", lead.owners], ["Spare keys", lead.spare_keys], ["Condition", lead.bike_condition], ["Damage", lead.damage], ["History", lead.history], ["Service history", lead.service], ["MOT", lead.mot], ["Extras", lead.extras], ["Expected price", lead.price]]} />
       <section className="website-detail-card"><h2>Customer Details</h2><dl><Row label="First name" value={lead.fname} /><Row label="Last name" value={lead.lname} /><Row label="Full name" value={customerName(lead)} /><Row label="Email" value={lead.email} /><Row label="Phone" value={lead.phone} /><Row label="Postcode" value={lead.postcode} /><Row label="Source website" value={lead.website} /><Row label="Date received" value={formatLeadDate(lead.date || lead.created_at)} /></dl><div className="website-actions">{lead.phone && <a href={`tel:${lead.phone}`}>Call Customer</a>}{lead.email && <a href={`mailto:${lead.email}`}>Email Customer</a>}<button onClick={() => copyText(lead.phone)}>Copy Phone Number</button><button onClick={() => copyText(lead.email)}>Copy Email</button><button onClick={() => copyText(lead.postcode)}>Copy Postcode</button></div></section>
+      <section className="website-detail-card location-card"><h2>Location</h2><div className="website-map-preview">{mapUrl ? <iframe title="Customer location map" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /> : <span>{leadLocationStatus(lead)}</span>}</div><dl><Row label="Customer town" value={lead.location_town} /><Row label="Location" value={leadLocationTitle(lead)} /><Row label="Postcode" value={lead.normalised_postcode || lead.postcode} /><Row label="Approximate distance" value={lead.latitude != null ? `${formatMiles(lead.distance_from_yesmoto_miles)} from YesMoto` : "Not available"} /><Row label="Driving distance" value={formatMiles(lead.driving_distance_miles)} /><Row label="Estimated drive" value={formatDriveMinutes(lead.estimated_drive_minutes)} /><Row label="Lookup status" value={leadLocationStatus(lead)} /><Row label="Last lookup" value={formatLeadDate(lead.location_checked_at)} /></dl><div className="website-actions"><a href={googleMapsUrl(lead)} target="_blank" rel="noreferrer">View Location</a><a href={directionsUrl("YesMoto", lead)} target="_blank" rel="noreferrer">Get Directions</a><button disabled={locating} onClick={() => void refreshLocation()}>{locating ? "Resolving..." : "Refresh Location"}</button></div></section>
       <section className="website-detail-card valuation-card">
         <h2>Valuation</h2>
         <div className="valuation-grid">
@@ -153,6 +189,7 @@ export default function WebsiteLeadDetailPage() {
         <div className="website-actions valuation-actions">{isUrl(form.auto_trader_search) && <a href={form.auto_trader_search} target="_blank">Open AutoTrader Search</a>}<button disabled={saving} onClick={() => saveChanges()}>{saving ? "Saving..." : "Save Changes"}</button></div>
       </section>
       <section className="website-detail-card status-actions"><h2>Status Actions</h2><div className="website-actions">{[["reviewing", "Mark Reviewing"], ["contacted", "Mark Contacted"], ["offer_made", "Mark Offer Made"], ["accepted", "Mark Accepted"], ["declined", "Mark Declined"], ["purchased", "Mark Purchased"], ["closed", "Close Lead"]].map(([status, label]) => <button disabled={saving} onClick={() => statusAction(status)} key={status}>{label}</button>)}</div><dl><Row label="Contacted" value={formatLeadDate(lead.contacted_at)} /><Row label="Offer made" value={formatLeadDate(lead.offer_made_at)} /><Row label="Purchased" value={formatLeadDate(lead.purchased_at)} /><Row label="Retail Check" value={lead.retail_check_id} /><Row label="Valuation started" value={formatLeadDate(lead.valuation_started_at)} /><Row label="Valuation completed" value={formatLeadDate(lead.valuation_completed_at)} /><Row label="Valuation error" value={lead.valuation_error} /><Row label="Market Retail" value={formatGbp(lead.retail_estimate)} /><Row label="Suggested Offer" value={formatGbp(lead.suggested_offer)} /><Row label="Estimated Margin" value={formatGbp(lead.estimated_margin)} /></dl></section>
+      <ReferralHistory referrals={referrals} onUpdated={next => setReferrals(current => current.map(item => item.id === next.id ? next : item))} />
     </section>
     {lightboxOpen && <div className="website-lightbox"><button className="close" onClick={() => setLightboxOpen(false)}>Close</button><button className="previous" onClick={() => setSelectedImage((selectedImage - 1 + images.length) % images.length)}>Previous</button>{mainImage && <img src={mainImage} alt="Full screen lead motorcycle" />}<button className="next" onClick={() => setSelectedImage((selectedImage + 1) % images.length)}>Next</button><span>{selectedImage + 1} of {images.length}</span></div>}
   </main>;
@@ -180,6 +217,18 @@ function InfoCard({ title, rows }: { title: string; rows: [string, React.ReactNo
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return <div><dt>{label}</dt><dd>{value || "Not recorded"}</dd></div>;
+}
+
+function ReferralHistory({ referrals, onUpdated }: { referrals: LeadReferral[]; onUpdated: (referral: LeadReferral) => void }) {
+  const [busyId, setBusyId] = useState("");
+  async function update(referral: LeadReferral, outcome: string) {
+    setBusyId(referral.id);
+    const response = await fetch(`/api/lead-referrals/${referral.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dealer_outcome: outcome, notes: referral.notes }) });
+    const payload = await response.json();
+    if (response.ok) onUpdated(payload.referral);
+    setBusyId("");
+  }
+  return <section className="website-detail-card status-actions referral-history"><h2>Referral History</h2><div className="website-actions"><Link href="/website-leads">Send another referral from lead card</Link><Link href="/dealer-contacts">Dealer Contacts</Link></div>{!referrals.length ? <p>No dealer referrals recorded yet.</p> : <div className="referral-history-list">{referrals.map(referral => <article key={referral.id}><header><div><b>{referral.dealer?.dealer_name || "Dealer"}</b><span>{referral.communication_method.toUpperCase()} · {referral.referral_status} · {formatLeadDate(referral.created_at)}</span></div><select value={referral.dealer_outcome} disabled={busyId === referral.id} onChange={event => void update(referral, event.target.value)}><option>Awaiting response</option><option>Dealer interested</option><option>Dealer declined</option><option>Customer contacted</option><option>Completed</option><option>Cancelled</option></select></header><dl><Row label="Customer details" value={referral.customer_consent_confirmed ? `Included with consent: ${referral.customer_consent_source}` : "Not confirmed or not included"} /><Row label="Subject" value={referral.message_subject} /><Row label="Failure" value={referral.failure_reason} /></dl><pre>{referral.message_body}</pre></article>)}</div>}</section>;
 }
 
 function copyText(value: string | null | undefined) {

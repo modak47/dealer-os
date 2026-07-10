@@ -1,4 +1,4 @@
-export const WEBSITE_LEAD_STATUSES = ["new", "reviewing", "contacted", "offer_made", "accepted", "declined", "purchased", "closed"] as const;
+export const WEBSITE_LEAD_STATUSES = ["new", "reviewing", "contacted", "offer_made", "accepted", "declined", "purchased", "closed", "purchase_agreed", "purchase_cancelled", "referred_to_dealer"] as const;
 export const WEBSITE_VALUATION_STATUSES = ["pending", "in_progress", "valued", "offer_ready", "needs_review", "complete"] as const;
 export const WEBSITE_LEAD_SOURCES = ["bikebuyeruk", "sellyourmotorbike", "motorcyclebuyer"] as const;
 
@@ -30,6 +30,18 @@ export type WebsiteLead = {
   email: string | null;
   phone: string | null;
   postcode: string | null;
+  normalised_postcode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  location_display_name?: string | null;
+  location_town?: string | null;
+  geocoding_status?: string | null;
+  geocoding_provider?: string | null;
+  location_checked_at?: string | null;
+  location_lookup_error?: string | null;
+  distance_from_yesmoto_miles?: number | null;
+  driving_distance_miles?: number | null;
+  estimated_drive_minutes?: number | null;
   image1: string | null;
   image2: string | null;
   image3: string | null;
@@ -52,6 +64,13 @@ export type WebsiteLead = {
   valuation_notes: string | null;
   "Motorway output": string | null;
   retail_check_id?: string | null;
+  stock_bike_id?: string | null;
+  purchase_agreed_at?: string | null;
+  latest_referral_id?: string | null;
+  latest_referred_dealer_id?: string | null;
+  latest_referred_dealer_name?: string | null;
+  latest_referred_at?: string | null;
+  referral_count?: number | null;
   valuation_started_at?: string | null;
   valuation_completed_at?: string | null;
   valuation_error?: string | null;
@@ -76,4 +95,16 @@ export type WebsiteLeadUpdate = Partial<Pick<WebsiteLead,
   valuation_started_at?: string | null;
   valuation_completed_at?: string | null;
   valuation_error?: string | null;
+  normalised_postcode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  location_display_name?: string | null;
+  location_town?: string | null;
+  geocoding_status?: string | null;
+  geocoding_provider?: string | null;
+  location_checked_at?: string | null;
+  location_lookup_error?: string | null;
+  distance_from_yesmoto_miles?: number | null;
+  driving_distance_miles?: number | null;
+  estimated_drive_minutes?: number | null;
 };
