@@ -21,12 +21,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const body = await request.json() as { checklist?: PdiChecklistItem[]; technicianName?: string; signatureDataUrl?: string };
+    const body = await request.json() as { checklist?: PdiChecklistItem[]; technicianName?: string; signatureDataUrl?: string; customerName?: string; customerSignatureDataUrl?: string; completionConfirmed?: boolean };
     const checklist = Array.isArray(body.checklist) ? body.checklist : defaultPdiChecklist;
     const technicianName = String(body.technicianName || "").trim();
     const signatureDataUrl = String(body.signatureDataUrl || "");
+    const customerName = String(body.customerName || "").trim();
+    const customerSignatureDataUrl = String(body.customerSignatureDataUrl || "");
     if (!technicianName) return NextResponse.json({ error: "Technician name is required." }, { status: 400 });
     if (!signatureDataUrl.startsWith("data:image/png;base64,")) return NextResponse.json({ error: "Technician signature is required." }, { status: 400 });
+    if (!body.completionConfirmed) return NextResponse.json({ error: "Please confirm the PDI is complete before generating the PDF." }, { status: 400 });
 
     const db = getSupabaseAdmin();
     const { data: bike, error: bikeError } = await db.from("stock_bikes").select("*").eq("id", id).maybeSingle();
@@ -35,7 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const supabase = await createClient();
     const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
-    const pdfBytes = await buildPdiPdf(bike as SupabaseStockBike, { checklist, technicianName, signatureDataUrl });
+    const pdfBytes = await buildPdiPdf(bike as SupabaseStockBike, { checklist, technicianName, signatureDataUrl, customerName, customerSignatureDataUrl, completionConfirmed: true });
     const fileName = `PDI-${bike.registration || bike.id}-${new Date().toISOString().slice(0, 10)}.pdf`;
     const filePath = stockDocumentPath(id, fileName);
     const upload = await db.storage.from(stockDocumentsBucket).upload(filePath, Buffer.from(pdfBytes), { contentType: "application/pdf", upsert: false });
