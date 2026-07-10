@@ -9,3 +9,5 @@
 ✓ Ready in 563ms
 
  GET / 200 in 758ms (next.js: 204ms, application-code: 553ms)
+ GET /admin?next=%2Fadmin%2Fstock 200 in 286ms (next.js: 43ms, proxy.ts: 6ms, application-code: 237ms)
+✓ Compiled in 248ms

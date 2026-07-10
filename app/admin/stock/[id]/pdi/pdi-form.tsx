@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SupabaseStockBike } from "@/lib/stock-bike-types";
 import { defaultPdiChecklist, pdiSections, type PdiChecklistItem, type PdiResult } from "@/lib/stock-pdi-types";
 
@@ -16,6 +16,30 @@ function editableChecklist(value: PdiChecklistItem[]) {
 function SignaturePad({ label, onChange }: { label: string; onChange: (value: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    function resize() {
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.round(rect.width * dpr));
+      const height = Math.max(1, Math.round(rect.height * dpr));
+      if (canvas.width === width && canvas.height === height) return;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (ctx) {
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+      }
+    }
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
   function point(event: React.PointerEvent<HTMLCanvasElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -36,8 +60,9 @@ function SignaturePad({ label, onChange }: { label: string; onChange: (value: st
     const ctx = event.currentTarget.getContext("2d");
     if (!ctx) return;
     const p = point(event);
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2;
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.strokeStyle = "#ffffff";
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
@@ -49,10 +74,11 @@ function SignaturePad({ label, onChange }: { label: string; onChange: (value: st
   }
   function clear() {
     const canvas = canvasRef.current;
-    canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+    const rect = canvas?.getBoundingClientRect();
+    if (canvas && rect) canvas.getContext("2d")?.clearRect(0, 0, rect.width, rect.height);
     onChange("");
   }
-  return <div><span>{label}</span><canvas ref={canvasRef} width={720} height={180} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerLeave={end} /><button type="button" onClick={clear}>Clear signature</button></div>;
+  return <div><span>{label}</span><canvas ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerLeave={end} /><button type="button" onClick={clear}>Clear signature</button></div>;
 }
 
 export function PdiForm({ bike, initialChecklist = defaultPdiChecklist }: { bike: SupabaseStockBike; initialChecklist?: PdiChecklistItem[] }) {
