@@ -1,0 +1,33 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useParams } from "next/navigation";
+
+type Bike = {id:string;stockNumber:string|null;registration:string|null;make:string|null;model:string|null;year:number|null;status:string;purchasePrice:number;deposit:number;balance:number;purchaseDate:string|null;seller:string|null;source:string|null;workshopCost:number;partsCost:number;labourCost:number;valetingCost:number;photographyCost:number;transportCosts:number;hpiCost:number;miscellaneousCost:number;targetRetail:number;advertisedPrice:number;agreedSalePrice:number;discountGiven:number;totalInvestment:number;expectedGrossProfit:number;actualGrossProfit:number;profitPercent:number|null;alerts:string[];raw:Record<string,unknown>};
+const fields=["purchase_price","deposit_paid","balance_outstanding","purchase_date","seller_name","purchase_source","workshop_cost","parts_cost","labour_cost","valeting_cost","photography_cost","estimated_transport_cost","actual_transport_cost","hpi_cost","miscellaneous_cost","target_retail_price","price","actual_sale_price","discount_given"] as const;
+const labels:Record<string,string>={purchase_price:"Purchase Price",deposit_paid:"Deposit",balance_outstanding:"Balance",purchase_date:"Purchase Date",seller_name:"Seller",purchase_source:"Source",workshop_cost:"Workshop",parts_cost:"Parts",labour_cost:"Labour",valeting_cost:"Valeting",photography_cost:"Photography",estimated_transport_cost:"Estimated Transport",actual_transport_cost:"Actual Transport",hpi_cost:"HPI",miscellaneous_cost:"Miscellaneous",target_retail_price:"Target Retail",price:"Current Advertised Price",actual_sale_price:"Agreed Sale Price",discount_given:"Discount Given"};
+const money=(v:number)=>new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP",maximumFractionDigits:0}).format(v||0);
+
+export default function StockLedgerBikePage(){
+  const params=useParams<{id:string}>(),[bike,setBike]=useState<Bike|null>(null),[form,setForm]=useState<Record<string,string>>({}),[error,setError]=useState(""),[notice,setNotice]=useState(""),[saving,setSaving]=useState(false);
+  useEffect(()=>{let active=true;fetch(`/api/stock-ledger/${params.id}`).then(async r=>{const p=await r.json();if(!r.ok)throw new Error(p.error||"Unable to load bike finance.");if(active){setBike(p.bike);setForm(formFrom(p.bike))}}).catch(e=>active&&setError(e instanceof Error?e.message:"Unable to load bike finance."));return()=>{active=false}},[params.id]);
+  const calc=useMemo(()=>{const n=(key:string)=>Number(form[key]||0)||0,total=n("purchase_price")+n("workshop_cost")+n("parts_cost")+n("labour_cost")+n("valeting_cost")+n("photography_cost")+n("estimated_transport_cost")+n("actual_transport_cost")+n("hpi_cost")+n("miscellaneous_cost"),retail=n("target_retail_price")||n("price"),sale=n("actual_sale_price"),expected=retail-total,actual=sale?sale-total:0,percent=total?((sale||retail)-total)/total*100:null;return{total,retail,sale,expected,actual,percent}},[form]);
+  function set(key:string,value:string){setForm(current=>({...current,[key]:value}))}
+  async function save(e:FormEvent){e.preventDefault();setSaving(true);setError("");setNotice("");const response=await fetch(`/api/stock-ledger/${params.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const payload=await response.json();if(response.ok){setBike(payload.bike);setForm(formFrom(payload.bike));setNotice("Finance saved.")}else setError(payload.error||"Unable to save finance.");setSaving(false)}
+  if(error&&!bike)return <main className="admin-page stock-ledger-page"><div className="website-state error">{error}</div></main>;
+  if(!bike)return <main className="admin-page stock-ledger-page"><div className="website-state">Loading finance breakdown...</div></main>;
+  return <main className="admin-page stock-ledger-page"><div className="website-detail-head"><Link href="/admin/stock-ledger">Back to stock ledger</Link><div><span className="website-badge">{bike.status}</span><h1>{bike.stockNumber||bike.registration||bike.id} · {[bike.make,bike.model].filter(Boolean).join(" ")}</h1><p>Detailed financial breakdown and live profit calculations.</p></div></div>{error&&<div className="website-state error compact">{error}</div>}{notice&&<div className="website-state success compact">{notice}</div>}
+    <section className="ledger-bike-kpis"><article><span>Total Cost</span><strong>{money(calc.total)}</strong></article><article><span>Expected Profit</span><strong>{money(calc.expected)}</strong></article><article><span>Actual Profit</span><strong>{calc.sale?money(calc.actual):"-"}</strong></article><article><span>Profit %</span><strong>{calc.percent==null?"-":`${calc.percent.toFixed(1)}%`}</strong></article></section>
+    {bike.alerts.length>0&&<section className="ledger-alerts">{bike.alerts.map(alert=><b key={alert}>{alert}</b>)}</section>}
+    <form className="ledger-finance-form" onSubmit={save}>
+      <Panel title="Purchase" keys={["purchase_price","deposit_paid","balance_outstanding","purchase_date","seller_name","purchase_source"]} form={form} set={set}/>
+      <Panel title="Costs" keys={["workshop_cost","parts_cost","labour_cost","valeting_cost","photography_cost","estimated_transport_cost","actual_transport_cost","hpi_cost","miscellaneous_cost"]} form={form} set={set}/>
+      <Panel title="Retail" keys={["target_retail_price","price","actual_sale_price","discount_given"]} form={form} set={set}/>
+      <section className="ledger-finance-summary"><h2>Live Calculation</h2><p>Purchase {money(Number(form.purchase_price)||0)} + costs {money(calc.total-(Number(form.purchase_price)||0))} = total cost {money(calc.total)}.</p><p>Retail {money(calc.retail)} gives expected profit {money(calc.expected)}.</p>{calc.sale>0&&<p>Sale {money(calc.sale)} gives actual profit {money(calc.actual)}.</p>}<button className="admin-primary" disabled={saving}>{saving?"Saving...":"Save Finance"}</button></section>
+    </form>
+  </main>
+}
+
+function formFrom(bike:Bike){return Object.fromEntries(fields.map(key=>[key,String((bike.raw?.[key]??"") as string|number)]))}
+function Panel({title,keys,form,set}:{title:string;keys:string[];form:Record<string,string>;set:(key:string,value:string)=>void}){return <section className="ledger-finance-panel"><h2>{title}</h2>{keys.map(key=><label key={key}><span>{labels[key]}</span><input type={key.includes("date")?"date":key.includes("name")||key.includes("source")?"text":"number"} min="0" step="0.01" value={form[key]??""} onChange={e=>set(key,e.target.value)}/></label>)}</section>}
