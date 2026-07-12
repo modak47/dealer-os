@@ -6,7 +6,7 @@ import { confirmationLinks, updateCollection } from "@/lib/collections";
 
 export const dynamic = "force-dynamic";
 
-const selectCollection = "*,stock:stock_bikes(id,stock_number,registration,make,model,variant,year,status,website_lead_id,customer_name,customer_phone,customer_email,customer_address,customer_postcode,collection_address,collection_postcode,collection_latitude,collection_longitude,collection_location_display_name,distance_from_yesmoto_miles,estimated_drive_minutes,collection_notes,purchase_price,deposit_paid,balance_outstanding,expected_arrival_date,mileage),assigned_user:dealer_users(id,full_name,role,phone)";
+const selectCollection = "*,stock:stock_bikes(id,stock_number,registration,make,model,variant,year,status,website_lead_id,customer_name,customer_phone,customer_email,customer_address,customer_postcode,collection_address,collection_postcode,collection_latitude,collection_longitude,collection_location_display_name,distance_from_yesmoto_miles,estimated_drive_minutes,collection_notes,purchase_price,deposit_paid,balance_outstanding,expected_arrival_date,mileage),assigned_user:dealer_users!stock_collections_assigned_user_id_fkey(id,full_name,role,phone)";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!await requireStaffUser()) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
