@@ -16,7 +16,7 @@ function nonNegative(value: unknown, label: string) {
   return parsed;
 }
 
-export async function confirmPurchasePendingArrival(db: SupabaseClient, stockId: string, body: Record<string, unknown>, userId: string | null) {
+export async function confirmPurchasePendingArrival(db: SupabaseClient, stockId: string | number, body: Record<string, unknown>, userId: string | null) {
   const now = new Date().toISOString();
   const updates = {
     status: "In Stock",
@@ -45,7 +45,7 @@ export async function confirmPurchasePendingArrival(db: SupabaseClient, stockId:
   return data;
 }
 
-export async function cancelPurchasePending(db: SupabaseClient, stockId: string, websiteLeadId: number | null | undefined, reason: string, userId: string | null) {
+export async function cancelPurchasePending(db: SupabaseClient, stockId: string | number, websiteLeadId: number | null | undefined, reason: string, userId: string | null) {
   const now = new Date().toISOString();
   if (!reason) throw new Error("Cancellation reason is required.");
   const { data, error } = await db.from("stock_bikes").update({ status: "Purchase Cancelled", cancelled_at: now, cancellation_reason: reason, show_on_website: false, reserve_enabled: false, updated_by: userId }).eq("id", stockId).select("*").single();

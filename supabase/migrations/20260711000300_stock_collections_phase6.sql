@@ -1,6 +1,6 @@
 create table if not exists public.stock_collections (
   id uuid primary key default gen_random_uuid(),
-  stock_bike_id uuid not null references public.stock_bikes(id) on delete cascade,
+  stock_bike_id bigint not null references public.stock_bikes(id) on delete cascade,
   website_lead_id bigint,
   collection_type text not null default 'customer_collection',
   collection_status text not null default 'not_scheduled',
@@ -108,7 +108,7 @@ create index if not exists stock_collections_stock_idx on public.stock_collectio
 create table if not exists public.stock_collection_events (
   id uuid primary key default gen_random_uuid(),
   collection_id uuid not null references public.stock_collections(id) on delete cascade,
-  stock_bike_id uuid not null references public.stock_bikes(id) on delete cascade,
+  stock_bike_id bigint not null references public.stock_bikes(id) on delete cascade,
   event_type text not null,
   message text,
   previous_status text,

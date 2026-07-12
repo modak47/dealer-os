@@ -12,7 +12,7 @@ export const paymentMethods = ["no_payment_due", "bank_transfer", "cash", "finan
 export type CollectionStatus = typeof collectionStatuses[number];
 export type CollectionRow = Record<string, unknown> & {
   id: string;
-  stock_bike_id: string;
+  stock_bike_id: number;
   website_lead_id: number | null;
   collection_type: string;
   collection_status: CollectionStatus;
@@ -37,7 +37,7 @@ export type CollectionRow = Record<string, unknown> & {
 };
 
 export type CollectionStock = {
-  id: string;
+  id: number;
   stock_number: string | null;
   registration: string | null;
   make: string | null;
@@ -85,8 +85,9 @@ export function canTransition(from: string, to: string) {
 
 export async function getCollections(view = "upcoming", stockId?: string | null, assigned = "all") {
   const db = getSupabaseAdmin();
+  const parsedStockId = optionalStockId(stockId);
   const [{ data, error }, { data: pending, error: pendingError }, { data: staff }] = await Promise.all([
-    buildCollectionQuery(view, stockId, assigned),
+    buildCollectionQuery(view, parsedStockId, assigned),
     db.from("stock_bikes").select(pendingSelect).eq("status", "Purchase Pending").order("created_at", { ascending: false }),
     db.from("dealer_users").select("id,full_name,role,phone,active").eq("active", true).order("full_name"),
   ]);
@@ -98,7 +99,7 @@ export async function getCollections(view = "upcoming", stockId?: string | null,
 
   const collections = (data ?? []) as CollectionRow[];
   const activeStockIds = new Set(collections.filter(item => !terminal(item.collection_status)).map(item => item.stock_bike_id));
-  const unscheduled = ((pending ?? []) as CollectionStock[]).filter(bike => !activeStockIds.has(String(bike.id)));
+  const unscheduled = ((pending ?? []) as CollectionStock[]).filter(bike => !activeStockIds.has(Number(bike.id)));
   return {
     migrationReady: true,
     collections,
@@ -110,7 +111,7 @@ export async function getCollections(view = "upcoming", stockId?: string | null,
 
 export async function createCollection(body: Record<string, unknown>, userId: string | null) {
   const db = getSupabaseAdmin();
-  const stockId = text(body.stock_bike_id, 80);
+  const stockId = requiredStockId(body.stock_bike_id);
   if (!stockId) throw new Error("Stock record is required.");
   const { data: stock, error: stockError } = await db.from("stock_bikes").select(pendingSelect).eq("id", stockId).maybeSingle();
   if (stockError) throw stockError;
@@ -203,9 +204,9 @@ export async function updateCollection(id: string, body: Record<string, unknown>
   };
   const { data, error } = await db.from("stock_collections").update(update).eq("id", id).select(selectCollection).single();
   if (error) throw error;
-  await syncStockLocation(db, String(current.stock_bike_id), location.stock);
+  await syncStockLocation(db, current.stock_bike_id, location.stock);
   await applyStockFinanceFromCollection(db, data as CollectionRow);
-  await writeEvent(id, String(current.stock_bike_id), "collection_edited", "Collection edited", String(current.collection_status), String(data.collection_status), {}, userId);
+  await writeEvent(id, current.stock_bike_id, "collection_edited", "Collection edited", String(current.collection_status), String(data.collection_status), {}, userId);
   return { collection: data, warnings: await conflictWarnings(data as CollectionRow) };
 }
 
@@ -276,7 +277,7 @@ async function transitionCollection(current: CollectionRow, next: CollectionStat
   if (error) throw error;
   await applyStockFinanceFromCollection(db, data as CollectionRow);
   if (next === "received") {
-    await confirmPurchasePendingArrival(db, String(current.stock_bike_id), {
+    await confirmPurchasePendingArrival(db, current.stock_bike_id, {
       actual_purchase_price: data.final_purchase_price ?? (current.stock as CollectionStock | null)?.purchase_price ?? 0,
       actual_mileage: data.actual_mileage ?? (current.stock as CollectionStock | null)?.mileage,
       keys_received: data.keys_received,
@@ -286,7 +287,7 @@ async function transitionCollection(current: CollectionRow, next: CollectionStat
       actual_arrival_date: now.slice(0, 10),
     }, userId);
   }
-  await writeEvent(current.id, String(current.stock_bike_id), eventTypeFor(next), eventMessageFor(next), String(current.collection_status), next, {}, userId);
+  await writeEvent(current.id, current.stock_bike_id, eventTypeFor(next), eventMessageFor(next), String(current.collection_status), next, {}, userId);
   return { collection: data, warnings: await conflictWarnings(data as CollectionRow) };
 }
 
@@ -304,11 +305,11 @@ async function prepareConfirmation(current: CollectionRow, body: Record<string, 
   };
   const { data, error } = await db.from("stock_collections").update(update).eq("id", current.id).select(selectCollection).single();
   if (error) throw error;
-  await writeEvent(current.id, String(current.stock_bike_id), "confirmation_prepared", `Customer confirmation prepared by ${method}`, String(current.collection_status), String(current.collection_status), { method }, userId);
+  await writeEvent(current.id, current.stock_bike_id, "confirmation_prepared", `Customer confirmation prepared by ${method}`, String(current.collection_status), String(current.collection_status), { method }, userId);
   return { collection: data, warnings: [] };
 }
 
-async function buildCollectionQuery(view: string, stockId?: string | null, assigned = "all") {
+async function buildCollectionQuery(view: string, stockId?: number | null, assigned = "all") {
   const db = getSupabaseAdmin();
   let query = db.from("stock_collections").select(selectCollection).order("scheduled_date", { ascending: true }).order("scheduled_start_time", { ascending: true });
   const today = new Date();
@@ -344,7 +345,7 @@ async function resolveCollectionLocation(body: Record<string, unknown>, stock?: 
   };
 }
 
-async function syncStockLocation(db: ReturnType<typeof getSupabaseAdmin>, stockId: string, update: Record<string, unknown>) {
+async function syncStockLocation(db: ReturnType<typeof getSupabaseAdmin>, stockId: number, update: Record<string, unknown>) {
   await db.from("stock_bikes").update(update).eq("id", stockId);
 }
 
@@ -376,7 +377,7 @@ export async function conflictWarnings(collection: CollectionRow) {
   return (data ?? []).filter(other => start < minutes(other.scheduled_end_time) && end > minutes(other.scheduled_start_time)).map(other => `${collection.assigned_driver_name || "Assigned staff"} already has a collection ${other.collection_postcode ? `near ${other.collection_postcode}` : ""} scheduled until ${String(other.scheduled_end_time).slice(0, 5)}.`);
 }
 
-async function writeEvent(collectionId: string, stockId: string, type: string, message: string, previousStatus: string | null, newStatus: string | null, metadata: Record<string, unknown>, userId: string | null) {
+async function writeEvent(collectionId: string, stockId: number, type: string, message: string, previousStatus: string | null, newStatus: string | null, metadata: Record<string, unknown>, userId: string | null) {
   await getSupabaseAdmin().from("stock_collection_events").insert({ collection_id: collectionId, stock_bike_id: stockId, event_type: type, message, previous_status: previousStatus, new_status: newStatus, metadata, created_by: userId });
 }
 
@@ -492,6 +493,19 @@ function hasSchedule(body: Record<string, unknown>) {
 
 function text(value: unknown, max = 500) {
   return cleanLocationText(value, max) || null;
+}
+
+function optionalStockId(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error("Stock ID must be a valid number.");
+  return parsed;
+}
+
+function requiredStockId(value: unknown) {
+  const parsed = optionalStockId(value);
+  if (!parsed) throw new Error("Stock record is required.");
+  return parsed;
 }
 
 function nonNegative(value: unknown, label: string) {
