@@ -1,3 +1,64 @@
+do $$
+declare
+  constraint_record record;
+begin
+  if to_regclass('public.stock_collections') is not null
+    and exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'stock_collections'
+        and column_name = 'stock_bike_id'
+        and data_type = 'uuid'
+    )
+  then
+    if exists (select 1 from public.stock_collections where stock_bike_id is not null) then
+      raise exception 'stock_collections.stock_bike_id is uuid but public.stock_bikes.id is bigint. Clear existing collection rows before rerunning this repair migration.';
+    end if;
+
+    for constraint_record in
+      select conname
+      from pg_constraint
+      where conrelid = 'public.stock_collections'::regclass
+        and conkey @> array[(select attnum from pg_attribute where attrelid = 'public.stock_collections'::regclass and attname = 'stock_bike_id')]
+    loop
+      execute format('alter table public.stock_collections drop constraint if exists %I', constraint_record.conname);
+    end loop;
+
+    alter table public.stock_collections alter column stock_bike_id drop not null;
+    alter table public.stock_collections alter column stock_bike_id type bigint using null;
+    alter table public.stock_collections alter column stock_bike_id set not null;
+  end if;
+
+  if to_regclass('public.stock_collection_events') is not null
+    and exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'stock_collection_events'
+        and column_name = 'stock_bike_id'
+        and data_type = 'uuid'
+    )
+  then
+    if exists (select 1 from public.stock_collection_events where stock_bike_id is not null) then
+      raise exception 'stock_collection_events.stock_bike_id is uuid but public.stock_bikes.id is bigint. Clear existing collection event rows before rerunning this repair migration.';
+    end if;
+
+    for constraint_record in
+      select conname
+      from pg_constraint
+      where conrelid = 'public.stock_collection_events'::regclass
+        and conkey @> array[(select attnum from pg_attribute where attrelid = 'public.stock_collection_events'::regclass and attname = 'stock_bike_id')]
+    loop
+      execute format('alter table public.stock_collection_events drop constraint if exists %I', constraint_record.conname);
+    end loop;
+
+    alter table public.stock_collection_events alter column stock_bike_id drop not null;
+    alter table public.stock_collection_events alter column stock_bike_id type bigint using null;
+    alter table public.stock_collection_events alter column stock_bike_id set not null;
+  end if;
+end $$;
+
 create table if not exists public.stock_collections (
   id uuid primary key default gen_random_uuid(),
   stock_bike_id bigint not null references public.stock_bikes(id) on delete cascade,
@@ -120,6 +181,29 @@ create table if not exists public.stock_collection_events (
 
 create index if not exists stock_collection_events_collection_idx on public.stock_collection_events(collection_id, created_at desc);
 create index if not exists stock_collection_events_stock_idx on public.stock_collection_events(stock_bike_id, created_at desc);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'stock_collections_stock_bike_id_fkey'
+      and conrelid = 'public.stock_collections'::regclass
+  ) then
+    alter table public.stock_collections
+      add constraint stock_collections_stock_bike_id_fkey
+      foreign key (stock_bike_id) references public.stock_bikes(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'stock_collection_events_stock_bike_id_fkey'
+      and conrelid = 'public.stock_collection_events'::regclass
+  ) then
+    alter table public.stock_collection_events
+      add constraint stock_collection_events_stock_bike_id_fkey
+      foreign key (stock_bike_id) references public.stock_bikes(id) on delete cascade;
+  end if;
+end $$;
 
 create or replace function public.stock_collection_set_updated_at()
 returns trigger

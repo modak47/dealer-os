@@ -92,10 +92,13 @@ export async function getCollections(view = "upcoming", stockId?: string | null,
     db.from("dealer_users").select("id,full_name,role,phone,active").eq("active", true).order("full_name"),
   ]);
   if (error) {
-    if (["42P01", "42703"].includes(error.code ?? "")) return emptyCollections(false);
+    if (isCollectionSchemaError(error)) return emptyCollections(false);
     throw error;
   }
-  if (pendingError) throw pendingError;
+  if (pendingError) {
+    if (isCollectionSchemaError(pendingError)) return emptyCollections(false);
+    throw pendingError;
+  }
 
   const collections = (data ?? []) as CollectionRow[];
   const activeStockIds = new Set(collections.filter(item => !terminal(item.collection_status)).map(item => item.stock_bike_id));
@@ -485,6 +488,13 @@ function emptyCollections(migrationReady: boolean) {
 
 function terminal(status: string) {
   return ["received", "cancelled", "failed"].includes(status);
+}
+
+function isCollectionSchemaError(error: { code?: string; message?: string; details?: string | null }) {
+  const code = error.code ?? "";
+  const message = `${error.message ?? ""} ${error.details ?? ""}`;
+  return ["42P01", "42703", "PGRST200", "PGRST204"].includes(code)
+    || /stock_collections|stock_collection_events|stock_bikes|dealer_users|relationship|schema cache|foreign key/i.test(message);
 }
 
 function hasSchedule(body: Record<string, unknown>) {
