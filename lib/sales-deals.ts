@@ -83,8 +83,8 @@ export async function getSalesPipeline(): Promise<SalesPipelineResult> {
   const now = new Date();
   const month = now.getMonth();
   const year = now.getFullYear();
-  const openDeals = deals.filter(deal => !["Completed", "Cancelled"].includes(deal.status));
-  const completedThisMonth = deals.filter(deal => deal.status === "Completed" && deal.completed_at && sameMonth(deal.completed_at, month, year)).length;
+  const openDeals = deals.filter(deal => !["Completed", "Sale Completed", "Cancelled"].includes(deal.status));
+  const completedThisMonth = deals.filter(deal => ["Completed", "Sale Completed"].includes(deal.status) && deal.completed_at && sameMonth(deal.completed_at, month, year)).length;
 
   return {
     migrationReady: true,
@@ -93,9 +93,9 @@ export async function getSalesPipeline(): Promise<SalesPipelineResult> {
     kpis: {
       openDeals: openDeals.length,
       reserved: reservations.length + openDeals.filter(deal => deal.status === "Reserved").length,
-      awaitingPayment: openDeals.filter(deal => deal.status === "Awaiting Payment").length,
+      awaitingPayment: openDeals.filter(deal => ["Sale Pending", "Awaiting Payment", "Sale Agreed"].includes(deal.status)).length,
       finance: openDeals.filter(deal => deal.status === "Finance").length,
-      delivery: openDeals.filter(deal => deal.status === "Delivery").length,
+      delivery: openDeals.filter(deal => ["Sold", "Delivery"].includes(deal.status)).length,
       completedThisMonth,
       openValue: openDeals.reduce((sum, deal) => sum + Number(deal.sale_price ?? deal.bike?.price ?? 0), 0),
       outstandingBalance: openDeals.reduce((sum, deal) => sum + Number(deal.balance_due ?? invoiceBalance(deal) ?? 0), 0),

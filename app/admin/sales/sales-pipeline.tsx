@@ -7,10 +7,10 @@ import type { PipelineReservation, SalesDeal } from "@/lib/sales-deals";
 
 const columns = [
   { key: "Reservation", title: "Reservations", statuses: ["Reservation"] },
-  { key: "Awaiting Payment", title: "Awaiting Payment", statuses: ["Awaiting Payment", "Sale Agreed"] },
+  { key: "Sale Pending", title: "Sale Pending", statuses: ["Sale Pending", "Awaiting Payment", "Sale Agreed"] },
   { key: "Finance", title: "Finance", statuses: ["Finance"] },
-  { key: "Delivery", title: "Handover", statuses: ["Delivery"] },
-  { key: "Completed", title: "Completed", statuses: ["Completed"] },
+  { key: "Sold", title: "Sold / Handover", statuses: ["Sold", "Delivery"] },
+  { key: "Sale Completed", title: "Completed", statuses: ["Sale Completed", "Completed"] },
   { key: "Cancelled", title: "Cancelled", statuses: ["Cancelled"] },
 ];
 
@@ -60,6 +60,9 @@ export function SalesPipeline({ deals, reservations }: { deals: SalesDeal[]; res
       <select value={stage} onChange={event => setStage(event.target.value)}>
         <option value="all">All stages</option>
         <option value="Reservation">Reservations</option>
+        <option>Sale Pending</option>
+        <option>Sold</option>
+        <option>Sale Completed</option>
         <option>Awaiting Payment</option>
         <option>Finance</option>
         <option>Delivery</option>
@@ -111,7 +114,7 @@ function DealCard({ deal }: { deal: SalesDeal }) {
     <footer>
       <Link href={`/admin/sales/${deal.id}`}>View Deal</Link>
       {invoice && <Link href={`/admin/accounts/invoices/${invoice.id}/document`} target="_blank">Invoice</Link>}
-      {deal.bike?.id && <Link href={`/admin/stock/${deal.bike.id}`}>Stock</Link>}
+      {deal.bike?.id && <Link href={`/admin/stock/${deal.bike.id}`}>Vehicle</Link>}
     </footer>
   </article>;
 }
