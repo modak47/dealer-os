@@ -12,7 +12,7 @@ type NavGroup = { name: string; key: string; collapsible: boolean; items: NavIte
 
 const groups: NavGroup[] = [
   { name: "Overview", key: "overview", collapsible: false, items: [{ name: "Overview", href: "/admin/dashboard", icon: "O" }, { name: "Settings", href: "/admin/settings", icon: "⚙" }] },
-  { name: "Sales", key: "sales", collapsible: true, items: [{ name: "Stock", href: "/admin/stock", icon: "S" }, { name: "Stock Ledger", href: "/admin/stock-ledger", icon: "£" }, { name: "Sales Pipeline", href: "/admin/sales", icon: "P" }, { name: "New Sale", href: "/admin/sales/new", icon: "N" }, { name: "Invoices", href: "/admin/accounts/invoices", icon: "I" }, { name: "Customers", href: "/admin/customers", icon: "C" }] },
+  { name: "Sales", key: "sales", collapsible: true, items: [{ name: "Stock", href: "/admin/stock", icon: "S" }, { name: "Book In", href: "/admin/stock/book-in", icon: "B" }, { name: "Financial Ledger", href: "/admin/ledger", icon: "L" }, { name: "Stock Ledger", href: "/admin/stock-ledger", icon: "£" }, { name: "Sales Pipeline", href: "/admin/sales", icon: "P" }, { name: "New Sale", href: "/admin/sales/new", icon: "N" }, { name: "Invoices", href: "/admin/accounts/invoices", icon: "I" }, { name: "Customers", href: "/admin/customers", icon: "C" }] },
   { name: "Preparation", key: "preparation", collapsible: true, items: [{ name: "Collections", href: "/admin/collections", icon: "C" }, { name: "Workflow", href: "/workflow", icon: "W" }, { name: "Workshop", href: "/workshop", icon: "W" }, { name: "Valeting", href: "/valeting", icon: "V" }, { name: "Photos", href: "/photos", icon: "P" }] },
   { name: "Buying Tools", key: "buying", collapsible: true, items: [{ name: "Market", href: "/market-intelligence", icon: "M" }, { name: "Opportunities", href: "/admin/opportunities", icon: "O" }, { name: "Retail Checker", href: "/admin/retail-check", icon: "R" }, { name: "VRM Lookup", href: "/admin/vrm-lookup", icon: "V" }] },
   { name: "Leads", key: "leads", collapsible: true, items: [{ name: "Leads", href: "/admin/leads", icon: "L" }, { name: "Website Leads", href: "/website-leads", icon: "W" }, { name: "Dealer Contacts", href: "/dealer-contacts", icon: "D" }] },
@@ -77,3 +77,5 @@ export function AdminSidebar({ identity, mobileOpen = false, onNavigate }: { ide
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
+
+
