@@ -37,7 +37,7 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
   const kpis = useMemo(() => [
     ["Status", String(activeSale?.status ?? bike.status ?? "Unknown")],
     ["Customer", customerName(activeSale ?? activeReservation) || customerNameFromSelect(selectedCustomer) || "-"],
-    ["Invoice", latestInvoice ? `${latestInvoice.invoice_number ?? "Invoice"} · ${money(latestInvoice.balance)} due` : "Not created"],
+    ["Invoice", latestInvoice ? `${latestInvoice.invoice_number ?? "Invoice"} - ${money(latestInvoice.balance)} due` : "Not created"],
     ["Payments", money(workspace.payments.reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0))],
   ], [activeReservation, activeSale, bike.status, latestInvoice, selectedCustomer, workspace.payments]);
 
@@ -70,9 +70,9 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
     <header className="dms-vehicle-hero">
       <div className="dms-vehicle-hero-media" style={{ backgroundImage: `url("${bike.primary_image_url || "/bike-placeholder.svg"}")` }} />
       <div>
-        <Link href="/admin/stock" className="dms-vehicle-back">← Stock</Link>
+        <Link href="/admin/stock" className="dms-vehicle-back">Back to Stock</Link>
         <h1>{[bike.year, bike.make, bike.model, bike.variant].filter(Boolean).join(" ") || "Motorcycle"}</h1>
-        <p>{bike.registration || "Registration pending"} · {bike.stock_number || `Stock #${bike.id}`}</p>
+        <p>{bike.registration || "Registration pending"} - {bike.stock_number || `Stock #${bike.id}`}</p>
         <div className="dms-vehicle-stage">
           {["In Stock", "Reserved", "Sale Pending", "Sold", "Sale Completed"].map((stage, index) => <span className={index <= progress ? "done" : ""} key={stage}>{stage}</span>)}
         </div>
