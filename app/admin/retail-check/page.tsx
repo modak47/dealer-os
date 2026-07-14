@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -91,6 +91,8 @@ export default function RetailCheckPage() {
 
   const [selectedHistoryRecord, setSelectedHistoryRecord] =
     useState<any>(null);
+  const activeCheckIdRef = useRef(recordId);
+  const submissionGenerationRef = useRef(0);
 
   async function syncWebsiteLeadValuation(leadId:string, retailCheckId:string, data:Record<string, unknown>) {
     const retail = Number(data["Market Retail"]) || null;
@@ -126,12 +128,14 @@ export default function RetailCheckPage() {
 
   useEffect(() => {
     if (!recordId) return;
+    activeCheckIdRef.current = recordId;
     let cancelled = false;
 
     async function loadCurrent() {
+      const expectedId = recordId;
       const response = await fetch(`/api/retail-check/${recordId}`);
       const data = await response.json();
-      if (!cancelled && !data.error) {
+      if (!cancelled && activeCheckIdRef.current === expectedId && !data.error) {
         setValuation(data);
         setStatus(data.Status === "Checked" ? "Valuation Complete" : String(data.Status ?? "Pending"));
         setActiveTab("valuation");
@@ -164,9 +168,11 @@ export default function RetailCheckPage() {
 
   useEffect(() => {
     if (!recordId) return;
+    activeCheckIdRef.current = recordId;
     let stopped = false;
     let syncedLead = false;
     let pollInterval: ReturnType<typeof setInterval> | null = null;
+    const watchedId = recordId;
 
     function stopPollingIfTerminal(record: RetailCheck) {
       if (terminalStatuses.has(String(record.Status)) && pollInterval) {
@@ -176,29 +182,30 @@ export default function RetailCheckPage() {
     }
 
     async function refresh() {
-      const response = await fetch(`/api/retail-check/${recordId}`);
+      const response = await fetch(`/api/retail-check/${watchedId}`);
       const data = await response.json();
-      if (stopped || data.error) return;
+      if (stopped || activeCheckIdRef.current !== watchedId || String(data.id) !== String(watchedId) || data.error) return;
       setValuation(data);
       setStatus(data.Status === "Checked" ? "Valuation Complete" : String(data.Status ?? "Pending"));
       stopPollingIfTerminal(data);
       if (data.Status === "Checked" && websiteLeadId && !syncedLead) {
         syncedLead = true;
-        await syncWebsiteLeadValuation(websiteLeadId, recordId, data);
+        await syncWebsiteLeadValuation(websiteLeadId, watchedId, data);
       }
     }
 
     const supabase = createClient();
     const channel = supabase
-      .channel(`retail-check-${recordId}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "retail_checks", filter: `id=eq.${recordId}` }, async payload => {
+      .channel(`retail-check-${watchedId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "retail_checks", filter: `id=eq.${watchedId}` }, async payload => {
         const next = payload.new as RetailCheck;
+        if (stopped || activeCheckIdRef.current !== watchedId || String(next.id) !== String(watchedId)) return;
         setValuation(next);
         setStatus(next.Status === "Checked" ? "Valuation Complete" : String(next.Status ?? "Pending"));
         stopPollingIfTerminal(next);
         if (next.Status === "Checked" && websiteLeadId && !syncedLead) {
           syncedLead = true;
-          await syncWebsiteLeadValuation(websiteLeadId, recordId, next);
+          await syncWebsiteLeadValuation(websiteLeadId, watchedId, next);
         }
       })
       .subscribe();
@@ -255,13 +262,21 @@ export default function RetailCheckPage() {
 }
 
   async function checkMarket() {
+    const generation = submissionGenerationRef.current + 1;
+    submissionGenerationRef.current = generation;
     try {
       setSubmitError("");
       if (!registration.trim()) throw new Error("Registration is required.");
       if (!mileage.trim() || !Number.isFinite(Number(mileage))) throw new Error("Mileage is required.");
       if (askingPrice && !Number.isFinite(Number(askingPrice))) throw new Error("Asking price must be a number.");
       setLoading(true);
-      const nextRequestId = requestId || crypto.randomUUID();
+      activeCheckIdRef.current = "";
+      setRecordId("");
+      setSelectedHistoryRecord(null);
+      setValuation(null);
+      setStatus("Starting Check...");
+      setElapsedTick(0);
+      const nextRequestId = crypto.randomUUID();
       setRequestId(nextRequestId);
 
       const response = await fetch("/api/retail-check", {
@@ -281,8 +296,10 @@ export default function RetailCheckPage() {
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to create Retail Check");
+      if (submissionGenerationRef.current !== generation) return;
+      if (!data.recordId) throw new Error("Retail Check was not created.");
 
-      setSelectedHistoryRecord(null);
+      activeCheckIdRef.current = String(data.recordId);
       setValuation(data.record || null);
 
       setActiveTab("valuation");
@@ -296,9 +313,11 @@ export default function RetailCheckPage() {
       setRecordId(data.recordId); 
     } catch (error) {
       console.error(error);
-      setSubmitError(error instanceof Error ? error.message : "Failed to create Retail Check");
+      if (submissionGenerationRef.current === generation) {
+        setSubmitError(error instanceof Error ? error.message : "Failed to create Retail Check");
+      }
     } finally {
-      setLoading(false);
+      if (submissionGenerationRef.current === generation) setLoading(false);
     }
   }
 
@@ -330,6 +349,12 @@ export default function RetailCheckPage() {
 
   const elapsed =
     elapsedTick >= 0 ? elapsedSince(valuation?.["Queued At"] || valuation?.created_at) : "";
+
+  const activeCheckRunning =
+    ["Pending", "Processing"].includes(String(valuation?.Status ?? ""));
+
+  const runButtonDisabled =
+    loading || activeCheckRunning;
 
   const marketRetail =
   Number(displayedValuation?.["Market Retail"]) || 0;
@@ -473,8 +498,8 @@ export default function RetailCheckPage() {
               </div>
               
 
-              <button onClick={checkMarket} disabled={loading} className="w-full bg-[#00E51D] text-black font-bold py-4 rounded-xl">
-                {loading ? "Creating..." : "Run Retail Check"}
+              <button onClick={checkMarket} disabled={runButtonDisabled} className="w-full bg-[#00E51D] text-black font-bold py-4 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed">
+                {loading ? "Starting Check..." : activeCheckRunning ? "Valuation Running..." : "Run Retail Check"}
               </button>
 
              {submitError && (

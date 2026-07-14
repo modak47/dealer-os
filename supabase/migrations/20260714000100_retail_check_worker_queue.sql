@@ -1,4 +1,6 @@
 alter table public.retail_checks
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now(),
   add column if not exists "Progress Stage" text,
   add column if not exists "Progress Message" text,
   add column if not exists "Progress Percent" integer,
@@ -12,21 +14,39 @@ alter table public.retail_checks
   add column if not exists "Worker ID" text,
   add column if not exists "Request ID" uuid;
 
-alter table public.retail_checks
-  add constraint retail_checks_status_allowed
-  check ("Status" in ('Pending','Processing','Checked','Manual Review','Failed','Cancelled'))
-  not valid;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'retail_checks_status_allowed'
+      and conrelid = 'public.retail_checks'::regclass
+  ) then
+    alter table public.retail_checks
+      add constraint retail_checks_status_allowed
+      check ("Status" in ('Pending','Processing','Checked','Manual Review','Failed','Cancelled'))
+      not valid;
+  end if;
+end;
+$$;
 
-alter table public.retail_checks
-  validate constraint retail_checks_status_allowed;
+alter table public.retail_checks validate constraint retail_checks_status_allowed;
 
-alter table public.retail_checks
-  add constraint retail_checks_progress_percent_range
-  check ("Progress Percent" is null or ("Progress Percent" >= 0 and "Progress Percent" <= 100))
-  not valid;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'retail_checks_progress_percent_range'
+      and conrelid = 'public.retail_checks'::regclass
+  ) then
+    alter table public.retail_checks
+      add constraint retail_checks_progress_percent_range
+      check ("Progress Percent" is null or ("Progress Percent" >= 0 and "Progress Percent" <= 100))
+      not valid;
+  end if;
+end;
+$$;
 
-alter table public.retail_checks
-  validate constraint retail_checks_progress_percent_range;
+alter table public.retail_checks validate constraint retail_checks_progress_percent_range;
 
 update public.retail_checks
 set
