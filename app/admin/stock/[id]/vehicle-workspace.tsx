@@ -66,14 +66,14 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
   const canReserve = !activeReservation && !activeSale && ["In Stock", "On Forecourt", "Available", "Prep"].includes(String(bike.status ?? ""));
   const canStartSale = !activeReservation && !activeSale && !isComplete && ["In Stock", "On Forecourt", "Available", "Prep"].includes(String(bike.status ?? ""));
 
-  return <div className="admin-page vehicle-workspace">
-    <header className="vehicle-hero">
-      <div className="vehicle-hero-media" style={{ backgroundImage: `url("${bike.primary_image_url || "/bike-placeholder.svg"}")` }} />
+  return <div className="admin-page dms-vehicle-workspace">
+    <header className="dms-vehicle-hero">
+      <div className="dms-vehicle-hero-media" style={{ backgroundImage: `url("${bike.primary_image_url || "/bike-placeholder.svg"}")` }} />
       <div>
-        <Link href="/admin/stock" className="vehicle-back">← Stock</Link>
+        <Link href="/admin/stock" className="dms-vehicle-back">← Stock</Link>
         <h1>{[bike.year, bike.make, bike.model, bike.variant].filter(Boolean).join(" ") || "Motorcycle"}</h1>
         <p>{bike.registration || "Registration pending"} · {bike.stock_number || `Stock #${bike.id}`}</p>
-        <div className="vehicle-stage">
+        <div className="dms-vehicle-stage">
           {["In Stock", "Reserved", "Sale Pending", "Sold", "Sale Completed"].map((stage, index) => <span className={index <= progress ? "done" : ""} key={stage}>{stage}</span>)}
         </div>
       </div>
@@ -84,18 +84,18 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
       </nav>
     </header>
 
-    {!workspace.migrationReady && <p className="vehicle-warning">Run migration 20260713000200_joined_vehicle_dms_workflow.sql to enable vehicle history and workflow actions.</p>}
+    {!workspace.migrationReady && <p className="dms-vehicle-warning">Run migration 20260713000200_joined_vehicle_dms_workflow.sql to enable vehicle history and workflow actions.</p>}
     {message && <p className={message === "Workflow updated." ? "stock-save-message success" : "stock-save-message"}>{message}</p>}
 
-    <section className="vehicle-kpis">
+    <section className="dms-vehicle-kpis">
       {kpis.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}
     </section>
 
-    <nav className="vehicle-tabs">
+    <nav className="dms-vehicle-tabs">
       {(["overview", "sale", "invoice", "workflow", "history"] as Tab[]).map(value => <button type="button" className={tab === value ? "active" : ""} onClick={() => setTab(value)} key={value}>{label(value)}</button>)}
     </nav>
 
-    {tab === "overview" && <section className="vehicle-grid">
+    {tab === "overview" && <section className="dms-vehicle-grid">
       <ActionPanel title="Reserve Bike" disabled={!canReserve} disabledText="Bike is not available to reserve">
         <CustomerPicker customers={workspace.customers} value={customerId} onChange={setCustomerId} />
         <Field label="Deposit" value={deposit} onChange={setDeposit} type="number" />
@@ -111,7 +111,7 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
       <StatusPanel title="Current Sale" rows={activeSale ? saleRows(activeSale) : [["Sale", "None active"]]} />
     </section>}
 
-    {tab === "sale" && <section className="vehicle-grid">
+    {tab === "sale" && <section className="dms-vehicle-grid">
       <ActionPanel title="Sale Actions" disabled={!activeSale} disabledText="No active sale for this bike">
         {activeReservation && !activeSale && <button disabled={busy === "convertReservation"} onClick={() => void run("convertReservation", { reservation_id: activeReservation.id })}>{busy === "convertReservation" ? "Creating..." : "Convert Reservation to Sale"}</button>}
         {activeSale && <button disabled={busy === "markSold" || String(activeSale.status) === "Sold"} onClick={() => void run("markSold", { sale_id: activeSale.id })}>{busy === "markSold" ? "Saving..." : "Mark Sold"}</button>}
@@ -123,12 +123,12 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
       <RecordList title="Sales" records={workspace.sales} type="sale" />
     </section>}
 
-    {tab === "invoice" && <section className="vehicle-grid">
+    {tab === "invoice" && <section className="dms-vehicle-grid">
       <RecordList title="Invoices" records={workspace.invoices} type="invoice" />
       <RecordList title="Payments" records={workspace.payments} type="payment" />
     </section>}
 
-    {tab === "workflow" && <section className="vehicle-grid">
+    {tab === "workflow" && <section className="dms-vehicle-grid">
       <ActionPanel title="Reservation Actions" disabled={!activeReservation} disabledText="No active reservation">
         {activeReservation && <button className="danger" onClick={() => setPending("cancelReservation")}>Cancel Reservation</button>}
         {activeReservation && !activeSale && <button disabled={busy === "convertReservation"} onClick={() => void run("convertReservation", { reservation_id: activeReservation.id })}>Convert to Sale Pending</button>}
@@ -138,7 +138,7 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
 
     {tab === "history" && <Timeline records={workspace.activity} />}
 
-    {pending && <div className="vehicle-modal">
+    {pending && <div className="dms-vehicle-modal">
       <form onSubmit={event => { event.preventDefault(); const payload = pending === "cancelReservation" ? { reservation_id: activeReservation?.id, reason } : { sale_id: activeSale?.id, reason }; void run(pending, payload); }}>
         <h2>{pendingLabel(pending)}</h2>
         <p>This will update stock, sale, invoice and history records together.</p>
@@ -150,19 +150,19 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
 }
 
 function ActionPanel({ title, disabled, disabledText, children }: { title: string; disabled?: boolean; disabledText?: string; children: React.ReactNode }) {
-  return <section className={`vehicle-card ${disabled ? "muted" : ""}`}><h2>{title}</h2>{disabled && <p>{disabledText}</p>}{children}</section>;
+  return <section className={`dms-vehicle-card ${disabled ? "muted" : ""}`}><h2>{title}</h2>{disabled && <p>{disabledText}</p>}{children}</section>;
 }
 
 function StatusPanel({ title, rows }: { title: string; rows: string[][] }) {
-  return <section className="vehicle-card"><h2>{title}</h2><dl>{rows.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl></section>;
+  return <section className="dms-vehicle-card"><h2>{title}</h2><dl>{rows.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl></section>;
 }
 
 function RecordList({ title, records, type }: { title: string; records: Record<string, unknown>[]; type: "sale" | "invoice" | "payment" | "task" }) {
-  return <section className="vehicle-card"><h2>{title}</h2>{records.length ? <div className="vehicle-records">{records.map(record => <article key={String(record.id)}><b>{recordTitle(record, type)}</b><span>{recordSub(record, type)}</span>{recordLink(record, type)}</article>)}</div> : <p>No records yet.</p>}</section>;
+  return <section className="dms-vehicle-card"><h2>{title}</h2>{records.length ? <div className="dms-vehicle-records">{records.map(record => <article key={String(record.id)}><b>{recordTitle(record, type)}</b><span>{recordSub(record, type)}</span>{recordLink(record, type)}</article>)}</div> : <p>No records yet.</p>}</section>;
 }
 
 function Timeline({ records }: { records: Record<string, unknown>[] }) {
-  return <section className="vehicle-card vehicle-history"><h2>Vehicle History</h2>{records.length ? records.map(record => <article key={String(record.id)}><i /><div><span>{date(record.created_at)}</span><b>{String(record.description ?? record.event_type ?? "Event")}</b><p>{String(record.event_type ?? "")}</p></div></article>) : <p>No history events yet.</p>}</section>;
+  return <section className="dms-vehicle-card dms-vehicle-history"><h2>Vehicle History</h2>{records.length ? records.map(record => <article key={String(record.id)}><i /><div><span>{date(record.created_at)}</span><b>{String(record.description ?? record.event_type ?? "Event")}</b><p>{String(record.event_type ?? "")}</p></div></article>) : <p>No history events yet.</p>}</section>;
 }
 
 function CustomerPicker({ customers, value, onChange }: { customers: VehicleWorkspaceData["customers"]; value: string; onChange: (value: string) => void }) {
@@ -234,3 +234,4 @@ function money(value: unknown) {
   const number = Number(value ?? 0);
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(Number.isFinite(number) ? number : 0);
 }
+
