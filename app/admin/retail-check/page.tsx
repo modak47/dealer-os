@@ -1,7 +1,41 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+
+type RetailCheck = Record<string, any> & { id?: string | number; Status?: string };
+
+const terminalStatuses = new Set(["Checked", "Manual Review", "Failed", "Cancelled"]);
+
+function progressValue(record: RetailCheck | null) {
+  const value = Number(record?.["Progress Percent"]);
+  if (Number.isFinite(value)) return Math.max(0, Math.min(100, value));
+  if (record?.Status === "Checked") return 100;
+  if (record?.Status === "Processing") return 25;
+  return record?.Status === "Pending" ? 0 : 0;
+}
+
+function safeProgressMessage(record: RetailCheck | null) {
+  if (!record) return "";
+  if (record["Progress Message"]) return String(record["Progress Message"]);
+  if (record.Status === "Pending") return "Your retail check has been queued.";
+  if (record.Status === "Processing") return "Your retail check is being processed.";
+  if (record.Status === "Checked") return "Retail check complete.";
+  if (record.Status === "Manual Review") return "Not enough reliable comparable motorcycles were found. This check needs manual review.";
+  if (record.Status === "Failed") return "The retail check could not be completed.";
+  return "";
+}
+
+function elapsedSince(value: unknown) {
+  if (!value) return "";
+  const started = new Date(String(value)).getTime();
+  if (!Number.isFinite(started)) return "";
+  const seconds = Math.max(0, Math.floor((Date.now() - started) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
 
 function KPI({
   title,
@@ -37,11 +71,14 @@ export default function RetailCheckPage() {
   const [askingPrice, setAskingPrice] = useState("");
   const [offerPrice, setOfferPrice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [showManualSearch, setShowManualSearch] = useState(false);
   const [recordId, setRecordId] = useState(searchParams.get("recordId") ?? "");
+  const [requestId, setRequestId] = useState(searchParams.get("requestId") ?? "");
   const [websiteLeadId] = useState(searchParams.get("leadId") ?? "");
-  const [valuation, setValuation] = useState<any>(null);
+  const [valuation, setValuation] = useState<RetailCheck | null>(null);
   const [status, setStatus] = useState("");
+  const [elapsedTick, setElapsedTick] = useState(0);
   const [activeTab, setActiveTab] = useState("valuation");
   const [derivative, setDerivative] =
   useState("");
@@ -88,15 +125,23 @@ export default function RetailCheckPage() {
   }, []);
 
   useEffect(() => {
-    if (recordId) {
-      fetch(`/api/retail-check/${recordId}`).then(response => response.json()).then(data => {
-        if (!data.error) {
-          setValuation(data);
-          setStatus(data.Status === "Checked" ? "Valuation Complete" : "Waiting for market analysis...");
-          setActiveTab("valuation");
-        }
-      });
+    if (!recordId) return;
+    let cancelled = false;
+
+    async function loadCurrent() {
+      const response = await fetch(`/api/retail-check/${recordId}`);
+      const data = await response.json();
+      if (!cancelled && !data.error) {
+        setValuation(data);
+        setStatus(data.Status === "Checked" ? "Valuation Complete" : String(data.Status ?? "Pending"));
+        setActiveTab("valuation");
+      }
     }
+
+    loadCurrent();
+    return () => {
+      cancelled = true;
+    };
   }, [recordId]);
 
   useEffect(() => {
@@ -119,20 +164,60 @@ export default function RetailCheckPage() {
 
   useEffect(() => {
     if (!recordId) return;
+    let stopped = false;
+    let syncedLead = false;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
 
-    const interval = setInterval(async () => {
-    const response = await fetch(`/api/retail-check/${recordId}`);
-    const data = await response.json();
-    if (data.Status === "Checked") {
+    function stopPollingIfTerminal(record: RetailCheck) {
+      if (terminalStatuses.has(String(record.Status)) && pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    async function refresh() {
+      const response = await fetch(`/api/retail-check/${recordId}`);
+      const data = await response.json();
+      if (stopped || data.error) return;
       setValuation(data);
-      setStatus("Valuation Complete");
-      if (websiteLeadId) await syncWebsiteLeadValuation(websiteLeadId, recordId, data);
-      clearInterval(interval);
-    } 
-    }, 5000);
+      setStatus(data.Status === "Checked" ? "Valuation Complete" : String(data.Status ?? "Pending"));
+      stopPollingIfTerminal(data);
+      if (data.Status === "Checked" && websiteLeadId && !syncedLead) {
+        syncedLead = true;
+        await syncWebsiteLeadValuation(websiteLeadId, recordId, data);
+      }
+    }
 
-    return () => clearInterval(interval);
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`retail-check-${recordId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "retail_checks", filter: `id=eq.${recordId}` }, async payload => {
+        const next = payload.new as RetailCheck;
+        setValuation(next);
+        setStatus(next.Status === "Checked" ? "Valuation Complete" : String(next.Status ?? "Pending"));
+        stopPollingIfTerminal(next);
+        if (next.Status === "Checked" && websiteLeadId && !syncedLead) {
+          syncedLead = true;
+          await syncWebsiteLeadValuation(websiteLeadId, recordId, next);
+        }
+      })
+      .subscribe();
+
+    refresh();
+    pollInterval = setInterval(() => void refresh(), 5000);
+
+    return () => {
+      stopped = true;
+      if (pollInterval) clearInterval(pollInterval);
+      void supabase.removeChannel(channel);
+    };
   }, [recordId, websiteLeadId]);
+
+  useEffect(() => {
+    if (!valuation || terminalStatuses.has(String(valuation.Status))) return;
+    const interval = setInterval(() => setElapsedTick(tick => tick + 1), 1000);
+    return () => clearInterval(interval);
+  }, [valuation]);
 
   const filteredModels = models
     .filter((m: any) => m.make === selectedMake && m.model)
@@ -171,7 +256,13 @@ export default function RetailCheckPage() {
 
   async function checkMarket() {
     try {
+      setSubmitError("");
+      if (!registration.trim()) throw new Error("Registration is required.");
+      if (!mileage.trim() || !Number.isFinite(Number(mileage))) throw new Error("Mileage is required.");
+      if (askingPrice && !Number.isFinite(Number(askingPrice))) throw new Error("Asking price must be a number.");
       setLoading(true);
+      const nextRequestId = requestId || crypto.randomUUID();
+      setRequestId(nextRequestId);
 
       const response = await fetch("/api/retail-check", {
         method: "POST",
@@ -184,13 +275,15 @@ export default function RetailCheckPage() {
           mileage,
           askingPrice,
           leadId: websiteLeadId || undefined,
+          requestId: nextRequestId,
         }),
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to create Retail Check");
 
       setSelectedHistoryRecord(null);
-      setValuation(null);
+      setValuation(data.record || null);
 
       setActiveTab("valuation");
 
@@ -199,11 +292,28 @@ export default function RetailCheckPage() {
         behavior: "smooth",
       });
 
-      setStatus("Waiting for market analysis...");
+      setStatus("Pending");
       setRecordId(data.recordId); 
     } catch (error) {
       console.error(error);
-      alert("Failed to create Retail Check");
+      setSubmitError(error instanceof Error ? error.message : "Failed to create Retail Check");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function retryCurrentCheck() {
+    if (!recordId || valuation?.Status !== "Failed") return;
+    setLoading(true);
+    setSubmitError("");
+    try {
+      const response = await fetch(`/api/retail-check/${recordId}/retry`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to retry Retail Check");
+      setValuation(data.record || null);
+      setStatus("Pending");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Unable to retry Retail Check");
     } finally {
       setLoading(false);
     }
@@ -211,6 +321,15 @@ export default function RetailCheckPage() {
 
   const displayedValuation =
   selectedHistoryRecord || valuation;
+
+  const progress =
+    progressValue(valuation);
+
+  const progressMessage =
+    safeProgressMessage(valuation);
+
+  const elapsed =
+    elapsedTick >= 0 ? elapsedSince(valuation?.["Queued At"] || valuation?.created_at) : "";
 
   const marketRetail =
   Number(displayedValuation?.["Market Retail"]) || 0;
@@ -355,42 +474,53 @@ export default function RetailCheckPage() {
               
 
               <button onClick={checkMarket} disabled={loading} className="w-full bg-[#00E51D] text-black font-bold py-4 rounded-xl">
-                {loading ? "Creating..." : "Check Market"}
+                {loading ? "Creating..." : "Run Retail Check"}
               </button>
 
-             {status && (
+             {submitError && (
+              <div className="bg-red-950/40 border border-red-800 rounded-xl p-4 text-red-200 text-sm">
+                {submitError}
+              </div>
+             )}
+
+             {(status || valuation) && (
               <div className="bg-black border border-zinc-800 rounded-xl p-4">
 
-                <div className="font-semibold text-white mb-3">
-                  {status}
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div>
+                    <div className="font-semibold text-white">
+                      {valuation?.Status || status}
+                    </div>
+                    <div className="text-zinc-500 text-xs">
+                      {valuation?.Registration || registration}
+                    </div>
+                  </div>
+                  {elapsed && (
+                    <div className="text-zinc-500 text-xs">
+                      {elapsed}
+                    </div>
+                  )}
                 </div>
 
-                {status !== "Valuation Complete" ? (
-                  <>
-                    <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-[#00E51D] h-2 animate-pulse"
-                        style={{ width: "75%" }}
-                      />
-                    </div>
+                <div className="text-[#00E51D] text-xs font-bold uppercase tracking-wide mb-2">
+                  {valuation?.["Progress Stage"] || "Queued"}
+                </div>
 
-                    <div className="text-zinc-400 text-sm mt-3">
-                      Searching market listings and analysing comparable bikes...
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-[#00E51D] h-2"
-                        style={{ width: "100%" }}
-                      />
-                    </div>
+                <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`bg-[#00E51D] h-2 ${terminalStatuses.has(String(valuation?.Status)) ? "" : "animate-pulse"}`}
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
 
-                    <div className="text-[#00E51D] text-sm mt-3 font-semibold">
-                      Analysis complete
-                    </div>
-                  </>
+                <div className="text-zinc-400 text-sm mt-3">
+                  {progressMessage || "Waiting for market analysis..."}
+                </div>
+
+                {valuation?.Status === "Failed" && (
+                  <button type="button" onClick={retryCurrentCheck} disabled={loading} className="mt-4 w-full bg-[#00E51D] text-black font-bold py-3 rounded-xl">
+                    {loading ? "Retrying..." : "Retry Retail Check"}
+                  </button>
                 )}
 
               </div>

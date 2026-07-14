@@ -50,6 +50,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     });
     await supabase.from("website_leads").update({ retail_check_id: String(retailCheck.id), updated_at: new Date().toISOString() }).eq("id", id);
     const completed = await waitForRetailCheck(retailCheck.id);
+    if (completed.Status !== "Checked") {
+      throw new Error(completed.Status === "Manual Review" ? "Valuation requires manual review" : String(completed["Last Error"] || "Valuation service unavailable"));
+    }
     const valuationUpdates = extractRetailCheckWebsiteLeadUpdates(completed);
     const completedAt = new Date().toISOString();
     const { error: updateError } = await supabase.from("website_leads").update({

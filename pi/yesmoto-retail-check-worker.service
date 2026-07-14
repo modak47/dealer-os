@@ -1,0 +1,16 @@
+[Unit]
+Description=YesMoto Retail Check Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yesmoto
+WorkingDirectory=/home/yesmoto/dealerbot
+EnvironmentFile=/home/yesmoto/dealerbot/.env
+ExecStart=/home/yesmoto/dealerbot/venv/bin/python /home/yesmoto/dealerbot/retail_check_worker.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
