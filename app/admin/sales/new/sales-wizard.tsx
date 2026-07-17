@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AddressLookup, type AddressValue } from "@/components/common/AddressLookup";
 import { CustomerLocationMap } from "@/components/maps/CustomerLocationMap";
@@ -8,10 +8,12 @@ import { InvoiceWorkflowStep } from "./invoice-workflow-step";
 
 type Customer = {
   id: string;
+  title: string | null;
   first_name: string;
   last_name: string;
   email: string | null;
   phone: string | null;
+  alternate_phone: string | null;
   house_name_number: string | null;
   street: string | null;
   address_line_1: string | null;
@@ -23,6 +25,9 @@ type Customer = {
   country: string | null;
   latitude: number | null;
   longitude: number | null;
+  customer_status?: string | null;
+  tags?: string[] | null;
+  notes?: string | null;
 };
 
 type Bike = {
@@ -54,6 +59,8 @@ type Address = {
   latitude: number | null;
   longitude: number | null;
 };
+
+type DuplicateCustomer = Pick<Customer, "id" | "title" | "first_name" | "last_name" | "email" | "phone" | "alternate_phone" | "postcode" | "address_line_1" | "city" | "customer_status">;
 
 const steps = ["Customer", "Lead", "Motorcycle", "Reserve & deposit", "Finance & sale", "Invoice & payment", "Delivery", "Complete"];
 const blankAddress: AddressValue = {
@@ -112,14 +119,51 @@ export function SalesWizard({
   const [postcode, setPostcode] = useState("");
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [addressBusy, setAddressBusy] = useState(false);
+  const [customerOptions, setCustomerOptions] = useState<Customer[]>(customers);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerSearchBusy, setCustomerSearchBusy] = useState(false);
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [customerCreateBusy, setCustomerCreateBusy] = useState(false);
+  const [customerCreateError, setCustomerCreateError] = useState("");
+  const [duplicateCustomers, setDuplicateCustomers] = useState<DuplicateCustomer[]>([]);
   const [wizardAddress, setWizardAddress] = useState<AddressValue>(() =>
     addressFromCustomer(customers.find((item) => item.id === defaultCustomer)),
   );
   const [reservationExpiryDefault] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16));
 
-  const customer = customers.find((item) => item.id === customerId);
+  const customer = customerOptions.find((item) => item.id === customerId);
   const bike = stock.find((item) => String(item.id) === bikeId);
   const searchStock = useMemo(() => stock, [stock]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const handle = window.setTimeout(async () => {
+      setCustomerSearchBusy(true);
+      try {
+        const response = await fetch(`/api/crm/customers?q=${encodeURIComponent(customerSearch)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const result = (await response.json()) as { customers?: Customer[] };
+        if (response.ok) {
+          const rows = result.customers ?? [];
+          setCustomerOptions((current) => {
+            const selected = current.find((item) => item.id === customerId);
+            return selected && !rows.some((item) => item.id === selected.id) ? [selected, ...rows] : rows;
+          });
+        }
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") setError("Unable to search customers.");
+      } finally {
+        if (!controller.signal.aborted) setCustomerSearchBusy(false);
+      }
+    }, 300);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(handle);
+    };
+  }, [customerSearch, customerId]);
 
   async function call(payload: Record<string, unknown>) {
     setBusy(true);
@@ -140,7 +184,38 @@ export function SalesWizard({
 
   function chooseCustomer(nextId: string) {
     setCustomerId(nextId);
-    setWizardAddress(addressFromCustomer(customers.find((item) => item.id === nextId)));
+    setWizardAddress(addressFromCustomer(customerOptions.find((item) => item.id === nextId)));
+  }
+
+  async function submitCustomerForm(form: HTMLFormElement, allowPossibleDuplicate = false) {
+    setCustomerCreateBusy(true);
+    setCustomerCreateError("");
+    setDuplicateCustomers([]);
+
+    const response = await fetch("/api/crm/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...Object.fromEntries(new FormData(form)), allow_possible_duplicate: allowPossibleDuplicate }),
+    });
+    const result = (await response.json()) as { customer?: Customer; duplicates?: DuplicateCustomer[]; error?: string };
+    setCustomerCreateBusy(false);
+
+    if (!response.ok || !result.customer) {
+      setCustomerCreateError(result.error || "Unable to create customer.");
+      setDuplicateCustomers(result.duplicates ?? []);
+      return;
+    }
+
+    setCustomerOptions((current) => [result.customer!, ...current.filter((item) => item.id !== result.customer!.id)]);
+    setCustomerId(result.customer.id);
+    setWizardAddress(addressFromCustomer(result.customer));
+    setShowCustomerForm(false);
+    form.reset();
+  }
+
+  async function createCustomer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await submitCustomerForm(event.currentTarget);
   }
 
   async function lookupAddress() {
@@ -242,13 +317,23 @@ export function SalesWizard({
           <>
             <h2>Select customer</h2>
             <p>Choose the customer purchasing the motorcycle.</p>
+            <div className="customer-search-tool">
+              <input
+                value={customerSearch}
+                onChange={(event) => setCustomerSearch(event.target.value)}
+                placeholder="Search customer name, email, phone or postcode"
+              />
+              <button type="button" onClick={() => setShowCustomerForm(true)}>
+                Add New Customer
+              </button>
+            </div>
             <label>
               <span>Customer</span>
               <select value={customerId} onChange={(event) => chooseCustomer(event.target.value)}>
-                <option value="">Select customer...</option>
-                {customers.map((item) => (
+                <option value="">{customerSearchBusy ? "Searching..." : "Select existing customer..."}</option>
+                {customerOptions.map((item) => (
                   <option value={item.id} key={item.id}>
-                    {item.last_name}, {item.first_name} - {item.email || item.phone}
+                    {item.last_name}, {item.first_name} - {item.email || item.phone || item.postcode || "No contact"}
                   </option>
                 ))}
               </select>
@@ -289,6 +374,144 @@ export function SalesWizard({
             )}
             <WizardActions next={() => setStep(1)} disabled={!customerId} />
           </>
+        )}
+
+        {showCustomerForm && (
+          <div className="sales-modal-backdrop" role="dialog" aria-modal="true" aria-label="Add new customer">
+            <form className="sales-modal stock-editor-panel crm-form" onSubmit={createCustomer}>
+              <header>
+                <div>
+                  <h2>Add New Customer</h2>
+                  <p>Create the customer without leaving this sale.</p>
+                </div>
+                <button type="button" onClick={() => setShowCustomerForm(false)}>
+                  Close
+                </button>
+              </header>
+
+              {customerCreateError && <p className="stock-save-message">{customerCreateError}</p>}
+
+              {duplicateCustomers.length > 0 && (
+                <div className="crm-setup">
+                  <b>Possible duplicate customer</b>
+                  <span>Select the existing customer below, or continue only if this is genuinely a separate person.</span>
+                  <div className="customer-duplicate-actions">
+                    {duplicateCustomers.map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        onClick={() => {
+                          const existing = item as Customer;
+                          setCustomerOptions((current) => [existing, ...current.filter((row) => row.id !== item.id)]);
+                          setCustomerId(item.id);
+                          setWizardAddress(addressFromCustomer(existing));
+                          setShowCustomerForm(false);
+                        }}
+                      >
+                        {item.first_name} {item.last_name} - {item.email || item.phone || item.postcode || "Existing customer"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="stock-form-grid">
+                <label>
+                  <span>Title</span>
+                  <input name="title" />
+                </label>
+                <label>
+                  <span>First name</span>
+                  <input name="first_name" required />
+                </label>
+                <label>
+                  <span>Last name</span>
+                  <input name="last_name" required />
+                </label>
+                <label>
+                  <span>Email</span>
+                  <input name="email" type="email" />
+                </label>
+                <label>
+                  <span>Mobile</span>
+                  <input name="phone" type="tel" />
+                </label>
+                <label>
+                  <span>Telephone</span>
+                  <input name="alternate_phone" type="tel" />
+                </label>
+                <label>
+                  <span>Address line 1</span>
+                  <input name="address_line_1" />
+                </label>
+                <label>
+                  <span>Address line 2</span>
+                  <input name="address_line_2" />
+                </label>
+                <label>
+                  <span>Town/City</span>
+                  <input name="city" />
+                </label>
+                <label>
+                  <span>County</span>
+                  <input name="county" />
+                </label>
+                <label>
+                  <span>Postcode</span>
+                  <input name="postcode" />
+                </label>
+                <label>
+                  <span>Customer type</span>
+                  <select name="customer_type" defaultValue="Retail">
+                    <option>Retail</option>
+                    <option>Trade</option>
+                    <option>Supplier</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Source</span>
+                  <select name="source" defaultValue="Manual">
+                    <option>Manual</option>
+                    <option>Website</option>
+                    <option>Phone</option>
+                    <option>Walk-in</option>
+                    <option>AutoTrader</option>
+                    <option>Facebook</option>
+                    <option>Email</option>
+                  </select>
+                </label>
+                <label className="full">
+                  <span>Notes</span>
+                  <textarea name="notes" rows={4} />
+                </label>
+                <div className="full delivery-checks">
+                  <label>
+                    <input type="checkbox" name="marketing_email" /> Email consent
+                  </label>
+                  <label>
+                    <input type="checkbox" name="marketing_sms" /> SMS consent
+                  </label>
+                  <label>
+                    <input type="checkbox" name="marketing_phone" /> Phone consent
+                  </label>
+                  <label>
+                    <input type="checkbox" name="marketing_whatsapp" /> WhatsApp consent
+                  </label>
+                </div>
+              </div>
+
+              <div className="crm-form-actions">
+                {duplicateCustomers.length > 0 && (
+                  <button type="button" onClick={(event) => event.currentTarget.form && void submitCustomerForm(event.currentTarget.form, true)} disabled={customerCreateBusy}>
+                    Create Separate Customer
+                  </button>
+                )}
+                <button className="admin-primary" disabled={customerCreateBusy}>
+                  {customerCreateBusy ? "Creating..." : "Create and Select Customer"}
+                </button>
+              </div>
+            </form>
+          </div>
         )}
 
         {step === 1 && (

@@ -14,7 +14,7 @@ const PUBLIC_DETAIL_FIELDS="id,dealer5_id,registration,make,model,variant,year,m
 export async function getSupabaseStockBikeByPublicIdentifier(identifier:string):Promise<{bike:SupabaseStockBike|null;method:string}>{
   if(!isSupabaseConfigured)return {bike:null,method:"supabase-not-configured"};
   const requested=identifier.trim().toLowerCase();let supabase;try{supabase=getSupabaseAdmin()}catch{supabase=createClient(supabaseUrl,supabaseAnonKey,{auth:{persistSession:false,autoRefreshToken:false}})}
-  const index=await supabase.from("stock_bikes").select("id,dealer5_id,registration,make,model,status,price").in("status",["In Stock","ON FORECOURT","Available","Reserved"]);
+  const index=await supabase.from("stock_bikes").select("id,dealer5_id,registration,make,model,status,price,show_on_website").in("status",["In Stock","ON FORECOURT","Available","Reserved"]).eq("show_on_website",true);
   if(index.error){console.error("[Public bike lookup] index failed",{requestedSlug:identifier,code:index.error.code});return {bike:null,method:"index-error"}}
   const rows=index.data??[];
   let match=rows.find(row=>publicSlug([row.make,row.model,row.registration].filter(Boolean).join("-"))===requested);let method="exact-slug";
@@ -41,7 +41,7 @@ export async function getSupabasePublicStockBikes():Promise<StockApiResponse>{
   if(!isSupabaseConfigured)return {stock:[],configured:false,error:"Supabase is not configured."};
   const supabase=createClient(supabaseUrl,supabaseAnonKey,{auth:{persistSession:false,autoRefreshToken:false}});
   const fields="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,category,body_style,fuel,transmission,image_urls,primary_image_url,created_at,show_on_website,reserve_enabled,reservation_amount";
-  const {data,error}=await supabase.from("stock_bikes").select(fields).in("status",["In Stock","ON FORECOURT","Available","Reserved"]).order("created_at",{ascending:false});
+  const {data,error}=await supabase.from("stock_bikes").select(fields).in("status",["In Stock","ON FORECOURT","Available","Reserved"]).eq("show_on_website",true).order("created_at",{ascending:false});
   if(error){console.error("Unable to load public Supabase stock",{code:error.code,message:error.message});return {stock:[],configured:true,error:"Unable to load stock."}}
   return {stock:(data??[]).map(row=>normalizeSupabaseStockBike(row as unknown as SupabaseStockBike)),configured:true};
 }
@@ -138,5 +138,6 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
     specifications:{...(mapped.specifications??{}),BHP:mapped.bhp,Torque:mapped.torque,CO2:mapped.co2,"Road Tax":mapped.road_tax,"Top Speed":mapped.top_speed,Length:mapped.length_mm,Width:mapped.width_mm,Weight:mapped.weight_kg,"Euro Emissions":mapped.euro_emissions,"HPI Category":mapped.hpi_category},
     dealer5Fields,
     advertSections:mapped.advert_sections??{},
+    showOnWebsite:mapped.show_on_website,
   };
 }

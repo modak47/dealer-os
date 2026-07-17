@@ -23,7 +23,7 @@ const SOLD_STATUSES=new Set(["sold","sale completed"]);
 export const isSold=(bike:StockBike)=>SOLD_STATUSES.has(normaliseStockStatus(bike.status));
 export const isReserved=(bike:StockBike)=>normaliseStockStatus(bike.status)==="reserved";
 export const isActive=(bike:StockBike)=>ACTIVE_STATUSES.has(normaliseStockStatus(bike.status));
-export const isPublic=(bike:StockBike)=>PUBLIC_STATUSES.has(normaliseStockStatus(bike.status))&&bike.price>0&&Boolean(bike.make.trim())&&Boolean(bike.model.trim());
+export const isPublic=(bike:StockBike)=>bike.showOnWebsite!==false&&PUBLIC_STATUSES.has(normaliseStockStatus(bike.status))&&bike.price>0&&Boolean(bike.make.trim())&&Boolean(bike.model.trim());
 export const customerStatus=(bike:StockBike):CustomerStatus=>isReserved(bike)?"Reserved":"In Stock";
 const slugify=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const text=(value:unknown)=>typeof value==="string"?value.trim():"";
