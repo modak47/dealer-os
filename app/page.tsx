@@ -8,10 +8,18 @@ import { CategoryTile } from "./components/category-tile";
 
 export const revalidate=60;
 const trustItems=["Excellent reviews","Finance available","Nationwide delivery","Part exchange welcome","Reserve online"];
+const categoryFallbackImages:Record<string,string>={
+  Scooters:"https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=900&q=82",
+  "125cc":"https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=900&q=82",
+  "Super Sports":"https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=900&q=82",
+  Roadster:"https://images.unsplash.com/photo-1558980664-10e7170b5df9?auto=format&fit=crop&w=900&q=82",
+  Adventure:"https://images.unsplash.com/photo-1508357941501-0924cf312bbd?auto=format&fit=crop&w=900&q=82",
+  Custom:"https://images.unsplash.com/photo-1558981359-219d6364c9c8?auto=format&fit=crop&w=900&q=82",
+};
 
 export default async function Home(){
   const bikes=await getPublicStockBikes();const featured=bikes.slice(0,4);const recent=bikes.slice(4,8).length?bikes.slice(4,8):featured;
-  const categories=PUBLIC_STYLES.map(category=>{const matches=bikes.filter(bike=>matchesPublicStyle(bike,category));return {category,count:matches.length,image:matches.find(bike=>bike.image!=="/bike-placeholder.svg")?.image}});
+  const categories=PUBLIC_STYLES.map(category=>{const matches=bikes.filter(bike=>matchesPublicStyle(bike,category));return {category,count:matches.length,image:matches.find(bike=>bike.image!=="/bike-placeholder.svg")?.image??categoryFallbackImages[category]}});
   return <>
     <section className="hero"><div className="wide hero-copy"><p>{dealership.heroTagline}</p><h1>{dealership.heroHeadlineLine1}<br/><em>{dealership.heroHeadlineLine2}</em></h1><h2>Carefully selected used motorcycles, professionally prepared and delivered nationwide.</h2><div className="rating">Excellent <b>★★★★★</b> <span>Trusted by riders throughout the UK</span></div><SearchPanel bikes={bikes}/></div></section>
     <section className="trust-strip"><div className="wide">{trustItems.map((item,index)=><div key={item}><span>{index===0?"★":"✓"}</span>{item}</div>)}</div></section>

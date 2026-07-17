@@ -342,19 +342,34 @@ def fetch_source_page(start, batch_size, max_attempts=3):
 
 
 def get_expected_source_count():
-    try:
-        response = (
-            supabase
-            .table("autotrader_listings")
-            .select('"Listing ID"', count="exact")
-            .limit(1)
-            .execute()
-        )
-    except Exception as e:
-        print(f"WARNING: Could not load exact autotrader_listings count: {e}")
-        return None
+    for attempt in range(1, 3):
+        try:
+            response = (
+                supabase
+                .rpc("get_autotrader_listing_count")
+                .execute()
+            )
 
-    return response.count
+            count_value = response.data
+
+            if isinstance(count_value, list):
+                count_value = count_value[0] if count_value else None
+
+            if isinstance(count_value, dict):
+                count_value = count_value.get("get_autotrader_listing_count")
+
+            if count_value is None:
+                raise RuntimeError("RPC returned no count")
+
+            return int(count_value)
+        except Exception as e:
+            if attempt == 1:
+                print(f"WARNING: Could not load autotrader listing count via RPC; retrying once: {e}")
+                time.sleep(1.0)
+                continue
+
+            print(f"WARNING: Could not load autotrader listing count via RPC: {e}")
+            return None
 
 
 # =====================================

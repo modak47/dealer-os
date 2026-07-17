@@ -49,6 +49,7 @@ export interface SupabaseStockBike {
   registration_date:string|null;
   display_status:string|null;
   show_on_website:boolean;
+  is_test_record?:boolean;
   reserve_enabled:boolean;
   reservation_amount:number;
   advert_sections:Record<string,unknown>;

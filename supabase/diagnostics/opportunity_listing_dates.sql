@@ -7,8 +7,8 @@ with joined as (
     bo."Days Live" as opportunity_days_live,
     bo.last_seen as opportunity_last_seen,
     coalesce(bo.status, 'New') as workflow_status,
-    al."First Seen Date" as listing_first_seen,
-    al."Last Seen Date" as listing_last_seen,
+    al."First Seen Date"::timestamptz as listing_first_seen,
+    al."Last Seen Date"::timestamptz as listing_last_seen,
     al."Days Live" as listing_days_live,
     al."Listing Status" as listing_status,
     al."Dealer or Private" as seller_type

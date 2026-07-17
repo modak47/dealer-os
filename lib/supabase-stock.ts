@@ -2,19 +2,41 @@ import "server-only";
 
 import type { StockBike } from "@/lib/airtable";
 import type { StockApiResponse, SupabaseStockBike } from "@/lib/stock-bike-types";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const publicSlug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const imageKey=(value:string)=>{try{const url=new URL(value);return `${url.origin}${url.pathname}`.toLowerCase()}catch{return value.trim().toLowerCase().split("?")[0]}};
 const dedupeImages=(values:string[])=>{const seen=new Set<string>();return values.filter(value=>{const key=imageKey(value);if(!key||seen.has(key))return false;seen.add(key);return true})};
-const PUBLIC_DETAIL_FIELDS="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,advert_title,stock_number,category,body_style,fuel,transmission,description,service_history,vat_status,specifications,dealer5_data,image_urls,primary_image_url,mot_expiry,notes,created_at,plate,engine_number,number_of_gears,previous_owners,registration_date,display_status,show_on_website,reserve_enabled,reservation_amount,advert_sections,bhp,torque,co2,road_tax,top_speed,length_mm,width_mm,weight_kg,euro_emissions,hpi_category,workshop_status,date_in_stock,sold_date,mot_status,valeting_status,photo_status,location,updated_at,source_url,dealer5_updated_at";
+const PUBLIC_STOCK_STATUSES=["In Stock","ON FORECOURT","Available","Reserved"];
+const PUBLIC_DETAIL_FIELDS="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,advert_title,stock_number,category,body_style,fuel,transmission,description,service_history,vat_status,specifications,dealer5_data,image_urls,primary_image_url,mot_expiry,notes,created_at,plate,engine_number,number_of_gears,previous_owners,registration_date,display_status,show_on_website,is_test_record,reserve_enabled,reservation_amount,advert_sections,bhp,torque,co2,road_tax,top_speed,length_mm,width_mm,weight_kg,euro_emissions,hpi_category,workshop_status,date_in_stock,sold_date,mot_status,valeting_status,photo_status,location,updated_at,source_url,dealer5_updated_at";
+const PUBLIC_INDEX_FIELDS="id,dealer5_id,registration,make,model,status,price,show_on_website,is_test_record,source_url";
+const PUBLIC_LIST_FIELDS="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,category,body_style,fuel,transmission,image_urls,primary_image_url,created_at,show_on_website,is_test_record,reserve_enabled,reservation_amount,source_url";
+type PublicStockRow=Partial<SupabaseStockBike>&{id:string};
+
+const serverStockClient=()=>{try{return getSupabaseAdmin()}catch{return createClient(supabaseUrl,supabaseAnonKey,{auth:{persistSession:false,autoRefreshToken:false}})}};
+const rowText=(value:unknown)=>typeof value==="string"?value.trim():typeof value==="number"?String(value):"";
+const hasRetailIdentity=(row:PublicStockRow)=>Boolean(rowText(row.make))&&Boolean(rowText(row.model))&&Number(row.price??0)>0;
+const isDealer5Source=(row:PublicStockRow)=>Boolean(rowText(row.dealer5_id))||/cardealer5|dealer5/i.test(rowText(row.source_url));
+const promoteLegacyDealer5Row=(row:PublicStockRow)=>({...row,show_on_website:true,is_test_record:false}) as SupabaseStockBike;
+
+async function loadPublicStockRows(supabase:SupabaseClient,fields:string){
+  const live=await supabase.from("stock_bikes").select(fields).in("status",PUBLIC_STOCK_STATUSES).eq("show_on_website",true).neq("is_test_record",true).gt("price",0).not("make","is",null).not("model","is",null).order("created_at",{ascending:false});
+  if(live.error||live.data?.length)return {data:(live.data??[]) as unknown as PublicStockRow[],error:live.error,fallback:false};
+
+  // Legacy Dealer5 imports pre-date the explicit website-publish flag. If no
+  // rows are explicitly live, show only current Dealer5 retail stock while still
+  // excluding controlled test records and incomplete/manual hidden stock.
+  const legacy=await supabase.from("stock_bikes").select(fields).in("status",PUBLIC_STOCK_STATUSES).eq("is_test_record",false).eq("show_on_website",false).gt("price",0).not("make","is",null).not("model","is",null).order("created_at",{ascending:false});
+  if(legacy.error)return {data:[],error:legacy.error,fallback:false};
+  return {data:((legacy.data??[]) as unknown as PublicStockRow[]).filter(row=>hasRetailIdentity(row)&&isDealer5Source(row)).map(promoteLegacyDealer5Row),error:null,fallback:true};
+}
 
 export async function getSupabaseStockBikeByPublicIdentifier(identifier:string):Promise<{bike:SupabaseStockBike|null;method:string}>{
   if(!isSupabaseConfigured)return {bike:null,method:"supabase-not-configured"};
-  const requested=identifier.trim().toLowerCase();let supabase;try{supabase=getSupabaseAdmin()}catch{supabase=createClient(supabaseUrl,supabaseAnonKey,{auth:{persistSession:false,autoRefreshToken:false}})}
-  const index=await supabase.from("stock_bikes").select("id,dealer5_id,registration,make,model,status,price,show_on_website").in("status",["In Stock","ON FORECOURT","Available","Reserved"]).eq("show_on_website",true);
+  const requested=identifier.trim().toLowerCase();const supabase=serverStockClient();
+  const index=await loadPublicStockRows(supabase,PUBLIC_INDEX_FIELDS);
   if(index.error){console.error("[Public bike lookup] index failed",{requestedSlug:identifier,code:index.error.code});return {bike:null,method:"index-error"}}
   const rows=index.data??[];
   let match=rows.find(row=>publicSlug([row.make,row.model,row.registration].filter(Boolean).join("-"))===requested);let method="exact-slug";
@@ -23,7 +45,8 @@ export async function getSupabaseStockBikeByPublicIdentifier(identifier:string):
   if(!match)return {bike:null,method};
   const detail=await supabase.from("stock_bikes").select(PUBLIC_DETAIL_FIELDS).eq("id",match.id).maybeSingle();
   if(detail.error){console.error("[Public bike lookup] detail failed",{requestedSlug:identifier,method,code:detail.error.code});return {bike:null,method:`${method}-detail-error`}}
-  return {bike:detail.data?normalizeSupabaseStockBike(detail.data as unknown as SupabaseStockBike):null,method};
+  const row=detail.data as unknown as SupabaseStockBike|null;
+  return {bike:row?normalizeSupabaseStockBike(index.fallback?{...row,show_on_website:true,is_test_record:false}:row):null,method:index.fallback?`${method}-dealer5-fallback`:method};
 }
 
 export async function getSupabaseStockBikes():Promise<StockApiResponse>{
@@ -39,10 +62,10 @@ export async function getSupabaseStockBikes():Promise<StockApiResponse>{
 
 export async function getSupabasePublicStockBikes():Promise<StockApiResponse>{
   if(!isSupabaseConfigured)return {stock:[],configured:false,error:"Supabase is not configured."};
-  const supabase=createClient(supabaseUrl,supabaseAnonKey,{auth:{persistSession:false,autoRefreshToken:false}});
-  const fields="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,category,body_style,fuel,transmission,image_urls,primary_image_url,created_at,show_on_website,reserve_enabled,reservation_amount";
-  const {data,error}=await supabase.from("stock_bikes").select(fields).in("status",["In Stock","ON FORECOURT","Available","Reserved"]).eq("show_on_website",true).order("created_at",{ascending:false});
+  const supabase=serverStockClient();
+  const {data,error,fallback}=await loadPublicStockRows(supabase,PUBLIC_LIST_FIELDS);
   if(error){console.error("Unable to load public Supabase stock",{code:error.code,message:error.message});return {stock:[],configured:true,error:"Unable to load stock."}}
+  if(fallback&&data.length)console.warn(`[Public stock] No explicit website stock found; serving ${data.length} legacy Dealer5 rows.`);
   return {stock:(data??[]).map(row=>normalizeSupabaseStockBike(row as unknown as SupabaseStockBike)),configured:true};
 }
 
@@ -139,5 +162,6 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
     dealer5Fields,
     advertSections:mapped.advert_sections??{},
     showOnWebsite:mapped.show_on_website,
+    isTestRecord:Boolean(mapped.is_test_record),
   };
 }

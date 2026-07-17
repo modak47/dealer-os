@@ -38,6 +38,7 @@ export interface StockBike {
   dealer5Fields?: Record<string,unknown>;
   advertSections?: Record<string,unknown>;
   showOnWebsite?: boolean;
+  isTestRecord?: boolean;
 }
 
 type AirtableRecord = { id:string; createdTime?:string; fields?:Record<string,unknown> };
