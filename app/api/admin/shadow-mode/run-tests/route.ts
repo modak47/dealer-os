@@ -10,6 +10,17 @@ export async function POST() {
     const result = await runControlledShadowTests();
     return NextResponse.json(result, { status: result.ready ? 200 : 409 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to run controlled shadow-mode tests." }, { status: 500 });
+    console.error("Controlled shadow-mode tests failed", error);
+    return NextResponse.json(errorDetail(error), { status: 500 });
   }
+}
+
+function errorDetail(error: unknown) {
+  const candidate = error as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown };
+  return {
+    error: typeof candidate.message === "string" ? candidate.message : "Unable to run controlled shadow-mode tests.",
+    code: typeof candidate.code === "string" ? candidate.code : null,
+    details: typeof candidate.details === "string" ? candidate.details : null,
+    hint: typeof candidate.hint === "string" ? candidate.hint : null,
+  };
 }

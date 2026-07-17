@@ -1,7 +1,7 @@
 import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
-export type InvoiceStatus="draft"|"sent"|"partially_paid"|"paid"|"overdue"|"cancelled";
+export type InvoiceStatus="draft"|"sent"|"partially_paid"|"paid"|"overdue"|"cancelled"|"credited";
 export type InvoiceRow={id:string;invoice_number:string;customer_id:string;stock_bike_id:number;reservation_id:string|null;subtotal:number;total:number;paid:number;balance:number;status:InvoiceStatus;issued_at:string;due_at:string|null;delivery_charge:number;notes:string|null;customer_snapshot:Record<string,unknown>;bike_snapshot:Record<string,unknown>;customer?:{first_name:string;last_name:string;email:string|null;phone:string|null;postcode:string|null}|null;bike?:{make:string|null;model:string|null;variant:string|null;registration:string|null;year:number|null}|null};
 export type InvoiceItem={id:string;description:string;quantity:number;unit_price:number;line_total:number;item_type:string;sort_order:number};
 export type InvoicePayment={id:string;amount:number;method:string;payment_type:string;receipt_number:string|null;paid_at:string;status:string;notes:string|null};

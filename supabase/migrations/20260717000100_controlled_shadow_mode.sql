@@ -181,7 +181,7 @@ begin
   perform public.crm_post_payment_ledger(v_refund_id);
   update public.financial_ledger_transactions set is_test_record = p.is_test_record where payment_id = v_refund_id;
   update public.crm_payments set status = case when status = 'Refund Required' then 'Refunded' else status end where id = p.id;
-  if p.invoice_id is not null then update public.crm_invoices set status = 'credited' where id = p.invoice_id and status in ('cancelled','voided','credited'); end if;
+  if p.invoice_id is not null then update public.crm_invoices set status = 'credited' where id = p.invoice_id and status in ('cancelled','credited'); end if;
   return v_refund_id;
 end;
 $$;

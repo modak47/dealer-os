@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 type Result = { marker: string; ready: boolean; steps: { name: string; ok: boolean; detail: string }[]; cleanup: string };
+type ApiError = { error?: string; code?: string | null; details?: string | null; hint?: string | null; steps?: Result["steps"] };
 
 export function ShadowModeRunner() {
   const [running, setRunning] = useState(false);
@@ -14,14 +15,15 @@ export function ShadowModeRunner() {
     setError("");
     setResult(null);
     const response = await fetch("/api/admin/shadow-mode/run-tests", { method: "POST" });
-    const body = await response.json();
+    const body = await response.json() as Result | ApiError;
     setRunning(false);
     if (!response.ok) {
-      setError(body.error || "Controlled shadow-mode tests failed.");
-      if (body.steps) setResult(body);
+      const problem = body as ApiError;
+      setError([problem.error || "Controlled shadow-mode tests failed.", problem.code, problem.details, problem.hint].filter(Boolean).join(" "));
+      if ("marker" in body) setResult(body as Result);
       return;
     }
-    setResult(body);
+    setResult(body as Result);
   }
 
   return (
