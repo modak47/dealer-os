@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   if (!await requireStaffUser()) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   try {
     const url = new URL(request.url);
-    const data = await getStockLedgerData();
+    const data = await getStockLedgerData({ includeTest: url.searchParams.get("includeTest") === "true" });
     const exportType = url.searchParams.get("export");
     if (exportType) {
       const rows = exportType === "pending" ? data.rows.filter(row => row.status === ledgerStatusSets.pendingStatus)

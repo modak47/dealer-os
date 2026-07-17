@@ -10,10 +10,10 @@ const pendingStatus = "Purchase Pending";
 
 export type LedgerRow = ReturnType<typeof toLedgerRow>;
 
-export async function getStockLedgerData() {
+export async function getStockLedgerData(options: { includeTest?: boolean } = {}) {
   const { data, error } = await getSupabaseAdmin().from("stock_bikes").select("*").order("created_at", { ascending: false });
   if (error) throw error;
-  const rows = ((data ?? []) as SupabaseStockBike[]).map(toLedgerRow);
+  const rows = ((data ?? []) as SupabaseStockBike[]).map(toLedgerRow).filter(row => options.includeTest || !row.isTestRecord);
   return {
     rows,
     kpis: buildKpis(rows),
@@ -106,6 +106,7 @@ function toLedgerRow(bike: SupabaseStockBike) {
     soldSnapshotAt: bike.sold_finance_snapshot_at,
     alerts,
     raw: bike,
+    isTestRecord: Boolean((bike as SupabaseStockBike & { is_test_record?: boolean }).is_test_record),
   };
 }
 
