@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "./supabase-admin";
 import { normalizeOpportunities } from "@/app/admin/opportunities/normalize-opportunity";
+import { loadOpportunitiesWithListingDates } from "@/app/admin/opportunities/opportunity-data";
 
 const statuses = new Set([
   "New",
@@ -22,10 +23,7 @@ type UpdateBody = {
 
 export async function GET() {
   try {
-    const { data, error } = await getSupabaseAdmin()
-      .from("buying_opportunities")
-      .select("*")
-      .order("Score", { ascending: false });
+    const { data, error } = await loadOpportunitiesWithListingDates(getSupabaseAdmin());
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(normalizeOpportunities(data ?? []));

@@ -18,10 +18,10 @@ export function formatMoney(value: number): string {
 }
 
 export function formatRelativeConfirmed(value: string | null | undefined): string {
-  if (!value) return "Never confirmed";
+  if (!value) return "Unknown";
 
   const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return "Never confirmed";
+  if (Number.isNaN(timestamp)) return "Unknown";
 
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
   if (elapsedSeconds < 60) return "Confirmed just now";
@@ -35,6 +35,17 @@ export function formatRelativeConfirmed(value: string | null | undefined): strin
 
   const days = Math.floor(hours / 24);
   return `Confirmed ${days} days ago`;
+}
+
+export function formatDaysLive(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "Unknown";
+}
+
+export function formatListingDate(value: string | null | undefined): string {
+  if (!value) return "Unknown";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleDateString("en-GB");
 }
 
 export function getValidAdvertUrl(value: string | null | undefined): string | null {
@@ -76,7 +87,7 @@ export function statusColour(status: OpportunityDisplayStatus): string {
 }
 
 export function opportunityTimestamp(opportunity: Opportunity): number {
-  const date = opportunity["First Seen Date"] || opportunity.last_seen;
+  const date = opportunity.listingFirstSeenAt;
   const timestamp = date ? new Date(date).getTime() : 0;
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }

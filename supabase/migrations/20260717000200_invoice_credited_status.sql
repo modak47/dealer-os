@@ -2,7 +2,25 @@ alter table public.crm_invoices drop constraint if exists crm_invoices_status_ch
 
 alter table public.crm_invoices
   add constraint crm_invoices_status_check
-  check (status in ('draft','sent','partially_paid','paid','overdue','cancelled','credited','Open','Paid'));
+  check (status in (
+    'draft',
+    'sent',
+    'partially_paid',
+    'paid',
+    'overdue',
+    'cancelled',
+    'credited',
+    'Open',
+    'Paid',
+    'Cancelled',
+    'Draft',
+    'Sent',
+    'Part Paid',
+    'Partially Paid',
+    'Overdue',
+    'Voided',
+    'voided'
+  ));
 
 create or replace function public.crm_record_refund(
   p_original_payment_id uuid,

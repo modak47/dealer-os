@@ -34,6 +34,8 @@ SOURCE_COLUMNS = ",".join([
     '"Source URL"',
     '"Dealer Name"',
     '"Image URL"',
+    '"First Seen Date"',
+    '"Last Seen Date"',
     '"Days Live"',
     '"HPI Category"',
 ])
@@ -748,6 +750,12 @@ for record in all_bikes:
 
             "Days Live":
             days_live,
+
+            "First Seen Date":
+            fields.get("First Seen Date"),
+
+            "last_seen":
+            fields.get("Last Seen Date"),
 
             "primary_image_url":
             fields.get("Image URL")

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import OpportunityCard, { AdvertLink, OpportunityNotes } from "./OpportunityCard";
 import {
+  formatDaysLive,
+  formatListingDate,
   formatMoney,
   formatRelativeConfirmed,
   getValidAdvertUrl,
@@ -264,7 +266,7 @@ export default function OpportunitiesTracker({
           return parseMoney(b["Potential Margin"]) - parseMoney(a["Potential Margin"]);
         }
         if (sortBy === "oldest") return opportunityTimestamp(a) - opportunityTimestamp(b);
-        if (sortBy === "daysLive") return Number(b["Days Live"]) - Number(a["Days Live"]);
+        if (sortBy === "daysLive") return (b.listingDaysLive ?? -1) - (a.listingDaysLive ?? -1);
         return opportunityTimestamp(b) - opportunityTimestamp(a);
       });
   }, [
@@ -469,8 +471,8 @@ function OpportunityModal({
     ["Year", String(opportunity["Year"])],
     ["Mileage", `${opportunity["Mileage"]?.toLocaleString()} miles`],
     ["Seller Type", opportunity["Seller Type"]],
-    ["First Seen", opportunity["First Seen Date"]],
-    ["Last Confirmed Live", formatRelativeConfirmed(opportunity.last_seen)],
+    ["First Seen", formatListingDate(opportunity.listingFirstSeenAt)],
+    ["Last Confirmed Live", formatRelativeConfirmed(opportunity.listingLastConfirmedAt)],
     ["Derivative ID", opportunity["Derivative ID"]],
   ];
   const imageUrl = getValidAdvertUrl(opportunity.primary_image_url);
@@ -627,7 +629,7 @@ function OpportunityModal({
               <ModalMetric label="Asking Price" value={opportunity["Asking Price"]} />
               <ModalMetric label="Margin %" value={opportunity["Margin %"]} />
               <ModalMetric label="Comparables" value={String(opportunity["Comparable Count"] ?? 0)} />
-              <ModalMetric label="Days Live" value={String(opportunity["Days Live"])} />
+              <ModalMetric label="Days Live" value={formatDaysLive(opportunity.listingDaysLive)} />
               <ModalMetric label="Listing ID" value={String(listingId)} />
             </div>
 

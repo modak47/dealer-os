@@ -24,8 +24,12 @@ export type Opportunity = {
   "Mileage": number;
   "Seller Type": string;
   "Advert URL": string | null;
-  "First Seen Date": string;
-  "Days Live": number;
+  "First Seen Date": string | null;
+  "Days Live": number | null;
+  listingFirstSeenAt: string | null;
+  listingLastConfirmedAt: string | null;
+  listingDaysLive: number | null;
+  isNewListing: boolean;
   "Derivative ID": string;
   "HPI Category"?: string | null;
   "Margin %": string;

@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import {
   displayStatus,
+  formatDaysLive,
   formatMoney,
   formatRelativeConfirmed,
   getValidAdvertUrl,
@@ -29,6 +30,7 @@ type OpportunityCardProps = {
 export default function OpportunityCard({ opportunity, onOpen, onUpdate }: OpportunityCardProps) {
   const listingId = opportunity["Listing ID"];
   const status = displayStatus(opportunity);
+  const statusLabel = status === "New" ? "Not reviewed" : status;
   const [showImage, setShowImage] = useState(false);
 
   return (
@@ -83,8 +85,13 @@ export default function OpportunityCard({ opportunity, onOpen, onUpdate }: Oppor
 
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${statusColour(status)}`}>
-                            {status}
+                            {statusLabel}
                           </span>
+                          {opportunity.isNewListing && (
+                            <span className="rounded-full border border-[#00E51D]/40 bg-[#00E51D]/15 px-3 py-1 text-sm font-semibold text-[#00E51D]">
+                              New
+                            </span>
+                          )}
                           <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${scoreColour(Number(opportunity["Score"]))}`}>
                             Score {opportunity["Score"]}
                           </span>
@@ -109,9 +116,9 @@ export default function OpportunityCard({ opportunity, onOpen, onUpdate }: Oppor
                           count={Number(opportunity["Comparable Count"] ?? 0)}
                           onClick={() => onOpen(opportunity, "comparables")}
                         />
-                        <InfoLabel label="Days Live" value={String(opportunity["Days Live"])} />
+                        <InfoLabel label="Days Live" value={formatDaysLive(opportunity.listingDaysLive)} />
                         <InfoLabel label="Seller" value={opportunity["Seller Type"]} />
-                        <InfoLabel label="Last Confirmed" value={formatRelativeConfirmed(opportunity.last_seen)} />
+                        <InfoLabel label="Last Confirmed" value={formatRelativeConfirmed(opportunity.listingLastConfirmedAt)} />
                       </div>
                     </div>
                   </div>
