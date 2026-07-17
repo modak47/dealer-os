@@ -16,7 +16,7 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 CAZOO_EMAIL = os.getenv("CAZOO_EMAIL", "")
 CAZOO_PASSWORD = os.getenv("CAZOO_PASSWORD", "")
-CAZOO_PROFILE_PATH = os.getenv("CAZOO_PROFILE_PATH", "/home/yesmoto/dealerbot/cazoo_profile")
+CAZOO_PROFILE_PATH = os.getenv("CAZOO_PROFILE_PATH", "/home/yesmoto/dealerbot/cazoo-profile")
 HEADLESS = os.getenv("RETAIL_CHECK_HEADLESS", "false").lower() in {"1", "true", "yes"}
 MAX_ATTEMPTS = int(os.getenv("RETAIL_CHECK_MAX_ATTEMPTS", "3"))
 
@@ -246,6 +246,120 @@ def lookup_registration(registration):
     }
 
 
+def is_cazoo_login_url(url):
+    lowered = (url or "").lower()
+    return "login" in lowered or "account/login" in lowered or "signin" in lowered
+
+
+def has_login_fields(page):
+    try:
+        username_count = page.locator('input[name="Username"], input[name="username"], input[type="email"], input[name*="user" i]').count()
+        password_count = page.locator('input[name="Password"], input[name="password"], input[type="password"]').count()
+        return username_count > 0 and password_count > 0
+    except Exception:
+        return False
+
+
+def on_authenticated_stock_page(page):
+    lowered = page.url.lower()
+    return "stock.cazoo.co.uk" in lowered and not is_cazoo_login_url(lowered) and not has_login_fields(page)
+
+
+def fill_first_visible(page, selectors, value):
+    last_error = None
+    for selector in selectors:
+        try:
+            locator = page.locator(selector).first
+            if locator.count() and locator.is_visible():
+                locator.fill(value)
+                return
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f"Unable to find login field. {safe_error(last_error) if last_error else ''}".strip())
+
+
+def click_first_visible(page, selectors):
+    last_error = None
+    for selector in selectors:
+        try:
+            locator = page.locator(selector).first
+            if locator.count() and locator.is_visible():
+                locator.click()
+                return
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f"Unable to find login submit control. {safe_error(last_error) if last_error else ''}".strip())
+
+
+def ensure_cazoo_session(force_login=False):
+    cookies_list = []
+    with sync_playwright() as p:
+        context = p.chromium.launch_persistent_context(CAZOO_PROFILE_PATH, headless=HEADLESS)
+        try:
+            page = context.new_page()
+            if force_login:
+                page.goto("https://dealercentre.cazoo.co.uk/account/login", wait_until="networkidle")
+            else:
+                page.goto("https://stock.cazoo.co.uk", wait_until="networkidle")
+
+            needs_login = force_login or is_cazoo_login_url(page.url) or has_login_fields(page) or "stock.cazoo.co.uk" not in page.url.lower()
+
+            if needs_login:
+                page.goto("https://dealercentre.cazoo.co.uk/account/login", wait_until="networkidle")
+                if not has_login_fields(page):
+                    raise RuntimeError(f"Cazoo login page did not show login fields. Current URL: {page.url}")
+                fill_first_visible(page, ['input[name="Username"]', 'input[name="username"]', 'input[type="email"]', 'input[name*="user" i]'], CAZOO_EMAIL)
+                fill_first_visible(page, ['input[name="Password"]', 'input[name="password"]', 'input[type="password"]'], CAZOO_PASSWORD)
+                click_first_visible(page, ['button[type="submit"]', 'input[type="submit"]'])
+                page.wait_for_load_state("networkidle")
+                if is_cazoo_login_url(page.url) or has_login_fields(page):
+                    raise RuntimeError("Cazoo login did not complete.")
+
+            page.goto("https://stock.cazoo.co.uk", wait_until="networkidle")
+            if not on_authenticated_stock_page(page):
+                raise RuntimeError(f"Authenticated Cazoo stock page was not verified. Current URL: {page.url}")
+
+            print(f"Cazoo stock page verified: {page.url}", flush=True)
+            cookies_list = context.cookies()
+            print(f"Cazoo session cookie count: {len(cookies_list)}", flush=True)
+        finally:
+            context.close()
+    return {cookie["name"]: cookie["value"] for cookie in cookies_list}
+
+
+def parse_percayso_response(response):
+    content_type = response.headers.get("Content-Type", "")
+    body = response.text or ""
+    print(
+        f"Percayso HTTP {response.status_code}; Content-Type: {content_type or '-'}; Length: {len(body)}",
+        flush=True,
+    )
+    if response.status_code in {401, 403}:
+        raise RuntimeError(f"Percayso authentication failed with HTTP {response.status_code}.")
+    response.raise_for_status()
+    stripped = body.strip()
+    if not stripped:
+        raise RuntimeError("Percayso returned an empty response.")
+    lower_start = stripped[:200].lower()
+    if "<html" in lower_start or "<!doctype html" in lower_start or "account/login" in lower_start or "signin" in lower_start:
+        raise RuntimeError("Percayso returned a login or HTML page instead of JSON.")
+    percayso_json = json.loads(stripped)
+    if isinstance(percayso_json, str):
+        percayso_json = json.loads(percayso_json)
+    return percayso_json
+
+
+def call_percayso_endpoint(registration, bike_mileage, cookies):
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*", "Referer": "https://stock.cazoo.co.uk/"}
+    percayso_url = (
+        "https://stock.cazoo.co.uk/cfc/ajax/ajax.cfc"
+        "?method=getData&base=percayso.percayso&request=getValuation&returnType=4"
+        f"&vrm={registration}&mileage={bike_mileage}"
+    )
+    response = requests.get(percayso_url, cookies=cookies, headers=headers, timeout=15)
+    return parse_percayso_response(response)
+
+
 def lookup_percayso(registration, bike_mileage, worker_id, record_id):
     days_to_sale = None
     percayso_retail = None
@@ -255,28 +369,16 @@ def lookup_percayso(registration, bike_mileage, worker_id, record_id):
     if not CAZOO_EMAIL or not CAZOO_PASSWORD:
         return percayso_retail, percayso_trade, percayso_independent, percayso_franchise, days_to_sale
 
-    with sync_playwright() as p:
-        context = p.chromium.launch_persistent_context(CAZOO_PROFILE_PATH, headless=HEADLESS)
-        try:
-            page = context.new_page()
-            page.goto("https://stock.cazoo.co.uk", wait_until="networkidle")
-            update_progress(record_id, "Percayso Valuation", "Checking the independent valuation data.", 82, worker_id)
-            cookies_list = context.cookies()
-        finally:
-            context.close()
+    print(f"Percayso lookup v2: using Cazoo profile {CAZOO_PROFILE_PATH}", flush=True)
+    update_progress(record_id, "Percayso Valuation", "Checking the independent valuation data.", 82, worker_id)
+    try:
+        cookies = ensure_cazoo_session(force_login=False)
+        percayso_json = call_percayso_endpoint(registration, bike_mileage, cookies)
+    except Exception as first_error:
+        print(f"Percayso first attempt failed safely: {safe_error(first_error)}", flush=True)
+        cookies = ensure_cazoo_session(force_login=True)
+        percayso_json = call_percayso_endpoint(registration, bike_mileage, cookies)
 
-    cookies = {cookie["name"]: cookie["value"] for cookie in cookies_list}
-    headers = {"User-Agent": "Mozilla/5.0", "Accept": "*/*", "Referer": "https://stock.cazoo.co.uk/"}
-    percayso_url = (
-        "https://stock.cazoo.co.uk/cfc/ajax/ajax.cfc"
-        "?method=getData&base=percayso.percayso&request=getValuation&returnType=4"
-        f"&vrm={registration}&mileage={bike_mileage}"
-    )
-    response = requests.get(percayso_url, cookies=cookies, headers=headers, timeout=15)
-    response.raise_for_status()
-    percayso_json = json.loads(response.text)
-    if isinstance(percayso_json, str):
-        percayso_json = json.loads(percayso_json)
     valuation = percayso_json["percaysoData"]["valuation"]
     days_to_sale = percayso_json["percaysoData"].get("daysToSale")
     return valuation.get("retail"), valuation.get("trade"), valuation.get("independent"), valuation.get("franchise"), days_to_sale
@@ -334,7 +436,7 @@ def process_retail_check(record, worker_id, supabase_client=None, max_attempts=M
             update_progress(record_id, "Percayso Valuation", "Checking the independent valuation data.", 82, worker_id, client)
             percayso_retail, percayso_trade, percayso_independent, percayso_franchise, days_to_sale = lookup_percayso(registration, bike_mileage, worker_id, record_id)
         except Exception as exc:
-            print(f"Percayso Error: {safe_error(exc)}", flush=True)
+            print(f"Percayso unavailable after authenticated retry; continuing with AutoTrader valuation. Reason: {safe_error(exc)}", flush=True)
 
         update_progress(record_id, "Saving Results", "Saving retail check results.", 95, worker_id, client)
         update_data = {

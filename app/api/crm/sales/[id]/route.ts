@@ -7,7 +7,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   if (!uuid(id)) return NextResponse.json({ error: "Invalid sale." }, { status: 400 });
   const { data, error } = await getSupabaseAdmin().from("crm_sales")
-    .select("*,customer:crm_customers(*),bike:stock_bikes(id,make,model,variant,registration,price,status,primary_image_url),delivery:crm_deliveries(*),payments:crm_payments(*)")
+    .select("*,customer:crm_customers(*),bike:stock_bikes!crm_sales_stock_bike_id_fkey(id,make,model,variant,registration,price,status,primary_image_url),delivery:crm_deliveries(*),payments:crm_payments(*)")
     .eq("id", id).maybeSingle();
   return error ? NextResponse.json({ error: error.message }, { status: 500 }) : data ? NextResponse.json({ sale: data }) : NextResponse.json({ error: "Sale not found." }, { status: 404 });
 }

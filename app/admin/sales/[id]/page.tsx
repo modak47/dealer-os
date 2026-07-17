@@ -10,7 +10,7 @@ export default async function SaleDetail({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const { data } = await getSupabaseAdmin()
     .from("crm_sales")
-    .select("*,customer:crm_customers(id,first_name,last_name,email,phone,postcode),bike:stock_bikes(id,stock_number,make,model,variant,year,registration,status,price,primary_image_url,purchase_price,total_stock_cost),delivery:crm_deliveries(*),payments:crm_payments(*),invoice:crm_invoices(*)")
+    .select("*,customer:crm_customers(id,first_name,last_name,email,phone,postcode),bike:stock_bikes!crm_sales_stock_bike_id_fkey(id,stock_number,make,model,variant,year,registration,status,price,primary_image_url,purchase_price,total_stock_cost),delivery:crm_deliveries(*),payments:crm_payments(*),invoice:crm_invoices(*)")
     .eq("id", id)
     .maybeSingle();
 
