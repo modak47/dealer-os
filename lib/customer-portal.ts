@@ -7,7 +7,7 @@ export type PortalLookup = { email: string; code: string };
 
 const clean = (value: unknown) => typeof value === "string" ? value.trim() : value === null || value === undefined ? "" : String(value).trim();
 const money = (value: unknown) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(Number(value ?? 0) || 0);
-const missing = (error: { code?: string } | null | undefined) => ["42P01", "42703", "PGRST205"].includes(error?.code ?? "");
+const missing = (error: { code?: string } | null | undefined) => ["42P01", "42703", "PGRST200", "PGRST201", "PGRST205"].includes(error?.code ?? "");
 
 function paymentReference(invoiceNumber?: string | null) {
   return invoiceNumber ? invoiceNumber.replace(/\s+/g, "") : "";
@@ -35,9 +35,9 @@ export async function loadCustomerPortal(input: PortalLookup) {
 
   const customerId = String(customer.id);
   const [reservations, sales, invoices, payments, deliveries, settings] = await Promise.all([
-    db.from("crm_reservations").select("id,status,deposit_amount,reserved_at,expires_at,delivery_option,delivery_charge,stock_bike_id,bike:stock_bikes(id,make,model,variant,year,registration,price,primary_image_url,status)").eq("customer_id", customerId).order("reserved_at", { ascending: false }),
-    db.from("crm_sales").select("id,status,sale_price,deposit_amount,balance_due,payment_status,delivery_method,delivery_date,collection_date,handover_status,created_at,completed_at,stock_bike_id,bike:stock_bikes(id,make,model,variant,year,registration,price,primary_image_url,status)").eq("customer_id", customerId).order("created_at", { ascending: false }),
-    db.from("crm_invoices").select("id,invoice_number,status,total,paid,balance,issued_at,due_at,delivery_charge,stock_bike_id,sale_id,reservation_id,bike:stock_bikes(id,make,model,variant,year,registration,primary_image_url)").eq("customer_id", customerId).is("deleted_at", null).order("created_at", { ascending: false }),
+    db.from("crm_reservations").select("id,status,deposit_amount,reserved_at,expires_at,delivery_option,delivery_charge,stock_bike_id").eq("customer_id", customerId).order("reserved_at", { ascending: false }),
+    db.from("crm_sales").select("id,status,sale_price,deposit_amount,balance_due,payment_status,delivery_method,delivery_date,collection_date,handover_status,created_at,completed_at,stock_bike_id").eq("customer_id", customerId).order("created_at", { ascending: false }),
+    db.from("crm_invoices").select("id,invoice_number,status,total,paid,balance,issued_at,due_at,delivery_charge,stock_bike_id,sale_id,reservation_id").eq("customer_id", customerId).is("deleted_at", null).order("created_at", { ascending: false }),
     db.from("crm_payments").select("id,amount,method,payment_type,receipt_number,paid_at,status,stock_bike_id,invoice_id,sale_id,reservation_id").eq("customer_id", customerId).is("deleted_at", null).order("paid_at", { ascending: false }),
     db.from("crm_deliveries").select("id,status,delivery_method,scheduled_at,completed_at,identity_checked,licence_verified,v5_prepared,handover_completed,keys_given,documents_signed,photos_taken,hpi_complete,notes,stock_bike_id,sale_id").eq("customer_id", customerId).is("deleted_at", null).order("created_at", { ascending: false }),
     getDealerSettings(),
@@ -46,7 +46,16 @@ export async function loadCustomerPortal(input: PortalLookup) {
   const hardError = [reservations, sales, invoices, payments, deliveries].find(result => result.error && !missing(result.error));
   if (hardError?.error) throw hardError.error;
 
-  const invoiceRows = invoices.data ?? [];
+  const reservationRows = reservations.error && missing(reservations.error) ? [] : reservations.data ?? [];
+  const saleRows = sales.error && missing(sales.error) ? [] : sales.data ?? [];
+  const invoiceRows = invoices.error && missing(invoices.error) ? [] : invoices.data ?? [];
+  const paymentRows = payments.error && missing(payments.error) ? [] : payments.data ?? [];
+  const deliveryRows = deliveries.error && missing(deliveries.error) ? [] : deliveries.data ?? [];
+  const bikeIds = Array.from(new Set([...reservationRows, ...saleRows, ...invoiceRows].map(row => Number((row as { stock_bike_id?: number | string | null }).stock_bike_id)).filter(Number.isFinite)));
+  const bikes = bikeIds.length ? await db.from("stock_bikes").select("id,make,model,variant,year,registration,price,primary_image_url,status").in("id", bikeIds) : { data: [], error: null };
+  if (bikes.error && !missing(bikes.error)) throw bikes.error;
+  const bikeById = new Map((bikes.data ?? []).map(bike => [Number(bike.id), bike]));
+  const withBike = <T extends { stock_bike_id?: number | string | null }>(rows: T[]) => rows.map(row => ({ ...row, bike: bikeById.get(Number(row.stock_bike_id)) ?? null }));
   const latestInvoice = invoiceRows[0] as Record<string, unknown> | undefined;
   const reference = paymentReference(clean(latestInvoice?.invoice_number) || `${settings.payment_reference_prefix}-${code}`);
 
@@ -58,11 +67,11 @@ export async function loadCustomerPortal(input: PortalLookup) {
       phone: customer.phone,
       postcode: customer.postcode,
     },
-    reservations: reservations.data ?? [],
-    sales: sales.data ?? [],
-    invoices: invoiceRows,
-    payments: payments.data ?? [],
-    deliveries: deliveries.data ?? [],
+    reservations: withBike(reservationRows),
+    sales: withBike(saleRows),
+    invoices: withBike(invoiceRows),
+    payments: paymentRows,
+    deliveries: deliveryRows,
     payment: {
       configured: Boolean(settings.bank_account_name && settings.bank_sort_code && settings.bank_account_number),
       accountName: settings.bank_account_name,
