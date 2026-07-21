@@ -13,6 +13,10 @@ function paymentReference(invoiceNumber?: string | null) {
   return invoiceNumber ? invoiceNumber.replace(/\s+/g, "") : "";
 }
 
+function isLiveInvoice(invoice: { status?: string | null }) {
+  return !["cancelled", "canceled", "credited", "void"].includes(clean(invoice.status).toLowerCase());
+}
+
 export async function loadCustomerPortal(input: PortalLookup) {
   const email = clean(input.email).toLowerCase();
   const code = clean(input.code).toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -58,6 +62,7 @@ export async function loadCustomerPortal(input: PortalLookup) {
   const withBike = <T extends { stock_bike_id?: number | string | null }>(rows: T[]) => rows.map(row => ({ ...row, bike: bikeById.get(Number(row.stock_bike_id)) ?? null }));
   const latestInvoice = invoiceRows[0] as Record<string, unknown> | undefined;
   const reference = paymentReference(clean(latestInvoice?.invoice_number) || `${settings.payment_reference_prefix}-${code}`);
+  const outstanding = invoiceRows.filter(isLiveInvoice).reduce((sum, invoice) => sum + Number((invoice as { balance?: number }).balance ?? 0), 0);
 
   return {
     ok: true,
@@ -80,7 +85,7 @@ export async function loadCustomerPortal(input: PortalLookup) {
       reference,
       instructions: settings.payment_instructions,
       wording: settings.vat_wording,
-      outstanding: money(invoiceRows.reduce((sum, invoice) => sum + Number((invoice as { balance?: number }).balance ?? 0), 0)),
+      outstanding: money(outstanding),
     },
     dealer: {
       name: settings.business_name,
