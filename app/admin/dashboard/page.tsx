@@ -5,6 +5,7 @@ import { getActiveStockBikes, getStockStats, isPublic, toPublicBike } from "@/li
 import { getAdminIdentity } from "@/lib/admin-identity";
 import { getCrmDashboard, getCrmLeads } from "@/lib/crm";
 import { WebsiteLeadsOverview } from "./website-leads-overview";
+import { hasUsableStockImage } from "@/lib/stock-images";
 
 export const revalidate = 60;
 
@@ -13,7 +14,7 @@ export default async function Dashboard() {
   const newLeads = crm.newLeads;
   const recentLeads = recentLeadResult.data.slice(0, 4);
   const publicBikes = bikes.filter(isPublic);
-  const missingImages = bikes.filter(bike => !bike.image || bike.image === "/bike-placeholder.svg").length;
+  const missingImages = bikes.filter(bike => !hasUsableStockImage(bike.imageUrls, bike.image)).length;
   const missingPrices = bikes.filter(bike => bike.price <= 0).length;
   const stats = [
     { name: "Total stock", value: stock.totalStock, href: "/admin/stock?filter=active" },

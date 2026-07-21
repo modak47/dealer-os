@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { PublicStockBike } from "@/lib/stock";
 import { matchesPublicStyle, PUBLIC_STYLES } from "@/lib/public-stock-filters";
+import { compareImageAvailability } from "@/lib/stock-images";
 
 const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(value);
 type InitialFilters = Record<string, string | undefined>;
@@ -21,12 +22,20 @@ export function StockPageClient({ bikes, initial }: { bikes: PublicStockBike[]; 
   const makes = [...new Set(bikes.map((bike) => bike.make).filter(Boolean))].sort();
   const models = [...new Set(bikes.filter((bike) => !make || bike.make === make).map((bike) => bike.model).filter(Boolean))].sort();
   const bodyTypes = [...new Set(bikes.map((bike) => bike.bodyStyle || bike.category).filter(Boolean))].sort();
+  const imageCompare = (a: PublicStockBike, b: PublicStockBike) => compareImageAvailability(a.photoReady, b.photoReady);
+  const newestCompare = (a: PublicStockBike, b: PublicStockBike) => Date.parse(b.createdTime || "0") - Date.parse(a.createdTime || "0");
   const shown = useMemo(() => bikes.filter((bike) => {
     const text = `${bike.make} ${bike.model} ${bike.variant} ${bike.bodyStyle} ${bike.category} ${bike.description}`.toLowerCase();
     const styleMatch = !style || (PUBLIC_STYLES as readonly string[]).includes(style) ? !style || matchesPublicStyle(bike, style) : `${bike.bodyStyle} ${bike.category}`.toLowerCase().includes(style.toLowerCase());
     const engineMatch = !engine || (engine === "125" && bike.engineCc >= 110 && bike.engineCc <= 140) || (engine === "under500" && bike.engineCc > 0 && bike.engineCc < 500) || (engine === "500plus" && bike.engineCc >= 500);
     return (!query || text.includes(query.toLowerCase())) && (!make || bike.make === make) && (!model || bike.model === model) && (!minPrice || bike.price >= minPrice) && (!maxPrice || bike.price <= maxPrice) && styleMatch && engineMatch && (!maxMileage || bike.mileageValue <= maxMileage);
-  }).sort((a, b) => sort === "price-asc" ? a.price - b.price : sort === "price-desc" ? b.price - a.price : sort === "year" ? b.year - a.year : sort === "mileage" ? a.mileageValue - b.mileageValue : Date.parse(b.createdTime || "0") - Date.parse(a.createdTime || "0")), [bikes, query, make, model, minPrice, maxPrice, style, engine, maxMileage, sort]);
+  }).sort((a, b) => {
+    if (sort === "price-asc") return a.price - b.price || imageCompare(a, b) || newestCompare(a, b);
+    if (sort === "price-desc") return b.price - a.price || imageCompare(a, b) || newestCompare(a, b);
+    if (sort === "year") return b.year - a.year || imageCompare(a, b) || newestCompare(a, b);
+    if (sort === "mileage") return a.mileageValue - b.mileageValue || imageCompare(a, b) || newestCompare(a, b);
+    return imageCompare(a, b) || newestCompare(a, b);
+  }), [bikes, query, make, model, minPrice, maxPrice, style, engine, maxMileage, sort]);
   const clear = () => { setQuery(""); setMake(""); setModel(""); setMinPrice(0); setMaxPrice(0); setStyle(""); setEngine(""); setMaxMileage(0); };
   return (
     <>

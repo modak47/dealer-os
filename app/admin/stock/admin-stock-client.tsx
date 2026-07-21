@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SupabaseStockBike } from "@/lib/stock-bike-types";
+import { compareImageAvailability, hasUsableStockImage, normalizeStockImageUrls } from "@/lib/stock-images";
 
 export type StockFilter = "active" | "live" | "reserved" | "sold" | "prep" | "pending" | "all";
 const normal = (value: string) => value.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
@@ -24,10 +25,10 @@ export function AdminStockTable({ bikes, initialFilter = "active", initialQuery 
     const status = normal(bike.status);
     const statusMatch = filter === "all" || (filter === "active" && ["in stock", "on forecourt", "reserved", "prep"].includes(status)) || (filter === "live" && ["in stock", "on forecourt"].includes(status)) || (filter === "reserved" && status === "reserved") || (filter === "sold" && ["sold", "sale completed"].includes(status)) || (filter === "prep" && status === "prep") || (filter === "pending" && ["purchase pending", "purchase cancelled"].includes(status));
     const searchMatch = !query || `${bike.make ?? ""} ${bike.model ?? ""} ${bike.variant ?? ""} ${bike.registration ?? ""} ${bike.stock_number ?? ""}`.toLowerCase().includes(query.toLowerCase());
-    const images = [bike.primary_image_url, ...bike.image_urls].filter(Boolean);
+    const images = normalizeStockImageUrls(bike.primary_image_url, bike.image_urls);
     const warningMatch = warning === "image" ? images.length === 0 : warning === "price" ? bike.price == null || bike.price <= 0 : true;
     return statusMatch && searchMatch && warningMatch;
-  }), [bikes, filter, query, warning]);
+  }).sort((a,b)=>compareImageAvailability(hasUsableStockImage(a.primary_image_url,a.image_urls),hasUsableStockImage(b.primary_image_url,b.image_urls))||Date.parse(b.created_at||"0")-Date.parse(a.created_at||"0")), [bikes, filter, query, warning]);
 
   return <>
     <div className="admin-filters stock-manager-filters">
@@ -42,7 +43,7 @@ export function AdminStockTable({ bikes, initialFilter = "active", initialQuery 
 function StockManagerCard({ bike }: { bike: SupabaseStockBike }) {
   const router = useRouter();
   const href = `/admin/stock/${bike.id}`;
-  const images = Array.from(new Set(bike.image_urls.filter((value): value is string => Boolean(value))));
+  const images = normalizeStockImageUrls(bike.primary_image_url, bike.image_urls);
   const image = images[0];
   const statusClass = normal(bike.status).replaceAll(" ", "-");
   const purchasePending = statusClass === "purchase-pending";

@@ -5,10 +5,9 @@ import type { StockApiResponse, SupabaseStockBike } from "@/lib/stock-bike-types
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeStockImageUrls } from "@/lib/stock-images";
 
 const publicSlug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-const imageKey=(value:string)=>{try{const url=new URL(value);return `${url.origin}${url.pathname}`.toLowerCase()}catch{return value.trim().toLowerCase().split("?")[0]}};
-const dedupeImages=(values:string[])=>{const seen=new Set<string>();return values.filter(value=>{const key=imageKey(value);if(!key||seen.has(key))return false;seen.add(key);return true})};
 const PUBLIC_STOCK_STATUSES=["In Stock","ON FORECOURT","Available","Reserved"];
 const PUBLIC_DETAIL_FIELDS="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,advert_title,stock_number,category,body_style,fuel,transmission,description,service_history,vat_status,specifications,dealer5_data,image_urls,primary_image_url,mot_expiry,notes,created_at,plate,engine_number,number_of_gears,previous_owners,registration_date,display_status,show_on_website,is_test_record,reserve_enabled,reservation_amount,advert_sections,bhp,torque,co2,road_tax,top_speed,length_mm,width_mm,weight_kg,euro_emissions,hpi_category,workshop_status,date_in_stock,sold_date,mot_status,valeting_status,photo_status,location,updated_at,source_url,dealer5_updated_at";
 const PUBLIC_INDEX_FIELDS="id,dealer5_id,registration,make,model,status,price,show_on_website,is_test_record,source_url";
@@ -79,11 +78,7 @@ export function normalizeSupabaseStockBike(bike:SupabaseStockBike):SupabaseStock
   const nested=(dealer5 as {fields?:unknown}).fields;
   const fields=nested&&typeof nested==="object"&&!Array.isArray(nested)?nested as Record<string,unknown>:{};
   const field=(...names:string[])=>{for(const name of names){const value=fields[name];if(!empty(value))return value}return null};
-  const sourceImages=dedupeImages((Array.isArray(bike.image_urls)?bike.image_urls:[]).filter((value):value is string=>typeof value==="string").map(value=>value.trim()).filter(Boolean));
-  // image_urls is the ordered source of truth. Keep a legacy fallback so records
-  // created before ordered arrays were introduced do not lose their only photo.
-  if(!sourceImages.length&&typeof bike.primary_image_url==="string"&&bike.primary_image_url.trim())sourceImages.push(bike.primary_image_url.trim());
-  const imageUrls=sourceImages;
+  const imageUrls=normalizeStockImageUrls(bike.image_urls,bike.primary_image_url);
   const primaryImage=imageUrls[0]||null;
   return {
     ...bike,
