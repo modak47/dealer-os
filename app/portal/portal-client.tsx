@@ -18,6 +18,7 @@ type PortalData = {
   payment: { configured: boolean; accountName: string; sortCode: string; accountNumber: string; reference: string; instructions: string; wording: string; outstanding: string };
   dealer: { name: string; phone: string; email: string; openingHours: string };
 };
+type PortalTab = "invoices" | "payments" | "handover" | "documents" | "help";
 
 const money = (value: unknown) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(Number(value ?? 0) || 0);
 const date = (value: unknown) => {
@@ -61,6 +62,7 @@ export function CustomerPortalClient() {
   const [signature, setSignature] = useState("");
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [data, setData] = useState<PortalData | null>(null);
+  const [activeTab, setActiveTab] = useState<PortalTab>("handover");
   const liveInvoices = useMemo(() => data?.invoices.filter(isLiveInvoice) ?? [], [data]);
   const current = useMemo(() => data?.sales[0] ?? data?.reservations[0] ?? liveInvoices[0] ?? data?.invoices[0], [data, liveInvoices]);
   const delivery = data?.deliveries[0];
@@ -207,38 +209,45 @@ export function CustomerPortalClient() {
         <article><span>Active invoice</span><strong>{text(liveInvoices[0]?.invoice_number) || "Pending"}</strong></article>
         <article><span>Delivery / collection</span><strong>{delivery ? date(delivery.scheduled_at) : "To arrange"}</strong></article>
       </div>
-      <nav className="portal-next-actions" aria-label="Customer portal actions">
-        <a href="#portal-documents"><span>Documents</span><b>Upload licence or proof of address</b></a>
-        <a href="#portal-handover"><span>Handover</span><b>{delivery ? "Confirm collection or delivery" : "Waiting for booking"}</b></a>
-        {liveInvoices[0] && <button type="button" onClick={() => void downloadInvoice(liveInvoices[0])}><span>Invoice</span><b>Download active invoice PDF</b></button>}
-      </nav>
       {(notice || actionError) && <div className={`portal-message ${actionError ? "error" : ""}`}>{actionError || notice}</div>}
-      <div className="portal-grid">
+      <div className="portal-overview">
         <section className="portal-bike">
           <div style={{ backgroundImage: `url("${text(bike?.primary_image_url) || "/bike-placeholder.svg"}")` }} />
           <h2>{bikeName(current)}</h2>
           <p>{text(bike?.registration) || "Registration pending"}</p>
           <small>{text(bike?.status) || status}</small>
         </section>
-        <section>
+        <section className="portal-payment-card">
           <h2>Payment details</h2>
           {data.payment.configured ? <dl><PortalBankRow label="Account name" value={data.payment.accountName} copy={copy} copied={copied} copyKey="account" /><PortalBankRow label="Sort code" value={data.payment.sortCode} copy={copy} copied={copied} copyKey="sort" /><PortalBankRow label="Account number" value={data.payment.accountNumber} copy={copy} copied={copied} copyKey="number" /><PortalBankRow label="Reference" value={data.payment.reference} copy={copy} copied={copied} copyKey="reference" /></dl> : <p>Bank details are not configured in the portal yet. Please contact {data.dealer.name}.</p>}
           {data.payment.configured && <button className="portal-copy-all" type="button" onClick={() => copy(`Account name: ${data.payment.accountName}\nSort code: ${data.payment.sortCode}\nAccount number: ${data.payment.accountNumber}\nReference: ${data.payment.reference}`, "all-bank")}>{copied === "all-bank" ? "Copied bank details" : "Copy all bank details"}</button>}
           {data.payment.instructions && <p>{data.payment.instructions}</p>}
         </section>
-        <section>
+      </div>
+      <div className="portal-workspace">
+        <nav className="portal-tabs" aria-label="Portal sections">
+          {([
+            ["handover", "Handover"],
+            ["documents", "Documents"],
+            ["invoices", "Invoices"],
+            ["payments", "Payments"],
+            ["help", "Help"],
+          ] as [PortalTab, string][]).map(([key, label]) => <button type="button" className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)} key={key}>{label}</button>)}
+        </nav>
+        <section className="portal-tab-panel">
+        {activeTab === "invoices" && <>
           <h2>Invoices</h2>
           {data.invoices.length ? data.invoices.map(invoice => <PortalRow key={text(invoice.id)} title={text(invoice.invoice_number) || "Invoice"} meta={`${cleanStatus(invoice.status)} - Due ${date(invoice.due_at)}`} value={`${money(invoice.balance)} due`} muted={!isLiveInvoice(invoice)} action={<button type="button" onClick={() => void downloadInvoice(invoice)} disabled={downloadBusy === text(invoice.id)}>{downloadBusy === text(invoice.id) ? "Preparing..." : "PDF"}</button>} />) : <p>No invoice has been issued yet.</p>}
-        </section>
-        <section>
+        </>}
+        {activeTab === "payments" && <>
           <h2>Payments received</h2>
           {data.payments.length ? data.payments.map(payment => <PortalRow key={text(payment.id)} title={text(payment.payment_type) || "Payment"} meta={`${text(payment.method) || "Payment"} - ${date(payment.paid_at)}`} value={money(payment.amount)} />) : <p>No payments are recorded yet.</p>}
-        </section>
-        <section id="portal-handover">
+        </>}
+        {activeTab === "handover" && <>
           <h2>Delivery and handover</h2>
           {delivery ? <><PortalRow title={text(delivery.delivery_method) || "Collection"} meta={cleanStatus(delivery.status)} value={date(delivery.scheduled_at)} /><div className="portal-checks">{["identity_checked", "licence_verified", "v5_prepared", "handover_completed", "keys_given", "documents_signed", "hpi_complete"].map(key => <span className={delivery[key] ? "done" : ""} key={key}>{label(key)}</span>)}</div>{delivery.customer_confirmed_at ? <p className="portal-confirmed">Confirmed by {text(delivery.customer_signature_name) || "customer"} on {date(delivery.customer_confirmed_at)}</p> : <div className="portal-signature"><label><span>Your name</span><input value={signatureName} onChange={event => setSignatureName(event.target.value)} /></label><SignaturePad onChange={setSignature} /><button type="button" onClick={() => void confirmDelivery()} disabled={confirmBusy || !signatureName || !signature}>{confirmBusy ? "Saving..." : "Confirm handover"}</button></div>}</> : <p>Delivery or collection details will appear here once booked.</p>}
-        </section>
-        <section id="portal-documents">
+        </>}
+        {activeTab === "documents" && <>
           <h2>Documents</h2>
           <form className="portal-upload" onSubmit={uploadDocument}>
             <select value={documentType} onChange={event => setDocumentType(event.target.value)}><option value="licence">Driving licence</option><option value="proof_of_address">Proof of address</option><option value="finance_document">Finance document</option><option value="other">Other document</option></select>
@@ -246,11 +255,16 @@ export function CustomerPortalClient() {
             <button disabled={!file || uploadBusy}>{uploadBusy ? "Uploading..." : "Upload document"}</button>
           </form>
           {data.documents.length ? <div className="portal-documents">{data.documents.map(document => <article key={text(document.id)}><b>{label(text(document.document_type) || "document")}</b><span>{text(document.file_name)}</span><small>{date(document.created_at)}</small></article>)}</div> : <p>No documents uploaded yet.</p>}
-        </section>
-        <section>
+        </>}
+        {activeTab === "help" && <>
           <h2>Need help?</h2>
           <p>Contact {data.dealer.name} if anything looks wrong or you need to arrange payment, collection or delivery.</p>
           <dl><div><dt>Phone</dt><dd><a href={`tel:${data.dealer.phone.replace(/\s/g, "")}`}>{data.dealer.phone}</a></dd></div><div><dt>Email</dt><dd><a href={`mailto:${data.dealer.email}`}>{data.dealer.email}</a></dd></div><div><dt>Hours</dt><dd>{data.dealer.openingHours}</dd></div></dl>
+        </>}
+        <section>
+          <h2>Quick actions</h2>
+          <div className="portal-quick-actions"><button type="button" onClick={() => setActiveTab("documents")}>Upload documents</button><button type="button" onClick={() => setActiveTab("handover")}>Confirm handover</button>{liveInvoices[0] && <button type="button" onClick={() => void downloadInvoice(liveInvoices[0])}>Download invoice PDF</button>}</div>
+        </section>
         </section>
       </div>
     </section>}
