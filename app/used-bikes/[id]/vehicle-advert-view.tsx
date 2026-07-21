@@ -16,6 +16,10 @@ type DescriptionSection={key:string;title:string;content:string[]};
 
 const clean=(value:unknown)=>typeof value==="string"?value.trim():typeof value==="number"?String(value):"";
 const normal=(value:string)=>value.toLowerCase().replace(/&/g,"and").replace(/[^a-z0-9]+/g," ").trim();
+const badAdvertLinePattern=/^(?:[?.!]|mount|through\s+jigsaw\s+finance\.?)$/i;
+const stripAdvertLine=(value:string)=>{const line=stripUnsafeAdvertText(value).replace(/\s+/g," ").trim();return line&&!badAdvertLinePattern.test(line)?line:""};
+const sanitizeDescriptionSections=(sections:DescriptionSection[])=>sections.map(section=>({...section,content:section.content.map(stripAdvertLine).filter(Boolean)})).filter(section=>section.content.length);
+const compareRelated=(a:PublicStockBike,b:PublicStockBike)=>Number(b.photoReady)-Number(a.photoReady)||Date.parse(b.createdTime||"0")-Date.parse(a.createdTime||"0");
 
 function specificationSource(bike:PublicStockDetailBike){
   const values=new Map<string,string>();
@@ -59,8 +63,8 @@ function parseDescription(text:string,attention:string):DescriptionSection[]{
   for(const heading of descriptionHeadings){for(const alias of heading.aliases){const escaped=alias.replace(/[.*+?^${}()|[\]\\]/g,"\\$&").replace(/\s+/g,"\\s+");prepared=prepared.replace(new RegExp(`${escaped}\\s*:?`,"gi"),`\n@@${heading.key}@@\n`)}}
   const definitions=new Map<string,string>(descriptionHeadings.map(item=>[item.key,item.title]));const sections:DescriptionSection[]=[];let current:DescriptionSection={key:"intro",title:"Introduction",content:[]};
   const push=()=>{if(current.content.length)sections.push(current)};
-  for(const raw of prepared.split(/\n+/)){const marker=raw.trim().match(/^@@(.+)@@$/);if(marker){push();const key=marker[1];current={key,title:definitions.get(key)??"Details",content:[]};continue}const line=stripUnsafeAdvertText(raw);if(!line)continue;current.content.push(line)}push();
-  if(attention&&!sections.some(section=>section.key==="headline"))sections.unshift({key:"headline",title:"The headline",content:[stripUnsafeAdvertText(attention)].filter(Boolean)});
+  for(const raw of prepared.split(/\n+/)){const marker=raw.trim().match(/^@@(.+)@@$/);if(marker){push();const key=marker[1];current={key,title:definitions.get(key)??"Details",content:[]};continue}const line=stripAdvertLine(raw);if(!line)continue;current.content.push(line)}push();
+  if(attention&&!sections.some(section=>section.key==="headline"))sections.unshift({key:"headline",title:"The headline",content:[stripAdvertLine(attention)].filter(Boolean)});
   return sections.length?sections:[{key:"intro",title:"About this motorcycle",content:[text]}];
 }
 
@@ -78,7 +82,7 @@ function DescriptionContent({text,attention,structured}:{text:string;attention:s
     ["delivery","Delivery","DELIVERY",["delivery"]],
   ];
   const structuredSections:DescriptionSection[]=canonicalSections.map(([key,title,,aliases])=>{const value=aliases.map(alias=>structured[alias]).find(candidate=>typeof candidate==="string"&&candidate.trim()) as string|undefined;return {key,title,content:value?value.replace(/[•●▪◦]\s*/g,"\n• ").split(/\n+/).map(line=>stripUnsafeAdvertText(line)).filter(Boolean):[]}}).filter(section=>section.content.length);
-  const sections=structuredSections.length?structuredSections:parseDescription(text,attention);
+  const sections=sanitizeDescriptionSections(structuredSections.length?structuredSections:parseDescription(text,attention));
   return <div className="vehicle-story-sections">{sections.map((section,sectionIndex)=>{const bullets=section.content.filter(line=>/^[•*\-✓✔]/.test(line));const prose=section.content.filter(line=>!/^[•*\-✓✔]/.test(line));const eyebrow=canonicalSections.find(([key])=>key===section.key)?.[2]??"VEHICLE DETAILS";return <article className={`vehicle-story-section ${section.key}`} key={`${section.key}-${section.title}-${sectionIndex}`}><header><span>{eyebrow}</span><h3>{section.title}</h3></header><div>{prose.map((line,index)=>{const pieces=line.length>420?line.split(/(?<=[.!?])\s+(?=[A-Z])/).reduce<string[]>((groups,sentence)=>{const last=groups.at(-1)??"";if(last.length<240){groups[groups.length-1]=`${last} ${sentence}`.trim()}else groups.push(sentence);return groups},[""]).filter(Boolean):[line];return pieces.map((piece,pieceIndex)=><p key={`${index}-${pieceIndex}`}>{piece}</p>)})}{bullets.length>0&&<ul>{bullets.map((line,index)=><li key={index}>{line.replace(/^[•*\-✓✔]\s*/,"")}</li>)}</ul>}</div></article>})}</div>;
 }
 
@@ -89,6 +93,7 @@ export function VehicleAdvertView({bike,related=[],preview=false,actions}:{bike:
   const description=hasAdvertSections?"":bike.description||`A superb example of the ${bike.make} ${bike.model}, professionally inspected and prepared by YesMoto.`;
   const whatsappNumber=dealership.phone.replace(/^0/,"44").replace(/\D/g,"");const whatsapp=`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hi YesMoto, I'm interested in the ${title}.`)}`;
   const benefits:[string,string,IconType][]=[["Nationwide delivery","Specialist insured delivery throughout mainland UK.","bike"],["Finance available","Flexible options through trusted finance partners.","tax"],["Reserve for £99","Secure this motorcycle online at any time.","shield"],["HPI checked","Vehicle history checked before it is advertised.","shield"],["Warranty included","Nationwide cover on qualifying motorcycles.","shield"],["Prepared properly","Individually inspected before handover.","gear"]];
+  const relatedBikes=related.filter(item=>item.id!==bike.id).sort(compareRelated).slice(0,3);
   return <main className={`vehicle-detail premium-advert ${preview?"admin-advert-preview-view":""}`}>
     {preview&&<section className="preview-live-banner"><b>PREVIEW — NOT LIVE</b>{actions}</section>}
     <section className="public-advert-hero"><div className="wide vehicle-wrap"><nav><Link href="/">Home</Link><span>/</span><Link href="/stock">Used bikes</Link><span>/</span><b>{bike.make} {bike.model}</b></nav><div className="public-advert-hero-grid"><div><span className={bike.status==="Reserved"?"vehicle-status reserved":"vehicle-status"}>{bike.status}</span><h1>{title}</h1><p>{subtitle}</p></div><div className="public-advert-hero-price"><small>YESMOTO PRICE</small><strong>{money(bike.price)}</strong><span>Finance available · Part exchange welcome</span></div></div><div className="public-advert-hero-actions">{bike.status==="Reserved"?<span className="disabled">Currently reserved</span>:<ReserveButton bikeId={bike.id} slug={bike.slug} bike={title} className="reserve" label="Reserve for £99" />}<a href={whatsapp} target="_blank" rel="noreferrer">WhatsApp</a><a href={phoneHref}>Call us</a><Link href="/part-exchange">Part exchange</Link></div></div></section>
@@ -97,6 +102,6 @@ export function VehicleAdvertView({bike,related=[],preview=false,actions}:{bike:
     </div>
     <section className="vehicle-trust"><div className="wide vehicle-wrap">{benefits.map(([heading,copy,icon])=><article key={heading}><VehicleSpecIcon type={icon}/><div><h3>{heading}</h3><p>{copy}</p></div></article>)}</div></section>
     <section className="vehicle-enquiry" id="enquiry"><div className="wide vehicle-wrap"><div className="enquiry-intro"><p className="vehicle-kicker">ASK ABOUT THIS MOTORCYCLE</p><h2>Let&apos;s talk about your next bike</h2><p>Ask for another photograph, arrange a callback, or discuss finance, delivery and part exchange with someone who knows motorcycles.</p><div><a href={phoneHref}>{dealership.phone}</a><span>{dealership.openingHours}</span></div></div><VehicleEnquiryForm bike={title} bikeId={bike.id} whatsapp={whatsapp}/></div></section>
-    {!!related.length&&<section className="vehicle-related wide vehicle-wrap"><div className="section-title"><h2>YOU MAY ALSO LIKE</h2><Link href="/stock">View all bikes</Link></div><div className="bike-grid">{related.filter(item=>item.id!==bike.id).slice(0,3).map(item=><BikeCard bike={item} key={item.id}/>)}</div></section>}
+    {!!relatedBikes.length&&<section className="vehicle-related wide vehicle-wrap"><div className="section-title"><h2>YOU MAY ALSO LIKE</h2><Link href="/stock">View all bikes</Link></div><div className="bike-grid">{relatedBikes.map(item=><BikeCard bike={item} key={item.id}/>)}</div></section>}
   </main>;
 }
