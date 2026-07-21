@@ -14,6 +14,7 @@ const moreLinks=[
   {name:"Motorcycle Preparation",href:"/motorcycle-preparation",description:"How every bike is prepared"},
   {name:"Why Buy From Us",href:"/why-buy-from-yesmoto",description:"The YesMoto difference"},
   {name:"Used Bike Warranty",href:"/used-motorcycle-warranty",description:"Ride away with confidence"},
+  {name:"Customer Portal",href:"/portal",description:"Invoices, payment and delivery status"},
 ];
 
 export function Header(){
@@ -23,7 +24,7 @@ export function Header(){
   const dropdownRef=useRef<HTMLDivElement>(null);
   const closeMenus=()=>{setMoreOpen(false);setMobileOpen(false)};
 
-  useEffect(()=>{closeMenus()},[pathname]);
+  useEffect(()=>{const timer=window.setTimeout(closeMenus,0);return()=>window.clearTimeout(timer)},[pathname]);
   useEffect(()=>{
     const onPointerDown=(event:PointerEvent)=>{if(moreOpen&&!dropdownRef.current?.contains(event.target as Node))setMoreOpen(false)};
     const onKeyDown=(event:KeyboardEvent)=>{if(event.key==="Escape")closeMenus()};

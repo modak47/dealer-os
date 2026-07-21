@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 export interface CrmCustomer {
   id:string; title:string|null; first_name:string; last_name:string; email:string|null; phone:string|null;
   house_name_number?:string|null;address_line_1?:string|null;address_line_2?:string|null;address_line_3?:string|null;city?:string|null;county?:string|null;postcode:string|null;country?:string|null;latitude?:number|null;longitude?:number|null; tags:string[]; notes:string|null; assigned_user_id:string|null; created_at:string; updated_at:string;
+  portal_access_code?: string | null;
 }
 export interface CrmLead {
   id:string; customer_id:string|null; source:string; status:string; interest_level:string|null; budget_min:number|null; budget_max:number|null;
