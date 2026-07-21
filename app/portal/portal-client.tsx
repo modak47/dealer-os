@@ -18,7 +18,7 @@ type PortalData = {
   payment: { configured: boolean; accountName: string; sortCode: string; accountNumber: string; reference: string; instructions: string; wording: string; outstanding: string };
   dealer: { name: string; phone: string; email: string; openingHours: string };
 };
-type PortalTab = "invoices" | "payments" | "handover" | "documents" | "help";
+type PortalTab = "invoices" | "payments" | "handover" | "documents";
 
 const money = (value: unknown) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(Number(value ?? 0) || 0);
 const date = (value: unknown) => {
@@ -231,7 +231,6 @@ export function CustomerPortalClient() {
             ["documents", "Documents"],
             ["invoices", "Invoices"],
             ["payments", "Payments"],
-            ["help", "Help"],
           ] as [PortalTab, string][]).map(([key, label]) => <button type="button" className={activeTab === key ? "active" : ""} onClick={() => setActiveTab(key)} key={key}>{label}</button>)}
         </nav>
         <section className="portal-tab-panel">
@@ -256,19 +255,23 @@ export function CustomerPortalClient() {
           </form>
           {data.documents.length ? <div className="portal-documents">{data.documents.map(document => <article key={text(document.id)}><b>{label(text(document.document_type) || "document")}</b><span>{text(document.file_name)}</span><small>{date(document.created_at)}</small></article>)}</div> : <p>No documents uploaded yet.</p>}
         </>}
-        {activeTab === "help" && <>
-          <h2>Need help?</h2>
-          <p>Contact {data.dealer.name} if anything looks wrong or you need to arrange payment, collection or delivery.</p>
-          <dl><div><dt>Phone</dt><dd><a href={`tel:${data.dealer.phone.replace(/\s/g, "")}`}>{data.dealer.phone}</a></dd></div><div><dt>Email</dt><dd><a href={`mailto:${data.dealer.email}`}>{data.dealer.email}</a></dd></div><div><dt>Hours</dt><dd>{data.dealer.openingHours}</dd></div></dl>
-        </>}
         <section>
           <h2>Quick actions</h2>
           <div className="portal-quick-actions"><button type="button" onClick={() => setActiveTab("documents")}>Upload documents</button><button type="button" onClick={() => setActiveTab("handover")}>Confirm handover</button>{liveInvoices[0] && <button type="button" onClick={() => void downloadInvoice(liveInvoices[0])}>Download invoice PDF</button>}</div>
         </section>
         </section>
       </div>
+      <PortalHelp dealer={data.dealer} />
     </section>}
   </main>;
+}
+
+function PortalHelp({ dealer }: { dealer: PortalData["dealer"] }) {
+  return <section className="portal-help-card">
+    <h2>Need help?</h2>
+    <p>Contact {dealer.name} if anything looks wrong or you need to arrange payment, collection or delivery.</p>
+    <dl><div><dt>Phone</dt><dd><a href={`tel:${dealer.phone.replace(/\s/g, "")}`}>{dealer.phone}</a></dd></div><div><dt>Email</dt><dd><a href={`mailto:${dealer.email}`}>{dealer.email}</a></dd></div><div><dt>Hours</dt><dd>{dealer.openingHours}</dd></div></dl>
+  </section>;
 }
 
 function PortalBankRow({ label, value, copy, copied, copyKey }: { label: string; value: string; copy: (value: string, key: string) => void; copied: string; copyKey: string }) {
