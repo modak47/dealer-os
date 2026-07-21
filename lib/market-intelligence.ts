@@ -139,11 +139,13 @@ export function normalizeMarketListing(row: Record<string, unknown>, index = 0):
   const lastSeen = dateValue(raw(row, keys.lastSeen));
   const daysLive = numberValue(raw(row, keys.daysLive)) ?? daysBetween(firstSeen, lastSeen);
   const listingId = text(raw(row, keys.listingId)) || `listing-${index}`;
+  const dealerPrivate = text(raw(row, keys.dealerPrivate)) || "—";
+  const dealerName = text(raw(row, keys.dealerName));
   return {
     id: text(row.id) || listingId,
     listingId,
-    dealerName: text(raw(row, keys.dealerName)) || "Unknown dealer",
-    dealerPrivate: text(raw(row, keys.dealerPrivate)) || "—",
+    dealerName: dealerName || (dealerPrivate.toLowerCase() === "private" ? "Private seller" : "Unknown dealer"),
+    dealerPrivate,
     status: text(raw(row, keys.status)) || "—",
     make: text(raw(row, keys.make)),
     model: text(raw(row, keys.model)),
@@ -258,9 +260,11 @@ function groupRows(rows: MarketListing[], getName: (row: MarketListing) => strin
 export function buildMarketAnalytics(rows: MarketListing[], totalRows: number, sampleLimited: boolean): MarketAnalytics {
   const active = rows.filter((row) => row.status.toLowerCase() === "active");
   const removed = rows.filter((row) => row.status.toLowerCase() === "removed");
+  const activeDealers = active.filter((row) => row.dealerPrivate.toLowerCase() === "dealer" && row.dealerName !== "Unknown dealer");
+  const removedDealers = removed.filter((row) => row.dealerPrivate.toLowerCase() === "dealer" && row.dealerName !== "Unknown dealer");
   const prices = rows.map((row) => row.price).filter((value): value is number => value !== null && value > 0);
   const daysLive = rows.map((row) => row.daysLive).filter((value): value is number => value !== null);
-  const dealerCount = new Set(rows.filter((row) => row.dealerPrivate.toLowerCase() === "dealer").map((row) => row.dealerName).filter(Boolean)).size;
+  const dealerCount = new Set(rows.filter((row) => row.dealerPrivate.toLowerCase() === "dealer").map((row) => row.dealerName).filter((name) => name && name !== "Unknown dealer")).size;
   const trend = new Map<string, number>();
 
   for (const row of removed) {
@@ -279,9 +283,9 @@ export function buildMarketAnalytics(rows: MarketListing[], totalRows: number, s
     averageAskingPrice: average(prices),
     medianAskingPrice: median(prices),
     averageDaysLive: average(daysLive),
-    dealerLeaderboard: groupRows(removed, (row) => row.dealerName, 20),
+    dealerLeaderboard: groupRows(removedDealers, (row) => row.dealerName, 20),
     makeModelSoldCounts: groupRows(removed, (row) => [row.make, row.model].filter(Boolean).join(" "), 20),
-    activeStockByDealer: groupRows(active, (row) => row.dealerName, 20),
+    activeStockByDealer: groupRows(activeDealers, (row) => row.dealerName, 20),
     removedTrend: [...trend.entries()].map(([date, count]) => ({ date, removed: count })).sort((a, b) => a.date.localeCompare(b.date)),
     sampleLimited,
   };

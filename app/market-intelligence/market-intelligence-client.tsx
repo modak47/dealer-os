@@ -10,6 +10,13 @@ interface MarketResponse {
   meta: { totalRows: number; fetchedRows: number; usedServerFilters: boolean; sampleLimited: boolean };
 }
 
+interface MarketFilterOptions {
+  dealerNames: string[];
+  makes: string[];
+  models: string[];
+  years: string[];
+}
+
 type FilterState = {
   from: string;
   to: string;
@@ -78,11 +85,16 @@ function TrendChart({ points }: { points: MarketAnalytics["removedTrend"] }) {
   return <section className="mi-panel mi-trend-panel"><div className="panel-title"><h2>Removed listings trend</h2><span>{points.length} dates</span></div><div className="mi-trend">{points.slice(-40).map((point) => <div key={point.date} title={`${date(point.date)}: ${point.removed} removed`}><i style={{ height: `${Math.max(8, (point.removed / max) * 100)}%` }} /><span>{new Date(point.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</span></div>)}{!points.length && <p className="mi-empty">No removed listings in this range.</p>}</div></section>;
 }
 
+function OptionList({ id, options }: { id: string; options: string[] }) {
+  return <datalist id={id}>{options.map((option) => <option key={`${id}-${option}`} value={option} />)}</datalist>;
+}
+
 export function MarketIntelligenceClient() {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(defaultFilters);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<MarketResponse | null>(null);
+  const [filterOptions, setFilterOptions] = useState<MarketFilterOptions>({ dealerNames: [], makes: [], models: [], years: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -91,13 +103,26 @@ export function MarketIntelligenceClient() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
+    fetch("/api/market-intelligence?options=filters", { signal: controller.signal })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Unable to load market filter options.");
+        setFilterOptions(body.options || { dealerNames: [], makes: [], models: [], years: [] });
+      })
+      .catch((fetchError: Error) => {
+        if (fetchError.name !== "AbortError") console.error(fetchError.message);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
     fetch(`/api/market-intelligence?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Unable to load market intelligence.");
         setData(body);
+        setError("");
       })
       .catch((fetchError: Error) => {
         if (fetchError.name !== "AbortError") setError(fetchError.message);
@@ -112,11 +137,15 @@ export function MarketIntelligenceClient() {
 
   function apply(event: React.FormEvent) {
     event.preventDefault();
+    setLoading(true);
+    setError("");
     setPage(1);
     setAppliedFilters(filters);
   }
 
   function reset() {
+    setLoading(true);
+    setError("");
     setFilters(defaultFilters);
     setAppliedFilters(defaultFilters);
     setPage(1);
@@ -126,15 +155,18 @@ export function MarketIntelligenceClient() {
 
   return <div className="market-intelligence">
     <form className="mi-filters" onSubmit={apply}>
+      <OptionList id="mi-dealer-options" options={filterOptions.dealerNames} />
+      <OptionList id="mi-make-options" options={filterOptions.makes} />
+      <OptionList id="mi-model-options" options={filterOptions.models} />
       <label><span>Date from</span><input type="date" value={filters.from} onChange={(event) => update("from", event.target.value)} /></label>
       <label><span>Date to</span><input type="date" value={filters.to} onChange={(event) => update("to", event.target.value)} /></label>
       <label><span>Listing status</span><select value={filters.listingStatus} onChange={(event) => update("listingStatus", event.target.value)}><option value="">All</option><option>Active</option><option>Removed</option></select></label>
       <label><span>Seller type</span><select value={filters.dealerPrivate} onChange={(event) => update("dealerPrivate", event.target.value)}><option value="">All</option><option>Dealer</option><option>Private</option></select></label>
-      <label><span>Dealer name</span><input value={filters.dealerName} onChange={(event) => update("dealerName", event.target.value)} placeholder="Superbike Factory Crawley" /></label>
-      <label><span>Make</span><input value={filters.make} onChange={(event) => update("make", event.target.value)} placeholder="Yamaha" /></label>
-      <label><span>Model</span><input value={filters.model} onChange={(event) => update("model", event.target.value)} placeholder="MT-125" /></label>
+      <label><span>Dealer name</span><input list="mi-dealer-options" value={filters.dealerName} onChange={(event) => update("dealerName", event.target.value)} placeholder="Start typing a dealer..." /></label>
+      <label><span>Make</span><input list="mi-make-options" value={filters.make} onChange={(event) => update("make", event.target.value)} placeholder="Yamaha" /></label>
+      <label><span>Model</span><input list="mi-model-options" value={filters.model} onChange={(event) => update("model", event.target.value)} placeholder="MT-125" /></label>
       <label><span>Derivative</span><input value={filters.derivative} onChange={(event) => update("derivative", event.target.value)} placeholder="ABS, Tech Max..." /></label>
-      <label><span>Year</span><input inputMode="numeric" value={filters.year} onChange={(event) => update("year", event.target.value)} placeholder="2022" /></label>
+      <label><span>Year</span><select value={filters.year} onChange={(event) => update("year", event.target.value)}><option value="">Any</option>{filterOptions.years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
       <label><span>Min price</span><input inputMode="numeric" value={filters.minPrice} onChange={(event) => update("minPrice", event.target.value)} placeholder="1000" /></label>
       <label><span>Max price</span><input inputMode="numeric" value={filters.maxPrice} onChange={(event) => update("maxPrice", event.target.value)} placeholder="10000" /></label>
       <label><span>Min mileage</span><input inputMode="numeric" value={filters.minMileage} onChange={(event) => update("minMileage", event.target.value)} placeholder="0" /></label>
@@ -171,7 +203,7 @@ export function MarketIntelligenceClient() {
     <section className="mi-panel mi-listings">
       <div className="panel-title"><h2>Listings</h2><span>{data?.pagination.total.toLocaleString("en-GB")} matching rows</span></div>
       <div className="mi-table-wrap"><table className="mi-table"><thead><tr><th>Status</th><th>Dealer</th><th>Bike</th><th>Year</th><th>Price</th><th>Mileage</th><th>Days</th><th>Seen</th><th /></tr></thead><tbody>{data?.rows.map((row) => <tr key={`${row.listingId}-${row.advertUrl}`}><td><span className={`mi-status ${row.status.toLowerCase()}`}>{row.status}</span></td><td><b>{row.dealerName}</b><small>{row.dealerPrivate}</small></td><td><b>{[row.make, row.model].filter(Boolean).join(" ") || "—"}</b><small>{row.derivative || `${row.location} ${row.postcode}`.trim() || row.listingId}</small></td><td>{row.year || "—"}</td><td>{money(row.price)}</td><td>{number(row.mileage)}</td><td>{number(row.daysLive)}</td><td><small>First {date(row.firstSeen)}</small><small>Last {date(row.lastSeen)}</small></td><td>{row.advertUrl ? <a href={row.advertUrl} target="_blank" rel="noreferrer">Advert ↗</a> : "—"}</td></tr>)}{!data?.rows.length && <tr><td colSpan={9}><p className="mi-empty">No listings match the selected filters.</p></td></tr>}</tbody></table></div>
-      <div className="mi-pagination"><button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading}>Previous</button><span>Page {data?.pagination.page} of {data?.pagination.pages}</span><button onClick={() => setPage((current) => current + 1)} disabled={loading || Boolean(data && page >= data.pagination.pages)}>Next</button></div>
+      <div className="mi-pagination"><button onClick={() => { setLoading(true); setError(""); setPage((current) => Math.max(1, current - 1)); }} disabled={page <= 1 || loading}>Previous</button><span>Page {data?.pagination.page} of {data?.pagination.pages}</span><button onClick={() => { setLoading(true); setError(""); setPage((current) => current + 1); }} disabled={loading || Boolean(data && page >= data.pagination.pages)}>Next</button></div>
     </section></>}
   </div>;
 }

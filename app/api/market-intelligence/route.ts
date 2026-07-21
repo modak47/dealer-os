@@ -14,6 +14,25 @@ import {
 export const dynamic = "force-dynamic";
 
 const FETCH_CHUNK_SIZE = 1000;
+const ANALYTICS_ROW_LIMIT = 10000;
+const FILTER_OPTION_SELECT = '"Dealer Name","Dealer or Private","Make","Model","Year"';
+
+type MarketFilterQuery = {
+  eq(column: string, value: unknown): MarketFilterQuery;
+  ilike(column: string, pattern: string): MarketFilterQuery;
+  gte(column: string, value: unknown): MarketFilterQuery;
+  lte(column: string, value: unknown): MarketFilterQuery;
+  or(filters: string): MarketFilterQuery;
+  range(from: number, to: number): MarketFilterQuery;
+  order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): MarketFilterQuery;
+  limit(count: number): MarketFilterQuery;
+};
+
+type MarketQueryResult = {
+  data?: Record<string, unknown>[] | null;
+  count?: number | null;
+  error?: unknown;
+};
 
 const sortableColumns: Partial<Record<MarketFilters["sort"], string>> = {
   lastSeen: "Last Seen Date",
@@ -31,7 +50,7 @@ function escapeLike(value: string) {
   return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
 }
 
-function applyMarketFilters(query: any, filters: MarketFilters) {
+function applyMarketFilters(query: MarketFilterQuery, filters: MarketFilters) {
   let nextQuery = query;
   const year = numberValue(filters.year);
   const minPrice = numberValue(filters.minPrice);
@@ -63,17 +82,60 @@ function baseQuery() {
   return getSupabaseAdmin().from("autotrader_listings");
 }
 
+function sortedTextOptions(values: Set<string>) {
+  return [...values].sort((a, b) => a.localeCompare(b, "en-GB"));
+}
+
+async function loadFilterOptions() {
+  const { count, error: countError } = await baseQuery().select("*", { count: "exact", head: true });
+  if (countError) throw countError;
+
+  const dealerNames = new Set<string>();
+  const makes = new Set<string>();
+  const models = new Set<string>();
+  const years = new Set<string>();
+  const total = count || 0;
+
+  for (let from = 0; from < total; from += FETCH_CHUNK_SIZE) {
+    const to = Math.min(from + FETCH_CHUNK_SIZE - 1, total - 1);
+    const { data, error } = await baseQuery().select(FILTER_OPTION_SELECT).range(from, to);
+    if (error) throw error;
+
+    for (const row of (data || []) as Record<string, unknown>[]) {
+      const dealerName = text(row["Dealer Name"]);
+      const sellerType = text(row["Dealer or Private"]);
+      const make = text(row.Make);
+      const model = text(row.Model);
+      const year = text(row.Year);
+      if (dealerName && sellerType.toLowerCase() === "dealer") dealerNames.add(dealerName);
+      if (make) makes.add(make);
+      if (model) models.add(model);
+      if (year) years.add(year);
+    }
+  }
+
+  return {
+    dealerNames: sortedTextOptions(dealerNames),
+    makes: sortedTextOptions(makes),
+    models: sortedTextOptions(models),
+    years: [...years].sort((a, b) => Number(b) - Number(a) || b.localeCompare(a, "en-GB")),
+  };
+}
+
 async function getExactFilteredCount(filters: MarketFilters) {
-  const { count, error } = await applyMarketFilters(baseQuery().select("*", { count: "exact", head: true }), filters);
+  const { count, error } = await (applyMarketFilters(baseQuery().select("*", { count: "exact", head: true }) as unknown as MarketFilterQuery, filters) as unknown as Promise<MarketQueryResult>);
   if (error) throw error;
   return count || 0;
 }
 
 async function loadAllFilteredRows(filters: MarketFilters, exactCount: number) {
   const rows: Record<string, unknown>[] = [];
-  for (let from = 0; from < exactCount; from += FETCH_CHUNK_SIZE) {
-    const to = Math.min(from + FETCH_CHUNK_SIZE - 1, exactCount - 1);
-    const { data, error } = await applyMarketFilters(baseQuery().select("*"), filters).range(from, to);
+  const rowLimit = Math.min(exactCount, ANALYTICS_ROW_LIMIT);
+  for (let from = 0; from < rowLimit; from += FETCH_CHUNK_SIZE) {
+    const to = Math.min(from + FETCH_CHUNK_SIZE - 1, rowLimit - 1);
+    let query = applyMarketFilters(baseQuery().select("*") as unknown as MarketFilterQuery, filters);
+    query = query.order(sortableColumns[filters.sort] || "Last Seen Date", { ascending: filters.direction === "asc", nullsFirst: false });
+    const { data, error } = await (query.range(from, to) as unknown as Promise<MarketQueryResult>);
     if (error) throw error;
     rows.push(...((data || []) as Record<string, unknown>[]));
     if ((data || []).length < FETCH_CHUNK_SIZE) break;
@@ -119,6 +181,10 @@ function filteredErrorMessage(error: unknown) {
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
+    if (url.searchParams.get("options") === "filters") {
+      return NextResponse.json({ options: await loadFilterOptions() });
+    }
+
     const filters = parseMarketFilters(url.searchParams);
     const format = url.searchParams.get("format");
     const exactFilteredCount = await getExactFilteredCount(filters);
@@ -127,7 +193,8 @@ export async function GET(request: Request) {
     const sorted = sortMarketRows(normalized, filters);
     const start = (filters.page - 1) * filters.pageSize;
     const pageRows = sorted.slice(start, start + filters.pageSize);
-    const analytics = buildMarketAnalytics(sorted, exactFilteredCount, false);
+    const sampleLimited = exactFilteredCount > rawRows.length;
+    const analytics = buildMarketAnalytics(sorted, exactFilteredCount, sampleLimited);
 
     if (format === "csv") return csvResponse(sorted);
 
@@ -145,7 +212,7 @@ export async function GET(request: Request) {
         totalRows: exactFilteredCount,
         fetchedRows: rawRows.length,
         usedServerFilters: true,
-        sampleLimited: false,
+        sampleLimited,
         sortableColumn: sortableColumns[filters.sort] || null,
       },
     });
