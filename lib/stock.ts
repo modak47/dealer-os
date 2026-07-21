@@ -9,7 +9,7 @@ export type CustomerStatus="In Stock"|"Reserved";
 export interface PublicStockBike {
   id:string; slug:string; createdTime:string; make:string; model:string; year:number; mileage:string; mileageValue:number;
   price:number; status:CustomerStatus; image:string; imageUrls:string[]; monthly:number; description:string;
-  photoReady:boolean;
+  photoReady:boolean; reserveEnabled:boolean;
   colour:string; engineCc:number; motExpiry:string; registrationDate:string; previousOwners:string;
   attentionGrabber:string;
   bodyStyle:string; fuel:string; transmission:string;
@@ -56,7 +56,7 @@ export function toPublicBike(bike:StockBike):PublicStockBike{const fields=bike.d
   make:customerText(field("Make")||bike.make)||"Unknown",model:customerText(field("Model")||bike.model)||"Motorcycle",year:detailedYear,
   mileage:detailedMileage?`${detailedMileage.toLocaleString("en-GB")} miles`:"Mileage unavailable",mileageValue:detailedMileage,
   price:detailedPrice,status:customerStatus(bike),image,imageUrls:images.length?images:[image],
-  photoReady,
+  photoReady,reserveEnabled:customerStatus(bike)!=="Reserved"&&bike.reserveEnabled!==false,
   monthly:Math.max(0,Math.round(detailedPrice/53)),description:confirmSpec||bike.description||bike.notes,
   colour:field("Colour")||bike.colour||"",engineCc:numeric(field("Engine Size"),bike.engineCc??0),motExpiry:field("MOT Expiry Date")||bike.motExpiry||"",registrationDate:field("Registration Date")||bike.registrationDate||"",previousOwners:field("Previous Owners")||bike.previousOwners||"",
   attentionGrabber:customerText(field("Attention Grabber (30 Chars - Autotrader/Website)","Attention Grabber")||bike.attentionGrabber),

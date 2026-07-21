@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getWebsitePageByPath, metadataFromWebsitePage } from "@/lib/website-pages";
 
-export const metadata:Metadata={title:"Motorcycle Preparation",description:"Discover how every used motorcycle at YesMoto is inspected, prepared and presented before sale."};
+export async function generateMetadata():Promise<Metadata>{return metadataFromWebsitePage(await getWebsitePageByPath("/motorcycle-preparation"),{title:"Motorcycle Preparation",description:"Discover how every used motorcycle at YesMoto is inspected, prepared and presented before sale.",path:"/motorcycle-preparation"})}
 const preparation=["Servicing","Replacement tyres","Brake maintenance","General repairs","Replacement parts where required","Safety checks","Road testing where appropriate","Professional valeting"];
 const pdi=["Controls","Brakes","Suspension","Steering","Tyres","Electrical systems","Fluid levels","Drive system","General safety items","Final inspection"];
 const history=["Outstanding finance","Insurance write-off status","Stolen register","Mileage history","VIN confirmation","Engine number","MOT history","Vehicle specification"];

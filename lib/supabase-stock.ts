@@ -157,6 +157,7 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
     dealer5Fields,
     advertSections:mapped.advert_sections??{},
     showOnWebsite:mapped.show_on_website,
+    reserveEnabled:mapped.reserve_enabled,
     isTestRecord:Boolean(mapped.is_test_record),
   };
 }

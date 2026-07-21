@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { dealership } from "@/config/dealership";
+import { getWebsitePageByPath, metadataFromWebsitePage } from "@/lib/website-pages";
 
-export const metadata:Metadata={title:"About YesMoto",description:"Meet YesMoto, Brighton's independent used motorcycle specialist with more than 22 years of motorcycle experience."};
+export async function generateMetadata():Promise<Metadata>{return metadataFromWebsitePage(await getWebsitePageByPath("/about"),{title:"About YesMoto",description:"Meet YesMoto, Brighton's independent used motorcycle specialist with more than 22 years of motorcycle experience.",path:"/about"})}
 
 const stats=[
   {value:"22+",label:"Years’ experience",detail:"Across workshops, sales and buying"},

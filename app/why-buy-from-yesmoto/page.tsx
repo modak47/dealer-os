@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getWebsitePageByPath, metadataFromWebsitePage } from "@/lib/website-pages";
 
-export const metadata:Metadata={title:"Why Buy From YesMoto",description:"Carefully selected motorcycles, honest presentation, nationwide delivery and over 22 years of motorcycle experience."};
+export async function generateMetadata():Promise<Metadata>{return metadataFromWebsitePage(await getWebsitePageByPath("/why-buy-from-yesmoto"),{title:"Why Buy From YesMoto",description:"Carefully selected motorcycles, honest presentation, nationwide delivery and over 22 years of motorcycle experience.",path:"/why-buy-from-yesmoto"})}
 const reasons=["Over 22 years of motorcycle industry experience","Family-run independent business","No routine auction buying","Carefully selected motorcycles and scooters","Professional workshop preparation","Detailed photography and walkaround videos","Nationwide delivery","Finance available","Warranty included","Honest descriptions","No pressure sales","Friendly, knowledgeable service"];
 const services=[{title:"Carefully selected",copy:"Sourced from private owners, franchised dealer part exchanges and Sell Your Motorbike Ltd—not routinely from auction."},{title:"Professionally prepared",copy:"Condition-led preparation, structured PDI, history checks, at least six months MOT and professional valeting."},{title:"Buy online confidently",copy:"50–100 photographs, walkaround video, detailed descriptions and honest presentation of each motorcycle."},{title:"Delivered nationwide",copy:"Specialist transport partners deliver throughout mainland UK with a personal handover on arrival."},{title:"Flexible finance",copy:"HP and PCP may be available through Jigsaw Finance, subject to status and lender criteria."},{title:"Warranty included",copy:"Qualifying motorcycles include a 3-month Warranty First warranty, with extended cover available."}];
 

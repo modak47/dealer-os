@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getWebsitePageByPath, metadataFromWebsitePage } from "@/lib/website-pages";
 
-export const metadata:Metadata={title:"Reserve Your Motorcycle Online",description:"Reserve a YesMoto motorcycle online for £99 and secure it for up to seven days."};
+export async function generateMetadata():Promise<Metadata>{return metadataFromWebsitePage(await getWebsitePageByPath("/reserve-online"),{title:"Reserve Your Motorcycle Online",description:"Reserve a YesMoto motorcycle online for £99 and secure it for up to seven days.",path:"/reserve-online"})}
 const steps=[{number:"01",title:"Find your motorcycle",copy:"Choose the motorcycle or scooter that’s right for you from our current stock."},{number:"02",title:"Reserve online for £99",copy:"Select Reserve on the advert and complete the secure online reservation."},{number:"03",title:"We contact you",copy:"Our team will discuss finance, delivery, collection and any questions you have."},{number:"04",title:"Complete your purchase",copy:"Pay the remaining balance and arrange delivery or an appointment to collect."}];
 const remoteDetails=["50–100 high-quality photographs","A detailed walkaround video","Comprehensive descriptions","Service history information where available"];
 const nextSteps=["Motorcycle finance if required","Nationwide delivery","Collection by appointment","Payment of the remaining balance"];

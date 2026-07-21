@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getWebsitePageByPath, metadataFromWebsitePage } from "@/lib/website-pages";
 
-export const metadata:Metadata={title:"Used Motorcycle Warranty",description:"Qualifying YesMoto motorcycles include a 3-month Warranty First warranty and nationwide support."};
+export async function generateMetadata():Promise<Metadata>{return metadataFromWebsitePage(await getWebsitePageByPath("/used-motorcycle-warranty"),{title:"Used Motorcycle Warranty",description:"Qualifying YesMoto motorcycles include a 3-month Warranty First warranty and nationwide support.",path:"/used-motorcycle-warranty"})}
 const included=["3-month Warranty First warranty","Parts and labour cover, subject to terms","Valid at any VAT-registered UK garage","Free roadside assistance, excluding home start"];
 const process=[{title:"Contact Warranty First",copy:"Claims are handled directly by their specialist team."},{title:"Choose a local garage",copy:"Use a VAT-registered garage near you—there is normally no need to return to Brighton."},{title:"Assessment and support",copy:"Warranty First works with the garage under the terms of your cover."}];
 

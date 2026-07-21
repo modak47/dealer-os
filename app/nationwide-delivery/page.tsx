@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getWebsitePageByPath, metadataFromWebsitePage } from "@/lib/website-pages";
 
-export const metadata:Metadata={title:"Nationwide Motorcycle Delivery",description:"Safe, insured motorcycle delivery from YesMoto in Brighton throughout mainland UK."};
+export async function generateMetadata():Promise<Metadata>{return metadataFromWebsitePage(await getWebsitePageByPath("/nationwide-delivery"),{title:"Nationwide Motorcycle Delivery",description:"Safe, insured motorcycle delivery from YesMoto in Brighton throughout mainland UK.",path:"/nationwide-delivery"})}
 const deliveryPrices=[{value:"Free",label:"Within 20 miles of Brighton"},{value:"From £189",label:"Mainland UK, including VAT"},{value:"Quoted",label:"Scotland, Ireland and international"}];
 const confidence=["Typically 50–100 high-quality photographs","Walkaround video on almost every motorcycle","Detailed, honest descriptions","Service history where available","Keys, accessories and documentation detailed","Additional photos, video or FaceTime on request"];
 const preparation=["Structured Pre-Delivery Inspection","Vehicle history check","Minimum six months MOT","Professional valet before handover"];

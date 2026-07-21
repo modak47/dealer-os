@@ -39,7 +39,7 @@ export function BikeCard({ bike }: { bike: PublicStockBike }) {
         <h3>{bike.year} {bike.make} {bike.model}</h3>
         <p>{bike.mileage}</p>
         <div className="bike-price"><strong>{money(bike.price)}</strong><small>From £{bike.monthly}/month</small></div>
-        <div className="bike-perks"><span>{bike.status === "Reserved" ? "Reserved" : "Reserve for £99"}</span><span>Enquire</span></div>
+        <div className="bike-perks"><span>{bike.status === "Reserved" ? "Reserved" : bike.reserveEnabled ? "Reserve online" : "Enquire first"}</span><span>Enquire</span></div>
       </div>
     </Link>
   );

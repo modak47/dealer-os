@@ -38,6 +38,7 @@ export interface StockBike {
   dealer5Fields?: Record<string,unknown>;
   advertSections?: Record<string,unknown>;
   showOnWebsite?: boolean;
+  reserveEnabled?: boolean;
   isTestRecord?: boolean;
 }
 
