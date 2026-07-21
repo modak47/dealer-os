@@ -207,6 +207,11 @@ export function CustomerPortalClient() {
         <article><span>Active invoice</span><strong>{text(liveInvoices[0]?.invoice_number) || "Pending"}</strong></article>
         <article><span>Delivery / collection</span><strong>{delivery ? date(delivery.scheduled_at) : "To arrange"}</strong></article>
       </div>
+      <nav className="portal-next-actions" aria-label="Customer portal actions">
+        <a href="#portal-documents"><span>Documents</span><b>Upload licence or proof of address</b></a>
+        <a href="#portal-handover"><span>Handover</span><b>{delivery ? "Confirm collection or delivery" : "Waiting for booking"}</b></a>
+        {liveInvoices[0] && <button type="button" onClick={() => void downloadInvoice(liveInvoices[0])}><span>Invoice</span><b>Download active invoice PDF</b></button>}
+      </nav>
       {(notice || actionError) && <div className={`portal-message ${actionError ? "error" : ""}`}>{actionError || notice}</div>}
       <div className="portal-grid">
         <section className="portal-bike">
@@ -229,11 +234,11 @@ export function CustomerPortalClient() {
           <h2>Payments received</h2>
           {data.payments.length ? data.payments.map(payment => <PortalRow key={text(payment.id)} title={text(payment.payment_type) || "Payment"} meta={`${text(payment.method) || "Payment"} - ${date(payment.paid_at)}`} value={money(payment.amount)} />) : <p>No payments are recorded yet.</p>}
         </section>
-        <section>
+        <section id="portal-handover">
           <h2>Delivery and handover</h2>
           {delivery ? <><PortalRow title={text(delivery.delivery_method) || "Collection"} meta={cleanStatus(delivery.status)} value={date(delivery.scheduled_at)} /><div className="portal-checks">{["identity_checked", "licence_verified", "v5_prepared", "handover_completed", "keys_given", "documents_signed", "hpi_complete"].map(key => <span className={delivery[key] ? "done" : ""} key={key}>{label(key)}</span>)}</div>{delivery.customer_confirmed_at ? <p className="portal-confirmed">Confirmed by {text(delivery.customer_signature_name) || "customer"} on {date(delivery.customer_confirmed_at)}</p> : <div className="portal-signature"><label><span>Your name</span><input value={signatureName} onChange={event => setSignatureName(event.target.value)} /></label><SignaturePad onChange={setSignature} /><button type="button" onClick={() => void confirmDelivery()} disabled={confirmBusy || !signatureName || !signature}>{confirmBusy ? "Saving..." : "Confirm handover"}</button></div>}</> : <p>Delivery or collection details will appear here once booked.</p>}
         </section>
-        <section>
+        <section id="portal-documents">
           <h2>Documents</h2>
           <form className="portal-upload" onSubmit={uploadDocument}>
             <select value={documentType} onChange={event => setDocumentType(event.target.value)}><option value="licence">Driving licence</option><option value="proof_of_address">Proof of address</option><option value="finance_document">Finance document</option><option value="other">Other document</option></select>
