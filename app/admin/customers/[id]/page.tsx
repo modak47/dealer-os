@@ -5,6 +5,7 @@ import { getCrmCustomer, getCustomerTimeline } from "@/lib/crm";
 import { CustomerLocationMap } from "@/components/maps/CustomerLocationMap";
 import { CustomerEditor } from "./customer-editor";
 import { CopyButton } from "./copy-button";
+import { PortalCodeActions } from "./portal-code-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +16,6 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
   const customer = result.data;
   const linked = await getCustomerTimeline(id);
   const address = [customer.address_line_1, customer.address_line_2, customer.address_line_3, customer.city, customer.county, customer.postcode, customer.country].filter(Boolean).join(", ");
-  const portalCode = customer.portal_access_code || "";
-  const portalLogin = [customer.email && `Email: ${customer.email}`, portalCode && `Portal code: ${portalCode}`, "Portal: /portal"].filter(Boolean).join("\n");
   const timeline = [
     ...linked.activities.map(item => ({ date: item.created_at, type: item.activity_type, title: item.subject, copy: item.body, href: "" })),
     ...linked.enquiries.map(item => ({ date: item.created_at, type: "Enquiry", title: item.subject || `${item.source} enquiry`, copy: item.message, href: "" })),
@@ -33,8 +32,7 @@ export default async function CustomerDetail({ params }: { params: Promise<{ id:
         <ProfileCopyRow href={customer.email ? `mailto:${customer.email}` : undefined} value={customer.email || ""} empty="No email" label="Copy email address" />
         <ProfileCopyRow href={customer.phone ? `tel:${customer.phone}` : undefined} value={customer.phone || ""} empty="No phone" label="Copy phone number" />
         <ProfileCopyRow value={address} empty="Address not recorded" label="Copy address" />
-        <ProfileCopyRow value={portalCode} empty="Run portal migration" prefix="Portal code:" label="Copy portal code" />
-        <div className="crm-profile-actions"><Link href="/portal" target="_blank">Open customer portal</Link><CopyButton value={portalLogin} label="Copy portal login details" /></div>
+        <PortalCodeActions customerId={id} email={customer.email} initialCode={customer.portal_access_code ?? ""} />
         {customer.latitude != null && customer.longitude != null && <a href="#customer-map">View on map</a>}
         <div>{customer.tags?.map(tag => <b key={tag}>{tag}</b>)}</div>
       </aside>
