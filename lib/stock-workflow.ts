@@ -46,7 +46,7 @@ export interface WorkflowFilters {
   includeCompleted?: boolean;
 }
 
-const stockFields = "id,registration,make,model,variant,year,status,image_urls,primary_image_url";
+const stockFields = "id,registration,make,model,variant,year,status,image_urls,primary_image_url,is_test_record";
 const migrationMissingCodes = new Set(["42P01", "PGRST205"]);
 
 export function isWorkflowDepartment(value: unknown): value is WorkflowDepartment {
@@ -105,10 +105,15 @@ export async function getStockWorkflowTasks(filters: WorkflowFilters = {}): Prom
   const tasks = (data || []).map((row) => normalizeTask(row as Record<string, unknown>));
   const ids = Array.from(new Set(tasks.map((task) => task.stock_bike_id).filter(Boolean)));
   const bikesById = new Map<string, WorkflowBikeSummary>();
+  const hiddenBikeIds = new Set<string>();
   if (ids.length) {
     const bikes = await db.from("stock_bikes").select(stockFields).in("id", ids);
     if (!bikes.error) {
       for (const bike of bikes.data || []) {
+        if (Boolean((bike as { is_test_record?: boolean }).is_test_record)) {
+          hiddenBikeIds.add(String(bike.id));
+          continue;
+        }
         const summary = bikeSummary(bike as unknown as SupabaseStockBike);
         if (summary) bikesById.set(String(summary.id), summary);
       }
@@ -118,7 +123,8 @@ export async function getStockWorkflowTasks(filters: WorkflowFilters = {}): Prom
   }
 
   const q = filters.q?.trim().toLowerCase();
-  const withBikes = tasks.map((task) => ({ ...task, bike: bikesById.get(task.stock_bike_id) || null }));
+  const liveTasks = tasks.filter((task) => !hiddenBikeIds.has(task.stock_bike_id));
+  const withBikes = liveTasks.map((task) => ({ ...task, bike: bikesById.get(task.stock_bike_id) || null }));
   const filtered = q ? withBikes.filter((task) => {
     const haystack = `${task.department} ${task.status} ${task.notes || ""} ${task.bike?.make || ""} ${task.bike?.model || ""} ${task.bike?.variant || ""} ${task.bike?.registration || ""} ${task.bike?.year || ""}`.toLowerCase();
     return haystack.includes(q);

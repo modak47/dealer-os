@@ -48,10 +48,12 @@ export async function getSupabaseStockBikeByPublicIdentifier(identifier:string):
   return {bike:row?normalizeSupabaseStockBike(index.fallback?{...row,show_on_website:true,is_test_record:false}:row):null,method:index.fallback?`${method}-dealer5-fallback`:method};
 }
 
-export async function getSupabaseStockBikes():Promise<StockApiResponse>{
+export async function getSupabaseStockBikes(options:{includeTest?:boolean}={}):Promise<StockApiResponse>{
   if(!isSupabaseConfigured)return {stock:[],configured:false,error:"Supabase is not configured."};
   const supabase=createClient(supabaseUrl,supabaseAnonKey,{auth:{persistSession:false,autoRefreshToken:false}});
-  const {data,error}=await supabase.from("stock_bikes").select("*").order("created_at",{ascending:false});
+  let query=supabase.from("stock_bikes").select("*").order("created_at",{ascending:false});
+  if(!options.includeTest)query=query.neq("is_test_record",true);
+  const {data,error}=await query;
   if(error){
     console.error("Unable to load Supabase stock",error);
     return {stock:[],configured:true,error:"Unable to load stock."};

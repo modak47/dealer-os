@@ -57,9 +57,11 @@ export async function getSalesPipeline(): Promise<SalesPipelineResult> {
   const [dealsResult, reservationsResult] = await Promise.all([
     db.from("crm_sales")
       .select("*,customer:crm_customers(id,first_name,last_name,email,phone),bike:stock_bikes!crm_sales_stock_bike_id_fkey(id,stock_number,make,model,variant,registration,price,status,primary_image_url,purchase_price,total_stock_cost),invoice:crm_invoices(id,invoice_number,status,total,paid,balance),delivery:crm_deliveries(*),payments:crm_payments(id,amount,method,payment_type,paid_at,status)")
+      .neq("is_test_record", true)
       .order("created_at", { ascending: false }),
     db.from("crm_reservations")
       .select("id,status,deposit_amount,reserved_at,expires_at,customer:crm_customers(id,first_name,last_name,email,phone),bike:stock_bikes(id,stock_number,make,model,variant,registration,price,status,primary_image_url)")
+      .neq("is_test_record", true)
       .in("status", ["Active", "Deposit Taken"])
       .order("reserved_at", { ascending: false }),
   ]);

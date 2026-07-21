@@ -8,7 +8,7 @@ export type InvoicePayment={id:string;amount:number;method:string;payment_type:s
 
 export async function getInvoices(status="all",q=""){
   const supabase=getSupabaseAdmin();
-  let query=supabase.from("crm_invoices").select("*,customer:crm_customers(first_name,last_name,email,phone,postcode),bike:stock_bikes(make,model,variant,registration,year)").is("deleted_at",null).order("created_at",{ascending:false});
+  let query=supabase.from("crm_invoices").select("*,customer:crm_customers(first_name,last_name,email,phone,postcode),bike:stock_bikes(make,model,variant,registration,year)").is("deleted_at",null).neq("is_test_record",true).order("created_at",{ascending:false});
   if(status!=="all")query=query.eq("status",status);
   const {data,error}=await query;
   if(error){if(error.code==="42P01"||error.code==="42703")return {data:[] as InvoiceRow[],migrationReady:false};throw error}
@@ -31,7 +31,7 @@ export async function getInvoice(id:string){
 }
 
 export async function getInvoiceableReservations(){
-  const {data,error}=await getSupabaseAdmin().from("crm_reservations").select("id,deposit_amount,delivery_option,delivery_charge,reserved_at,customer:crm_customers(id,first_name,last_name,email,phone,address_line_1,address_line_2,city,county,postcode),bike:stock_bikes(id,make,model,variant,registration,year,price,status)").in("status",["Active","Deposit Taken","Converted"]).order("reserved_at",{ascending:false});
+  const {data,error}=await getSupabaseAdmin().from("crm_reservations").select("id,deposit_amount,delivery_option,delivery_charge,reserved_at,customer:crm_customers(id,first_name,last_name,email,phone,address_line_1,address_line_2,city,county,postcode),bike:stock_bikes(id,make,model,variant,registration,year,price,status)").neq("is_test_record",true).in("status",["Active","Deposit Taken","Converted"]).order("reserved_at",{ascending:false});
   if(error)throw error;
   const {data:used}=await getSupabaseAdmin().from("crm_invoices").select("reservation_id").not("reservation_id","is",null).is("deleted_at",null);
   const usedIds=new Set((used??[]).map(x=>x.reservation_id));

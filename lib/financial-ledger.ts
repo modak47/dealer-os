@@ -30,6 +30,7 @@ export async function getFinancialLedger(searchParams: { from?: string; to?: str
   const db = getSupabaseAdmin();
   let query = db.from("financial_ledger_transactions")
     .select("*,bike:stock_bikes(stock_number,registration,make,model),customer:crm_customers(first_name,last_name),supplier:stock_suppliers(name,company_name),invoice:crm_invoices(invoice_number)")
+    .neq("is_test_record", true)
     .order("transaction_date", { ascending: false })
     .order("posted_at", { ascending: false })
     .limit(500);

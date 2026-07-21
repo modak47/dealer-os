@@ -5,8 +5,10 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { addStockCost } from "@/lib/stock-costs";
 
 type Step = { name: string; ok: boolean; detail: string; ids?: Record<string, unknown> };
+export type ShadowPurgeResult = { deleted: { table: string; count: number }[]; total: number; warnings: string[] };
 
 const runId = () => `SHADOW-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`;
+const missingSchema = (error: { code?: string; message?: string } | null | undefined) => Boolean(error && (["42P01", "42703", "PGRST204", "PGRST205"].includes(error.code ?? "") || /does not exist|schema cache|column/i.test(error.message ?? "")));
 
 export async function runControlledShadowTests() {
   const db = getSupabaseAdmin();
@@ -159,6 +161,86 @@ export async function runControlledShadowTests() {
     ids,
     cleanup: `Delete or void records tagged/marked with CONTROLLED SHADOW MODE TEST ${marker}; stock is is_test_record=true and show_on_website=false.`,
   };
+}
+
+export async function purgeControlledShadowTestData(): Promise<ShadowPurgeResult> {
+  const db = getSupabaseAdmin();
+  const deleted: ShadowPurgeResult["deleted"] = [];
+  const warnings: string[] = [];
+
+  async function collectIds(table: string): Promise<(string | number)[]> {
+    const { data, error } = await db.from(table).select("id").eq("is_test_record", true);
+    if (missingSchema(error)) {
+      warnings.push(`${table} is not available for test cleanup.`);
+      return [];
+    }
+    if (error) throw error;
+    return (data ?? []).map((row) => (row as { id: string | number }).id).filter((id) => id !== null && id !== undefined);
+  }
+
+  async function deleteEq(table: string, column: string, value: string | number | boolean | null) {
+    const { count, error } = value === null
+      ? await db.from(table).delete({ count: "exact" }).is(column, null)
+      : await db.from(table).delete({ count: "exact" }).eq(column, value);
+    if (missingSchema(error)) {
+      warnings.push(`${table}.${column} was skipped during test cleanup.`);
+      return;
+    }
+    if (error) throw error;
+    if (count) deleted.push({ table, count });
+  }
+
+  async function deleteIn(table: string, column: string, values: (string | number)[]) {
+    if (!values.length) return;
+    const { count, error } = await db.from(table).delete({ count: "exact" }).in(column, values);
+    if (missingSchema(error)) {
+      warnings.push(`${table}.${column} was skipped during test cleanup.`);
+      return;
+    }
+    if (error) throw error;
+    if (count) deleted.push({ table, count });
+  }
+
+  const [customerIds, leadIds, reservationIds, saleIds, invoiceIds, stockBikeIds] = await Promise.all([
+    collectIds("crm_customers"),
+    collectIds("crm_leads"),
+    collectIds("crm_reservations"),
+    collectIds("crm_sales"),
+    collectIds("crm_invoices"),
+    collectIds("stock_bikes"),
+  ]);
+
+  await deleteIn("crm_documents", "customer_id", customerIds);
+  await deleteIn("crm_documents", "lead_id", leadIds);
+  await deleteIn("crm_documents", "reservation_id", reservationIds);
+  await deleteIn("crm_documents", "sale_id", saleIds);
+  await deleteIn("crm_documents", "stock_bike_id", stockBikeIds);
+  await deleteIn("crm_communications", "customer_id", customerIds);
+  await deleteIn("crm_activities", "customer_id", customerIds);
+  await deleteIn("crm_activities", "lead_id", leadIds);
+  await deleteIn("crm_activities", "reservation_id", reservationIds);
+  await deleteIn("crm_activities", "sale_id", saleIds);
+  await deleteIn("crm_activities", "stock_bike_id", stockBikeIds);
+  await deleteIn("stock_workflow_tasks", "stock_bike_id", stockBikeIds);
+  await deleteIn("stock_activity_events", "stock_bike_id", stockBikeIds);
+
+  await deleteEq("stock_activity_events", "is_test_record", true);
+  await deleteEq("financial_ledger_transactions", "is_test_record", true);
+  await deleteEq("crm_payments", "is_test_record", true);
+  await deleteEq("crm_invoice_items", "is_test_record", true);
+  await deleteIn("crm_invoice_items", "invoice_id", invoiceIds);
+  await deleteEq("crm_deliveries", "is_test_record", true);
+  await deleteEq("crm_invoices", "is_test_record", true);
+  await deleteEq("crm_reservations", "is_test_record", true);
+  await deleteEq("crm_leads", "is_test_record", true);
+  await deleteEq("crm_sales", "is_test_record", true);
+  await deleteEq("stock_costs", "is_test_record", true);
+  await deleteEq("stock_purchases", "is_test_record", true);
+  await deleteEq("stock_bikes", "is_test_record", true);
+  await deleteEq("stock_suppliers", "is_test_record", true);
+  await deleteEq("crm_customers", "is_test_record", true);
+
+  return { deleted, total: deleted.reduce((sum, row) => sum + row.count, 0), warnings };
 }
 
 async function createCancellationRefundScenario(customerId: string, marker: string, userId: string | null) {
