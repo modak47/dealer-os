@@ -200,7 +200,7 @@ export function CustomerPortalClient() {
       {error && <b>{error}</b>}
       <button disabled={busy}>{busy ? "Checking..." : "View my portal"}</button>
     </form> : <section className="portal-dashboard">
-      <header><div><span>Welcome</span><h2>{data.customer.name || "Customer"}</h2><p>{data.customer.email}</p></div><button type="button" onClick={signOut}>Sign out</button></header>
+      <div className="portal-account-head"><div><span>Welcome</span><h2>{data.customer.name || "Customer"}</h2><p>{data.customer.email}</p></div><button type="button" onClick={signOut}>Sign out</button></div>
       {!hasDeal && <section className="portal-empty"><h2>No active motorcycle order yet</h2><p>Your portal is ready. Once a reservation, sale, invoice or delivery is linked to your customer record, the details will appear here.</p></section>}
       <div className="portal-progress">{["Enquiry", "Reserved", "Payment", "Handover booked", "Completed"].map((item, index) => <article className={index <= step ? "done" : ""} key={item}><i>{index + 1}</i><span>{item}</span></article>)}</div>
       <div className="portal-kpis">
