@@ -6,7 +6,7 @@ import {
   formatDaysLive,
   formatListingDate,
   formatMoney,
-  formatRelativeConfirmed,
+  formatRelativeAdvertSeen,
   getValidAdvertUrl,
   opportunityTimestamp,
   parseMoney,
@@ -472,7 +472,7 @@ function OpportunityModal({
     ["Mileage", `${opportunity["Mileage"]?.toLocaleString()} miles`],
     ["Seller Type", opportunity["Seller Type"]],
     ["First Seen", formatListingDate(opportunity.listingFirstSeenAt)],
-    ["Last Confirmed Live", formatRelativeConfirmed(opportunity.listingLastConfirmedAt)],
+    ["Advert Last Seen", formatRelativeAdvertSeen(opportunity.listingLastConfirmedAt)],
     ["Derivative ID", opportunity["Derivative ID"]],
   ];
   const imageUrl = getValidAdvertUrl(opportunity.primary_image_url);

@@ -14,6 +14,7 @@ type ListingRow = {
 type ActivityRow = {
   listing_id: number | string | null;
   activity_type: string | null;
+  description: string | null;
   created_at: string | null;
 };
 
@@ -92,7 +93,7 @@ async function fetchEarliestActivityById(
   for (const batch of chunk(listingIds, 500)) {
     const { data, error } = await supabase
       .from("opportunity_activity")
-      .select("listing_id, activity_type, created_at")
+      .select("listing_id, activity_type, description, created_at")
       .in("listing_id", batch)
       .order("created_at", { ascending: true });
 
@@ -105,7 +106,8 @@ async function fetchEarliestActivityById(
       const listingId = normalizeListingId(row.listing_id);
       const createdAt = validDate(row.created_at);
       if (listingId === null || !createdAt) continue;
-      if (row.activity_type && !/created/i.test(row.activity_type)) continue;
+      const activityText = `${row.activity_type ?? ""} ${row.description ?? ""}`.trim();
+      if (activityText && !/created/i.test(activityText)) continue;
       activityByListingId.set(listingId, earliestDate(activityByListingId.get(listingId), createdAt) ?? createdAt);
     }
   }

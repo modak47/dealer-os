@@ -17,24 +17,24 @@ export function formatMoney(value: number): string {
   }).format(value);
 }
 
-export function formatRelativeConfirmed(value: string | null | undefined): string {
+export function formatRelativeAdvertSeen(value: string | null | undefined): string {
   if (!value) return "Unknown";
 
   const timestamp = new Date(value).getTime();
   if (Number.isNaN(timestamp)) return "Unknown";
 
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (elapsedSeconds < 60) return "Confirmed just now";
+  if (elapsedSeconds < 60) return "Seen just now";
 
   const minutes = Math.floor(elapsedSeconds / 60);
-  if (minutes < 60) return `Confirmed ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  if (minutes < 60) return `Seen ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `Confirmed ${hours} hour${hours === 1 ? "" : "s"} ago`;
-  if (hours < 48) return "Confirmed yesterday";
+  if (hours < 24) return `Seen ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (hours < 48) return "Seen yesterday";
 
   const days = Math.floor(hours / 24);
-  return `Confirmed ${days} days ago`;
+  return `Seen ${days} days ago`;
 }
 
 export function formatDaysLive(value: number | null | undefined): string {
