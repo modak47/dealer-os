@@ -7,7 +7,7 @@ interface MarketResponse {
   analytics: MarketAnalytics;
   rows: MarketListing[];
   pagination: { page: number; pageSize: number; total: number; pages: number };
-  meta: { totalRows: number; fetchedRows: number; usedServerFilters: boolean; sampleLimited: boolean };
+  meta: { totalRows: number; fetchedRows: number; usedServerFilters: boolean; sampleLimited: boolean; summaryOnly?: boolean };
 }
 
 interface MarketFilterOptions {
@@ -72,6 +72,10 @@ function buildParams(filters: FilterState, page: number) {
   return params;
 }
 
+function hasAnalysisFilters(filters: FilterState) {
+  return Boolean(filters.from || filters.to || filters.listingStatus || filters.dealerPrivate || filters.dealerName || filters.make || filters.model || filters.derivative || filters.year || filters.minPrice || filters.maxPrice || filters.minMileage || filters.maxMileage || filters.location);
+}
+
 function KpiCard({ label, value, hint }: { label: string; value: string; hint: string }) {
   return <article className="mi-kpi"><span /><p>{label}</p><strong>{value}</strong><small>{hint}</small></article>;
 }
@@ -99,6 +103,7 @@ export function MarketIntelligenceClient() {
   const [error, setError] = useState("");
 
   const params = useMemo(() => buildParams(appliedFilters, page), [appliedFilters, page]);
+  const analysisReady = hasAnalysisFilters(appliedFilters);
   const exportHref = `/api/market-intelligence?${params.toString()}&format=csv`;
 
   useEffect(() => {
@@ -191,9 +196,9 @@ export function MarketIntelligenceClient() {
       <KpiCard label="Avg days live" value={number(analytics.averageDaysLive)} hint="From first seen to removed/today" />
     </div>
 
-    {data?.meta.sampleLimited && <div className="mi-warning">Analysis is based on the first 10,000 matching rows. Tighten filters for exact large-range reporting.</div>}
+    {!analysisReady && <div className="mi-warning">Showing top-level market statistics only. Apply a date, dealer, make, model or other filter to load charts, leaderboards, listings and CSV export.</div>}
 
-    <div className="mi-grid">
+    {analysisReady && <><div className="mi-grid">
       <TrendChart points={analytics.removedTrend} />
       <Leaderboard title="Dealer sold leaderboard" rows={analytics.dealerLeaderboard} />
       <Leaderboard title="Make / model sold counts" rows={analytics.makeModelSoldCounts} />
@@ -205,5 +210,6 @@ export function MarketIntelligenceClient() {
       <div className="mi-table-wrap"><table className="mi-table"><thead><tr><th>Status</th><th>Dealer</th><th>Bike</th><th>Year</th><th>Price</th><th>Mileage</th><th>Days</th><th>Seen</th><th /></tr></thead><tbody>{data?.rows.map((row) => <tr key={`${row.listingId}-${row.advertUrl}`}><td><span className={`mi-status ${row.status.toLowerCase()}`}>{row.status}</span></td><td><b>{row.dealerName}</b><small>{row.dealerPrivate}</small></td><td><b>{[row.make, row.model].filter(Boolean).join(" ") || "—"}</b><small>{row.derivative || `${row.location} ${row.postcode}`.trim() || row.listingId}</small></td><td>{row.year || "—"}</td><td>{money(row.price)}</td><td>{number(row.mileage)}</td><td>{number(row.daysLive)}</td><td><small>First {date(row.firstSeen)}</small><small>Last {date(row.lastSeen)}</small></td><td>{row.advertUrl ? <a href={row.advertUrl} target="_blank" rel="noreferrer">Advert ↗</a> : "—"}</td></tr>)}{!data?.rows.length && <tr><td colSpan={9}><p className="mi-empty">No listings match the selected filters.</p></td></tr>}</tbody></table></div>
       <div className="mi-pagination"><button onClick={() => { setLoading(true); setError(""); setPage((current) => Math.max(1, current - 1)); }} disabled={page <= 1 || loading}>Previous</button><span>Page {data?.pagination.page} of {data?.pagination.pages}</span><button onClick={() => { setLoading(true); setError(""); setPage((current) => current + 1); }} disabled={loading || Boolean(data && page >= data.pagination.pages)}>Next</button></div>
     </section></>}
+    </>}
   </div>;
 }

@@ -14,8 +14,8 @@ import {
 export const dynamic = "force-dynamic";
 
 const FETCH_CHUNK_SIZE = 1000;
-const ANALYTICS_ROW_LIMIT = 10000;
 const FILTER_OPTION_SELECT = '"Dealer Name","Dealer or Private","Make","Model","Year"';
+const ANALYTICS_SELECT = '"Listing ID","Listing Status","Dealer or Private","Dealer Name","Make","Model","Derivative","Year","Listed Price","Mileage","Location","Postcode","First Seen Date","Last Seen Date","Days Live","Advert URL"';
 
 type MarketFilterQuery = {
   eq(column: string, value: unknown): MarketFilterQuery;
@@ -128,12 +128,15 @@ async function getExactFilteredCount(filters: MarketFilters) {
   return count || 0;
 }
 
-async function loadAllFilteredRows(filters: MarketFilters, exactCount: number) {
+function hasAnalysisFilters(filters: MarketFilters) {
+  return Boolean(filters.from || filters.to || filters.listingStatus || filters.dealerPrivate || filters.dealerName || filters.make || filters.model || filters.derivative || filters.year || filters.minPrice || filters.maxPrice || filters.minMileage || filters.maxMileage || filters.location);
+}
+
+async function loadAllFilteredRows(filters: MarketFilters, exactCount: number, select = "*") {
   const rows: Record<string, unknown>[] = [];
-  const rowLimit = Math.min(exactCount, ANALYTICS_ROW_LIMIT);
-  for (let from = 0; from < rowLimit; from += FETCH_CHUNK_SIZE) {
-    const to = Math.min(from + FETCH_CHUNK_SIZE - 1, rowLimit - 1);
-    let query = applyMarketFilters(baseQuery().select("*") as unknown as MarketFilterQuery, filters);
+  for (let from = 0; from < exactCount; from += FETCH_CHUNK_SIZE) {
+    const to = Math.min(from + FETCH_CHUNK_SIZE - 1, exactCount - 1);
+    let query = applyMarketFilters(baseQuery().select(select) as unknown as MarketFilterQuery, filters);
     query = query.order(sortableColumns[filters.sort] || "Last Seen Date", { ascending: filters.direction === "asc", nullsFirst: false });
     const { data, error } = await (query.range(from, to) as unknown as Promise<MarketQueryResult>);
     if (error) throw error;
@@ -143,9 +146,16 @@ async function loadAllFilteredRows(filters: MarketFilters, exactCount: number) {
   return rows;
 }
 
-function csvResponse(rows: ReturnType<typeof normalizeMarketListing>[]) {
-  const headers = ["Listing ID", "Status", "Dealer/Private", "Dealer Name", "Make", "Model", "Derivative", "Year", "Price", "Mileage", "Location", "Postcode", "First Seen", "Last Seen", "Days Live", "Advert URL"];
-  const csvRows = rows.map((row) => [
+async function loadSummaryAnalytics(filters: MarketFilters, exactFilteredCount: number) {
+  const rawRows = await loadAllFilteredRows(filters, exactFilteredCount, ANALYTICS_SELECT);
+  const normalized = rawRows.map((row, index) => normalizeMarketListing(row, index));
+  return buildMarketAnalytics(normalized, exactFilteredCount, false);
+}
+
+const csvHeaders = ["Listing ID", "Status", "Dealer/Private", "Dealer Name", "Make", "Model", "Derivative", "Year", "Price", "Mileage", "Location", "Postcode", "First Seen", "Last Seen", "Days Live", "Advert URL"];
+
+function csvValues(row: ReturnType<typeof normalizeMarketListing>) {
+  return [
     row.listingId,
     row.status,
     row.dealerPrivate,
@@ -162,9 +172,38 @@ function csvResponse(rows: ReturnType<typeof normalizeMarketListing>[]) {
     row.lastSeen ?? "",
     row.daysLive ?? "",
     row.advertUrl,
-  ]);
-  const csv = [headers, ...csvRows].map((row) => row.map(csvEscape).join(",")).join("\n");
-  return new Response(csv, {
+  ];
+}
+
+function csvLine(row: unknown[]) {
+  return `${row.map(csvEscape).join(",")}\n`;
+}
+
+function csvResponse(filters: MarketFilters, exactCount: number) {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        controller.enqueue(encoder.encode(csvLine(csvHeaders)));
+        for (let from = 0; from < exactCount; from += FETCH_CHUNK_SIZE) {
+          const to = Math.min(from + FETCH_CHUNK_SIZE - 1, exactCount - 1);
+          let query = applyMarketFilters(baseQuery().select("*") as unknown as MarketFilterQuery, filters);
+          query = query.order(sortableColumns[filters.sort] || "Last Seen Date", { ascending: filters.direction === "asc", nullsFirst: false });
+          const { data, error } = await (query.range(from, to) as unknown as Promise<MarketQueryResult>);
+          if (error) throw error;
+          const lines = ((data || []) as Record<string, unknown>[])
+            .map((row, index) => csvLine(csvValues(normalizeMarketListing(row, from + index))))
+            .join("");
+          if (lines) controller.enqueue(encoder.encode(lines));
+          if ((data || []).length < FETCH_CHUNK_SIZE) break;
+        }
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+  });
+  return new Response(stream, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="autotrader-market-intelligence-${new Date().toISOString().slice(0, 10)}.csv"`,
@@ -188,15 +227,34 @@ export async function GET(request: Request) {
     const filters = parseMarketFilters(url.searchParams);
     const format = url.searchParams.get("format");
     const exactFilteredCount = await getExactFilteredCount(filters);
+    const canLoadAnalysis = hasAnalysisFilters(filters);
+
+    if (format === "csv") return csvResponse(filters, exactFilteredCount);
+
+    if (!canLoadAnalysis) {
+      const analytics = await loadSummaryAnalytics(filters, exactFilteredCount);
+      return NextResponse.json({
+        filters,
+        analytics,
+        rows: [],
+        pagination: { page: 1, pageSize: filters.pageSize, total: exactFilteredCount, pages: 1 },
+        meta: {
+          totalRows: exactFilteredCount,
+          fetchedRows: 0,
+          usedServerFilters: true,
+          sampleLimited: false,
+          summaryOnly: true,
+          sortableColumn: null,
+        },
+      });
+    }
+
     const rawRows = await loadAllFilteredRows(filters, exactFilteredCount);
     const normalized = rawRows.map((row, index) => normalizeMarketListing(row, index));
     const sorted = sortMarketRows(normalized, filters);
     const start = (filters.page - 1) * filters.pageSize;
     const pageRows = sorted.slice(start, start + filters.pageSize);
-    const sampleLimited = exactFilteredCount > rawRows.length;
-    const analytics = buildMarketAnalytics(sorted, exactFilteredCount, sampleLimited);
-
-    if (format === "csv") return csvResponse(sorted);
+    const analytics = buildMarketAnalytics(sorted, exactFilteredCount, false);
 
     return NextResponse.json({
       filters,
@@ -212,7 +270,8 @@ export async function GET(request: Request) {
         totalRows: exactFilteredCount,
         fetchedRows: rawRows.length,
         usedServerFilters: true,
-        sampleLimited,
+        sampleLimited: false,
+        summaryOnly: false,
         sortableColumn: sortableColumns[filters.sort] || null,
       },
     });
