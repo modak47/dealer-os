@@ -60,7 +60,9 @@ export function extractLegacyImageUrls(value: string | null | undefined): string
   return [...urls, ...fragments];
 }
 
-export function resolveLegacyImagePath(value: string, baseUrl = process.env.LEGACY_LEADS_IMAGE_BASE_URL ?? ""): string | null {
+const defaultLegacyImageBaseUrl = "https://sellyourmotorbike.co.uk";
+
+export function resolveLegacyImagePath(value: string, baseUrl = process.env.LEGACY_LEADS_IMAGE_BASE_URL ?? defaultLegacyImageBaseUrl): string | null {
   const image = value.trim();
   if (!image) return null;
   if (/^https?:\/\//i.test(image)) return image;
