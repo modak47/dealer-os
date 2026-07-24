@@ -5,7 +5,7 @@ import {
   displayStatus,
   formatDaysLive,
   formatMoney,
-  formatRelativeAdvertSeen,
+  formatRelativeConfirmed,
   getValidAdvertUrl,
   parseMoney,
   scoreColour,
@@ -118,7 +118,7 @@ export default function OpportunityCard({ opportunity, onOpen, onUpdate }: Oppor
                         />
                         <InfoLabel label="Days Live" value={formatDaysLive(opportunity.listingDaysLive)} />
                         <InfoLabel label="Seller" value={opportunity["Seller Type"]} />
-                        <InfoLabel label="Advert Seen" value={formatRelativeAdvertSeen(opportunity.listingLastConfirmedAt)} />
+                        <InfoLabel label="Last Confirmed" value={formatRelativeConfirmed(opportunity.listingLastConfirmedAt)} />
                       </div>
                     </div>
                   </div>

@@ -51,6 +51,13 @@ function earliestDate(...values: (string | null | undefined)[]): string | null {
     .sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
 }
 
+function latestDate(...values: (string | null | undefined)[]): string | null {
+  return values
+    .map(validDate)
+    .filter((value): value is string => value !== null)
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
+}
+
 function dateFromListingId(value: unknown): string | null {
   const text = String(value ?? "");
   const match = text.match(/^(\d{4})(\d{2})(\d{2})/);
@@ -156,7 +163,10 @@ export async function loadOpportunitiesWithListingDates(supabase: SupabaseClient
           earliestActivityById.get(listingId),
           dateFromListingId(listingId),
         ),
-        listingLastConfirmedAt: listing["Last Seen Date"],
+        listingLastConfirmedAt: latestDate(
+          typeof row.last_seen === "string" ? row.last_seen : null,
+          listing["Last Seen Date"],
+        ),
         listingDaysLive: listing["Days Live"],
         listingStatus: listing["Listing Status"],
         listingSellerType: listing["Dealer or Private"],
