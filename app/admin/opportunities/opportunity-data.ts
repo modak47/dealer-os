@@ -11,6 +11,12 @@ type ListingRow = {
   "Dealer or Private": string | null;
 };
 
+type ActivityRow = {
+  listing_id: number | string | null;
+  activity_type: string | null;
+  created_at: string | null;
+};
+
 const LISTING_SELECT =
   '"Listing ID","First Seen Date","Last Seen Date","Days Live","Listing Status","Dealer or Private"';
 
@@ -29,6 +35,29 @@ function chunk<T>(values: T[], size: number): T[][] {
     chunks.push(values.slice(index, index + size));
   }
   return chunks;
+}
+
+function validDate(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? value : null;
+}
+
+function earliestDate(...values: (string | null | undefined)[]): string | null {
+  return values
+    .map(validDate)
+    .filter((value): value is string => value !== null)
+    .sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
+}
+
+function dateFromListingId(value: unknown): string | null {
+  const text = String(value ?? "");
+  const match = text.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const isoDate = `${year}-${month}-${day}T00:00:00.000Z`;
+  return validDate(isoDate);
 }
 
 async function fetchListingsById(
@@ -54,6 +83,36 @@ async function fetchListingsById(
   return listings;
 }
 
+async function fetchEarliestActivityById(
+  supabase: SupabaseClient,
+  listingIds: number[],
+): Promise<Map<number, string>> {
+  const activityByListingId = new Map<number, string>();
+
+  for (const batch of chunk(listingIds, 500)) {
+    const { data, error } = await supabase
+      .from("opportunity_activity")
+      .select("listing_id, activity_type, created_at")
+      .in("listing_id", batch)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      if (["42P01", "42703"].includes(error.code ?? "")) return activityByListingId;
+      throw error;
+    }
+
+    for (const row of (data ?? []) as ActivityRow[]) {
+      const listingId = normalizeListingId(row.listing_id);
+      const createdAt = validDate(row.created_at);
+      if (listingId === null || !createdAt) continue;
+      if (row.activity_type && !/created/i.test(row.activity_type)) continue;
+      activityByListingId.set(listingId, earliestDate(activityByListingId.get(listingId), createdAt) ?? createdAt);
+    }
+  }
+
+  return activityByListingId;
+}
+
 export async function loadOpportunitiesWithListingDates(supabase: SupabaseClient): Promise<{
   data: OpportunityRow[];
   error: Error | null;
@@ -71,11 +130,16 @@ export async function loadOpportunitiesWithListingDates(supabase: SupabaseClient
   const listingIds = opportunityRows
     .map((row) => normalizeListingId(row["Listing ID"]))
     .filter((listingId): listingId is number => listingId !== null);
-  const listingsById = await fetchListingsById(supabase, listingIds);
+  const [listingsById, earliestActivityById] = await Promise.all([
+    fetchListingsById(supabase, listingIds),
+    fetchEarliestActivityById(supabase, listingIds),
+  ]);
 
   const merged = opportunityRows.flatMap((row) => {
     const listingId = normalizeListingId(row["Listing ID"]);
-    const listing = listingId === null ? null : listingsById.get(listingId);
+    if (listingId === null) return [];
+
+    const listing = listingsById.get(listingId);
 
     if (!listing) return [];
     if (listing["Listing Status"] !== "Active" || listing["Dealer or Private"] !== "Private") {
@@ -85,7 +149,11 @@ export async function loadOpportunitiesWithListingDates(supabase: SupabaseClient
     return [
       {
         ...row,
-        listingFirstSeenAt: listing["First Seen Date"],
+        listingFirstSeenAt: earliestDate(
+          listing["First Seen Date"],
+          earliestActivityById.get(listingId),
+          dateFromListingId(listingId),
+        ),
         listingLastConfirmedAt: listing["Last Seen Date"],
         listingDaysLive: listing["Days Live"],
         listingStatus: listing["Listing Status"],
