@@ -128,14 +128,17 @@ export default function WebsiteLeadsPage() {
 function LeadCard({ lead, running, locating, error, onRun, onRefreshLocation, onRefer, onBook }: { lead: WebsiteLead; running: boolean; locating: boolean; error?: string; onRun: () => void; onRefreshLocation: () => void; onRefer: () => void; onBook: () => void }) {
   const router = useRouter();
   const images = lead.resolved_images ?? combineLeadImages(lead);
+  const [imageFailed, setImageFailed] = useState(false);
   const margin = safeNumber(lead.estimated_margin);
   const processing = lead.valuation_status === "processing";
   const hasReg = Boolean(lead.reg?.trim());
   const runLabel = processing ? "Valuation in progress" : running ? "Valuing..." : lead.retail_check_id && lead.valuation_status === "completed" ? "Re-run Valuation" : "Run Retail Check";
   const locationAvailable = Boolean(lead.postcode || lead.normalised_postcode || lead.location_display_name || lead.latitude != null);
   const locationResolved = lead.latitude != null && lead.longitude != null;
-  return <article className="website-lead-card" onClick={() => router.push(`/website-leads/${lead.id}`)}>
-    <div className="website-lead-photo">{images[0] ? <img src={images[0]} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} onError={event => { event.currentTarget.style.display = "none"; }} /> : <span>No image</span>}<b>{images.length} photos</b></div>
+  const primaryImage = !imageFailed ? images[0] : null;
+  useEffect(() => setImageFailed(false), [lead.id, images[0]]);
+  return <article className={`website-lead-card ${primaryImage ? "" : "no-photo"}`} onClick={() => router.push(`/website-leads/${lead.id}`)}>
+    {primaryImage && <div className="website-lead-photo"><img src={primaryImage} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} onError={() => setImageFailed(true)} />{images.length > 1 && <b>{images.length} photos</b>}</div>}
     <div className="website-lead-card-body">
       <div className="website-lead-title"><span>{lead.reg || "No reg"}</span><h2>{[lead.make, lead.model].filter(Boolean).join(" ") || "Bike details pending"}</h2><p>{lead.year || "Year unknown"} · {formatMileage(lead.mileage)} · {lead.engine || "Engine n/a"}</p></div>
       <div className="website-card-badges"><span className="website-badge source">{lead.website || "unknown"}</span><span className={statusBadgeClass(lead.status)}>{statusLabel(lead.status)}</span><span className="website-badge">{statusLabel(lead.valuation_status || "pending")}</span>{Boolean(lead.referral_count) && <span className="website-badge badge-referred">Referred</span>}</div>

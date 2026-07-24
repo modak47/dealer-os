@@ -1,9 +1,11 @@
 import requests
 import statistics
 import time
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from collections import defaultdict
+from pathlib import Path
 from urllib.parse import urlparse
 from supabase import create_client
 
@@ -12,9 +14,32 @@ from supabase import create_client
 # CONFIG
 # =====================================
 
-SUPABASE_URL = "https://ejtbbpiqwytcyvromalw.supabase.co"
+def load_local_env():
+    env_path = Path(__file__).resolve().parent / ".env"
+    if not env_path.exists():
+        return
 
-SUPABASE_KEY = "sb_publishable_2HUSFaGa2KsxcGOzazvamg_-JW99eHG"
+    for raw_line in env_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        existing_value = os.environ.get(key, "")
+        if key and (not existing_value or existing_value == "your-service-role-key"):
+            os.environ[key] = value
+
+
+load_local_env()
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ejtbbpiqwytcyvromalw.supabase.co")
+
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+if not SUPABASE_KEY:
+    raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY must be configured for opportunity scanner writes")
 
 supabase = create_client(
     SUPABASE_URL,
@@ -150,6 +175,22 @@ def delete_opportunities_by_listing_id(listing_ids):
     return removed
 
 
+def refresh_live_opportunity_confirmations(listing_ids):
+    refreshed = 0
+
+    for batch in chunked(listing_ids):
+        supabase.table("buying_opportunities").update({
+            "last_seen": datetime.utcnow().isoformat()
+        }).in_(
+            "Listing ID",
+            batch
+        ).execute()
+
+        refreshed += len(batch)
+
+    return refreshed
+
+
 def count_current_opportunities():
     return len(fetch_listing_ids("buying_opportunities"))
 
@@ -261,6 +302,7 @@ def verify_live_opportunity_urls():
         "errors": 0,
     }
     removed_listing_ids = []
+    live_listing_ids = []
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [
@@ -287,14 +329,21 @@ def verify_live_opportunity_urls():
                 stats["errors"] += 1
             elif status == "live":
                 stats["live"] += 1
+                live_listing_ids.append(result["listing_id"])
             else:
                 stats["unverified"] += 1
 
     removed_from_opportunities = 0
+    refreshed_live_opportunities = 0
 
     if removed_listing_ids:
         removed_from_opportunities = delete_opportunities_by_listing_id(
             removed_listing_ids
+        )
+
+    if live_listing_ids:
+        refreshed_live_opportunities = refresh_live_opportunity_confirmations(
+            live_listing_ids
         )
 
     print(f"Verified live: {stats['live']}")
@@ -303,6 +352,7 @@ def verify_live_opportunity_urls():
     print(f"Blocked: {stats['blocked']}")
     print(f"Errors: {stats['errors']}")
     print(f"Removed from buying_opportunities: {removed_from_opportunities}")
+    print(f"Refreshed live opportunity confirmations: {refreshed_live_opportunities}")
 
     return set(removed_listing_ids)
 
