@@ -215,6 +215,8 @@ select
 from public.stock_bikes b
 where coalesce(b.is_test_record,false) = false;
 
+alter view public.dealer5_shadow_health set (security_invoker = true);
+
 grant select on public.dealer5_shadow_health to authenticated, service_role;
 grant execute on function public.stock_refresh_finance_snapshot(bigint) to authenticated, service_role;
 grant execute on function public.stock_add_cost(bigint,text,text,numeric,date,text,text,text,text,text,uuid) to authenticated, service_role;

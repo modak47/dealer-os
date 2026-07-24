@@ -90,7 +90,7 @@ const keys = {
   status: ["Listing Status", "listing_status", "listingStatus", "status"],
   make: ["Make", "make"],
   model: ["Model", "model"],
-  derivative: ["Derivative", "derivative", "Variant", "variant"],
+  derivative: ["Derivative", "Derivative ID", "derivative", "derivative_id", "Variant", "variant"],
   year: ["Year", "year", "Registration Year", "registration_year"],
   price: ["Listed Price", "listed_price", "Price", "price", "asking_price"],
   mileage: ["Mileage", "mileage"],

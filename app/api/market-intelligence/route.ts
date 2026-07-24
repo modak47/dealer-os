@@ -6,10 +6,11 @@ import {
   normalizeMarketListing,
   numberValue,
   parseMarketFilters,
-  sortMarketRows,
   text,
   type MarketFilters,
   type MarketAnalytics,
+  type MarketGroup,
+  type MarketTrendPoint,
 } from "@/lib/market-intelligence";
 
 export const dynamic = "force-dynamic";
@@ -63,7 +64,7 @@ function applyMarketFilters(query: MarketFilterQuery, filters: MarketFilters) {
   if (filters.dealerName) nextQuery = nextQuery.ilike("Dealer Name", `%${escapeLike(filters.dealerName)}%`);
   if (filters.make) nextQuery = nextQuery.ilike("Make", `%${escapeLike(filters.make)}%`);
   if (filters.model) nextQuery = nextQuery.ilike("Model", `%${escapeLike(filters.model)}%`);
-  if (filters.derivative) nextQuery = nextQuery.ilike("Derivative", `%${escapeLike(filters.derivative)}%`);
+  if (filters.derivative) nextQuery = nextQuery.ilike("Derivative ID", `%${escapeLike(filters.derivative)}%`);
   if (year !== null) nextQuery = nextQuery.eq("Year", year);
   if (minPrice !== null) nextQuery = nextQuery.gte("Listed Price", minPrice);
   if (maxPrice !== null) nextQuery = nextQuery.lte("Listed Price", maxPrice);
@@ -71,7 +72,7 @@ function applyMarketFilters(query: MarketFilterQuery, filters: MarketFilters) {
   if (maxMileage !== null) nextQuery = nextQuery.lte("Mileage", maxMileage);
   if (filters.location) {
     const location = escapeLike(filters.location);
-    nextQuery = nextQuery.or(`Location.ilike.%${location}%,Postcode.ilike.%${location}%`);
+    nextQuery = nextQuery.ilike("Location", `%${location}%`);
   }
   if (filters.from) nextQuery = nextQuery.gte("Last Seen Date", filters.from);
   if (filters.to) nextQuery = nextQuery.lte("Last Seen Date", filters.to);
@@ -165,6 +166,34 @@ function summaryNullableNumber(summary: Record<string, unknown>, key: string) {
   return Number.isFinite(number) ? number : null;
 }
 
+function marketGroups(value: unknown): MarketGroup[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const record = row as Record<string, unknown>;
+      return {
+        name: text(record.name),
+        count: summaryNumber(record, "count"),
+      };
+    })
+    .filter((row): row is MarketGroup => Boolean(row && row.name));
+}
+
+function marketTrend(value: unknown): MarketTrendPoint[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const record = row as Record<string, unknown>;
+      return {
+        date: text(record.date),
+        removed: summaryNumber(record, "removed"),
+      };
+    })
+    .filter((row): row is MarketTrendPoint => Boolean(row && row.date));
+}
+
 function hasAnalysisFilters(filters: MarketFilters) {
   return Boolean(filters.from || filters.to || filters.listingStatus || filters.dealerPrivate || filters.dealerName || filters.make || filters.model || filters.derivative || filters.year || filters.minPrice || filters.maxPrice || filters.minMileage || filters.maxMileage || filters.location);
 }
@@ -225,6 +254,43 @@ async function loadSummaryAnalytics(): Promise<MarketAnalytics> {
     removedTrend: [],
     sampleLimited: false,
   };
+}
+
+async function loadFilteredAnalytics(filters: MarketFilters): Promise<MarketAnalytics> {
+  const { data: summary, error } = await getSupabaseAdmin().rpc("get_autotrader_filtered_analytics", { filters });
+  if (!error && summary && typeof summary === "object" && !Array.isArray(summary)) {
+    const values = summary as Record<string, unknown>;
+    const totalRows = summaryNumber(values, "totalRows");
+    return {
+      totalRows,
+      filteredRows: summaryNumber(values, "filteredRows"),
+      activeCount: summaryNumber(values, "activeCount"),
+      removedCount: summaryNumber(values, "removedCount"),
+      dealerCount: summaryNumber(values, "dealerCount"),
+      averageAskingPrice: summaryNullableNumber(values, "averageAskingPrice"),
+      medianAskingPrice: summaryNullableNumber(values, "medianAskingPrice"),
+      averageDaysLive: summaryNullableNumber(values, "averageDaysLive"),
+      dealerLeaderboard: marketGroups(values.dealerLeaderboard),
+      makeModelSoldCounts: marketGroups(values.makeModelSoldCounts),
+      activeStockByDealer: marketGroups(values.activeStockByDealer),
+      removedTrend: marketTrend(values.removedTrend),
+      sampleLimited: false,
+    };
+  }
+
+  const exactFilteredCount = await getExactFilteredCount(filters);
+  const rawRows = await loadAllFilteredRows(filters, exactFilteredCount);
+  return buildMarketAnalytics(rawRows.map((row, index) => normalizeMarketListing(row, index)), exactFilteredCount, false);
+}
+
+async function loadPageRows(filters: MarketFilters) {
+  const start = (filters.page - 1) * filters.pageSize;
+  const end = start + filters.pageSize - 1;
+  let query = applyMarketFilters(baseQuery().select("*") as unknown as MarketFilterQuery, filters);
+  query = query.order(sortableColumns[filters.sort] || "Last Seen Date", { ascending: filters.direction === "asc", nullsFirst: false });
+  const { data, error } = await (query.range(start, end) as unknown as Promise<MarketQueryResult>);
+  if (error) throw error;
+  return ((data || []) as Record<string, unknown>[]).map((row, index) => normalizeMarketListing(row, start + index));
 }
 
 const csvHeaders = ["Listing ID", "Status", "Dealer/Private", "Dealer Name", "Make", "Model", "Derivative", "Year", "Price", "Mileage", "Location", "Postcode", "First Seen", "Last Seen", "Days Live", "Advert URL"];
@@ -301,10 +367,9 @@ export async function GET(request: Request) {
 
     const filters = parseMarketFilters(url.searchParams);
     const format = url.searchParams.get("format");
-    const exactFilteredCount = await getExactFilteredCount(filters);
     const canLoadAnalysis = hasAnalysisFilters(filters);
 
-    if (format === "csv") return csvResponse(filters, exactFilteredCount);
+    if (format === "csv") return csvResponse(filters, await getExactFilteredCount(filters));
 
     if (!canLoadAnalysis) {
       const analytics = await loadSummaryAnalytics();
@@ -312,9 +377,9 @@ export async function GET(request: Request) {
         filters,
         analytics,
         rows: [],
-        pagination: { page: 1, pageSize: filters.pageSize, total: exactFilteredCount, pages: 1 },
+        pagination: { page: 1, pageSize: filters.pageSize, total: analytics.totalRows, pages: 1 },
         meta: {
-          totalRows: exactFilteredCount,
+          totalRows: analytics.totalRows,
           fetchedRows: 0,
           usedServerFilters: true,
           sampleLimited: false,
@@ -324,12 +389,10 @@ export async function GET(request: Request) {
       });
     }
 
-    const rawRows = await loadAllFilteredRows(filters, exactFilteredCount);
-    const normalized = rawRows.map((row, index) => normalizeMarketListing(row, index));
-    const sorted = sortMarketRows(normalized, filters);
-    const start = (filters.page - 1) * filters.pageSize;
-    const pageRows = sorted.slice(start, start + filters.pageSize);
-    const analytics = buildMarketAnalytics(sorted, exactFilteredCount, false);
+    const [analytics, pageRows] = await Promise.all([
+      loadFilteredAnalytics(filters),
+      loadPageRows(filters),
+    ]);
 
     return NextResponse.json({
       filters,
@@ -338,12 +401,12 @@ export async function GET(request: Request) {
       pagination: {
         page: filters.page,
         pageSize: filters.pageSize,
-        total: exactFilteredCount,
-        pages: Math.max(1, Math.ceil(exactFilteredCount / filters.pageSize)),
+        total: analytics.filteredRows,
+        pages: Math.max(1, Math.ceil(analytics.filteredRows / filters.pageSize)),
       },
       meta: {
-        totalRows: exactFilteredCount,
-        fetchedRows: rawRows.length,
+        totalRows: analytics.filteredRows,
+        fetchedRows: pageRows.length,
         usedServerFilters: true,
         sampleLimited: false,
         summaryOnly: false,
