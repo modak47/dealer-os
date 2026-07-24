@@ -111,12 +111,11 @@ export async function buildPdiPdf(bikeInput: SupabaseStockBike, payload: PdiForm
   const checklist = payload.checklist?.length ? payload.checklist : defaultPdiChecklist;
 
   const bikeName = [bike.make, bike.model, bike.variant].filter(Boolean).join(" ");
-  fitText(page, bold, bikeName, 112, 721, 160, 6);
-  fitText(page, bold, bike.vin || "", 372, 721, 160, 6);
-  fitText(page, bold, bike.engine_number || "", 112, 701, 160, 6);
-  fitText(page, bold, bike.registration || "", 372, 701, 120, 6);
-  fitText(page, bold, new Date().toLocaleDateString("en-GB"), 112, 681, 80, 6);
-  fitText(page, bold, bike.mileage?.toLocaleString("en-GB") || "", 372, 681, 80, 6);
+  fitText(page, bold, bikeName, 165, 721, 160, 6);
+  fitText(page, bold, bike.vin || "", 165, 701, 160, 6);
+  fitText(page, bold, bike.engine_number || "", 430, 701, 120, 6);
+  fitText(page, bold, bike.registration || "", 165, 681, 110, 6);
+  fitText(page, bold, new Date().toLocaleDateString("en-GB"), 430, 681, 80, 6);
 
   const seen = new Map<string, number>();
   for (const item of checklist) {
@@ -131,10 +130,10 @@ export async function buildPdiPdf(bikeInput: SupabaseStockBike, payload: PdiForm
   await drawDealerStamp(pdf, page);
   drawTick(page, 39, 146, 8);
   drawTick(page, 39, 85, 8);
-  fitText(page, regular, payload.technicianName, 61, 109, 90, 7);
-  fitText(page, regular, payload.customerName || "", 307, 109, 86, 7);
-  await drawSignature(pdf, page, payload.signatureDataUrl, 166, 101, 122, 18);
-  await drawSignature(pdf, page, payload.customerSignatureDataUrl, 401, 101, 140, 18);
+  fitText(page, regular, payload.technicianName, 430, 126, 120, 8);
+  fitText(page, regular, payload.customerName || "", 430, 65, 120, 8);
+  await drawSignature(pdf, page, payload.signatureDataUrl, 166, 110, 154, 26);
+  await drawSignature(pdf, page, payload.customerSignatureDataUrl, 166, 39, 154, 26);
 
   return pdf.save();
 }
