@@ -12,7 +12,7 @@ type Props = {
   workspace: VehicleWorkspaceData;
 };
 
-type Tab = "overview" | "sale" | "invoice" | "workflow" | "history";
+type Tab = "overview" | "advert" | "sale" | "invoice" | "workflow" | "history";
 type PendingAction = "cancelReservation" | "cancelSale" | "reopenSale" | null;
 
 export function VehicleWorkspace({ bike, workspace }: Props) {
@@ -33,6 +33,7 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
   const selectedCustomer = workspace.customers.find(customer => customer.id === customerId);
   const progress = lifecycleRank(activeSale?.status ?? bike.status);
   const isComplete = [STOCK_STATUS.SALE_COMPLETED, "Completed"].includes(String(activeSale?.status ?? bike.status));
+  const advertRows = advertStatusRows(bike);
 
   const kpis = useMemo(() => [
     ["Status", String(activeSale?.status ?? bike.status ?? "Unknown")],
@@ -78,7 +79,11 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
         </div>
       </div>
       <nav>
+        {bike.show_on_website && <Link href={`/used-bikes/${bike.id}`} target="_blank">View Advert</Link>}
+        <Link href={`/admin/stock/${bike.id}?edit=1`}>Edit Advert</Link>
         <Link href={`/admin/stock/${bike.id}?edit=1`}>Edit Stock</Link>
+        <Link href={`/admin/stock/${bike.id}/pdi`}>PDI</Link>
+        <Link href={`/admin/stock-ledger/${bike.id}`}>Stock Ledger</Link>
         {activeSale && <Link href={`/admin/sales/${activeSale.id}`}>Open Sale</Link>}
         {latestInvoice && <Link href={`/admin/accounts/invoices/${latestInvoice.id}/document`} target="_blank">Open Invoice</Link>}
       </nav>
@@ -92,7 +97,7 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
     </section>
 
     <nav className="dms-vehicle-tabs">
-      {(["overview", "sale", "invoice", "workflow", "history"] as Tab[]).map(value => <button type="button" className={tab === value ? "active" : ""} onClick={() => setTab(value)} key={value}>{label(value)}</button>)}
+      {(["overview", "advert", "sale", "invoice", "workflow", "history"] as Tab[]).map(value => <button type="button" className={tab === value ? "active" : ""} onClick={() => setTab(value)} key={value}>{label(value)}</button>)}
     </nav>
 
     {tab === "overview" && <section className="dms-vehicle-grid">
@@ -109,6 +114,21 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
       </ActionPanel>
       <StatusPanel title="Current Reservation" rows={activeReservation ? reservationRows(activeReservation) : [["Reservation", "None active"]]} />
       <StatusPanel title="Current Sale" rows={activeSale ? saleRows(activeSale) : [["Sale", "None active"]]} />
+    </section>}
+
+    {tab === "advert" && <section className="dms-vehicle-grid">
+      <section className="dms-vehicle-card dms-advert-card">
+        <h2>Advert Control</h2>
+        <p>{bike.show_on_website ? "This bike is published on the customer-facing website." : "This bike is currently hidden from the customer-facing website."}</p>
+        <div className="dms-vehicle-actions">
+          {bike.show_on_website && <Link href={`/used-bikes/${bike.id}`} target="_blank">View Live Advert</Link>}
+          <Link href={`/admin/stock/${bike.id}?edit=1`}>Edit Advert Content</Link>
+          <Link href={`/admin/settings?section=advert-templates`}>Advert Templates</Link>
+        </div>
+      </section>
+      <StatusPanel title="Advert Readiness" rows={advertRows} />
+      <StatusPanel title="Bike Details" rows={bikeDetailRows(bike)} />
+      <StatusPanel title="Preparation" rows={prepRows(bike)} />
     </section>}
 
     {tab === "sale" && <section className="dms-vehicle-grid">
@@ -174,7 +194,7 @@ function Field({ label, value, onChange, type = "text" }: { label: string; value
 }
 
 function label(tab: Tab) {
-  return ({ overview: "Overview", sale: "Sale", invoice: "Invoices", workflow: "Workflow", history: "History" } as Record<Tab, string>)[tab];
+  return ({ overview: "Overview", advert: "Advert", sale: "Sale", invoice: "Invoices", workflow: "Workflow", history: "History" } as Record<Tab, string>)[tab];
 }
 
 function pendingLabel(action: Exclude<PendingAction, null>) {
@@ -202,6 +222,44 @@ function deliveryRows(record?: Record<string, unknown>) {
   if (!record) return [["Delivery", "Not created"]];
   const checks = ["identity_checked", "licence_verified", "v5_prepared", "handover_completed", "keys_given", "documents_signed", "hpi_complete"].filter(key => Boolean(record[key])).length;
   return [["Status", String(record.status ?? "-")], ["Scheduled", date(record.scheduled_at)], ["Checklist", `${checks}/7 complete`]];
+}
+
+function yesNo(value: unknown) {
+  return value ? "Yes" : "No";
+}
+
+function advertStatusRows(bike: SupabaseStockBike) {
+  const sections = Object.entries(bike.advert_sections ?? {}).filter(([key, value]) => key !== "__meta" && String(value ?? "").trim());
+  return [
+    ["Website live", yesNo(bike.show_on_website)],
+    ["Reserve online", yesNo(bike.reserve_enabled)],
+    ["Retail price", money(bike.price)],
+    ["Photos", `${bike.image_urls?.length || (bike.primary_image_url ? 1 : 0)} image${(bike.image_urls?.length || (bike.primary_image_url ? 1 : 0)) === 1 ? "" : "s"}`],
+    ["Advert title", bike.advert_title || [bike.year, bike.make, bike.model].filter(Boolean).join(" ") || "-"],
+    ["Advert sections", `${sections.length} populated`],
+  ];
+}
+
+function bikeDetailRows(bike: SupabaseStockBike) {
+  return [
+    ["Registration", bike.registration || "-"],
+    ["Mileage", bike.mileage ? `${Number(bike.mileage).toLocaleString("en-GB")} miles` : "-"],
+    ["Colour", bike.colour || "-"],
+    ["Engine", bike.engine_cc ? `${bike.engine_cc} cc` : "-"],
+    ["MOT", bike.mot_expiry ? date(bike.mot_expiry) : bike.mot_status || "-"],
+    ["HPI category", bike.hpi_category || "-"],
+  ];
+}
+
+function prepRows(bike: SupabaseStockBike) {
+  return [
+    ["Workshop", bike.workshop_status || "-"],
+    ["Valeting", bike.valeting_status || "-"],
+    ["Photography", bike.photo_status || "-"],
+    ["V5 received", yesNo(bike.v5_received)],
+    ["Service history", yesNo(bike.service_history_received)],
+    ["HPI complete", yesNo(bike.hpi_completed)],
+  ];
 }
 
 function recordTitle(record: Record<string, unknown>, type: string) {
