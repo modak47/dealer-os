@@ -112,6 +112,7 @@ export async function buildPdiPdf(bikeInput: SupabaseStockBike, payload: PdiForm
 
   const bikeName = [bike.make, bike.model, bike.variant].filter(Boolean).join(" ");
   fitText(page, bold, bikeName, 165, 721, 160, 6);
+  fitText(page, bold, bike.mileage ? `Mileage: ${bike.mileage.toLocaleString("en-GB")}` : "", 430, 721, 100, 6);
   fitText(page, bold, bike.vin || "", 165, 701, 160, 6);
   fitText(page, bold, bike.engine_number || "", 430, 701, 120, 6);
   fitText(page, bold, bike.registration || "", 165, 681, 110, 6);
@@ -129,8 +130,8 @@ export async function buildPdiPdf(bikeInput: SupabaseStockBike, payload: PdiForm
 
   await drawDealerStamp(pdf, page);
   drawTick(page, 39, 146, 8);
-  drawTick(page, 39, 85, 8);
   fitText(page, regular, payload.technicianName, 430, 126, 120, 8);
+  fitText(page, regular, new Date().toLocaleDateString("en-GB"), 430, 111, 80, 8);
   fitText(page, regular, payload.customerName || "", 430, 65, 120, 8);
   await drawSignature(pdf, page, payload.signatureDataUrl, 166, 110, 154, 26);
   await drawSignature(pdf, page, payload.customerSignatureDataUrl, 166, 39, 154, 26);
