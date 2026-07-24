@@ -157,7 +157,6 @@ export function MarketIntelligenceClient() {
   }
 
   const analytics = data?.analytics;
-  const dealerCount = data?.meta.summaryOnly && filterOptions.dealerNames.length ? filterOptions.dealerNames.length : analytics?.dealerCount;
 
   return <div className="market-intelligence">
     <form className="mi-filters" onSubmit={apply}>
@@ -191,13 +190,13 @@ export function MarketIntelligenceClient() {
     {analytics && <><div className="mi-kpis">
       <KpiCard label="Removed / sold" value={number(analytics.removedCount)} hint="Listings removed in selected range" />
       <KpiCard label="Active stock" value={number(analytics.activeCount)} hint="Currently active listings" />
-      <KpiCard label="Dealers" value={number(dealerCount)} hint="Unique dealer sellers" />
+      <KpiCard label="Dealers" value={number(analytics.dealerCount)} hint="Unique dealer sellers" />
       <KpiCard label="Avg asking price" value={money(analytics.averageAskingPrice)} hint="Filtered market average" />
       <KpiCard label="Median asking price" value={money(analytics.medianAskingPrice)} hint="Less distorted by outliers" />
       <KpiCard label="Avg days live" value={number(analytics.averageDaysLive)} hint="From first seen to removed/today" />
     </div>
 
-    {!analysisReady && <div className="mi-warning">Showing top-level market statistics only. Apply a date, dealer, make, model or other filter to load charts, leaderboards, listings and CSV export.</div>}
+    {!analysisReady && <div className="mi-warning">Showing top-level market statistics only. Apply a date, dealer, make, model or other filter to load charts, leaderboards and listings. Export CSV still downloads the current full dataset.</div>}
 
     {analysisReady && <><div className="mi-grid">
       <TrendChart points={analytics.removedTrend} />

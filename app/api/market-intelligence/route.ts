@@ -86,7 +86,22 @@ function sortedTextOptions(values: Set<string>) {
   return [...values].sort((a, b) => a.localeCompare(b, "en-GB"));
 }
 
+function stringOptions(value: unknown) {
+  return Array.isArray(value) ? value.map((option) => text(option)).filter(Boolean) : [];
+}
+
 async function loadFilterOptions() {
+  const { data: options, error } = await getSupabaseAdmin().rpc("get_autotrader_filter_options");
+  if (!error && options && typeof options === "object" && !Array.isArray(options)) {
+    const values = options as Record<string, unknown>;
+    return {
+      dealerNames: stringOptions(values.dealerNames),
+      makes: stringOptions(values.makes),
+      models: stringOptions(values.models),
+      years: stringOptions(values.years),
+    };
+  }
+
   const { count, error: countError } = await baseQuery().select("*", { count: "exact", head: true });
   if (countError) throw countError;
 
@@ -138,6 +153,18 @@ async function countForStatus(status: "Active" | "Removed") {
   return getExactFilteredCount({ page: 1, pageSize: 50, sort: "lastSeen", direction: "desc", listingStatus: status });
 }
 
+function summaryNumber(summary: Record<string, unknown>, key: string) {
+  const value = Number(summary[key] ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function summaryNullableNumber(summary: Record<string, unknown>, key: string) {
+  const value = summary[key];
+  if (value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function hasAnalysisFilters(filters: MarketFilters) {
   return Boolean(filters.from || filters.to || filters.listingStatus || filters.dealerPrivate || filters.dealerName || filters.make || filters.model || filters.derivative || filters.year || filters.minPrice || filters.maxPrice || filters.minMileage || filters.maxMileage || filters.location);
 }
@@ -157,6 +184,27 @@ async function loadAllFilteredRows(filters: MarketFilters, exactCount: number, s
 }
 
 async function loadSummaryAnalytics(): Promise<MarketAnalytics> {
+  const { data: summary, error } = await getSupabaseAdmin().rpc("get_autotrader_market_summary");
+  if (!error && summary && typeof summary === "object" && !Array.isArray(summary)) {
+    const values = summary as Record<string, unknown>;
+    const totalRows = summaryNumber(values, "totalRows");
+    return {
+      totalRows,
+      filteredRows: totalRows,
+      activeCount: summaryNumber(values, "activeCount"),
+      removedCount: summaryNumber(values, "removedCount"),
+      dealerCount: summaryNumber(values, "dealerCount"),
+      averageAskingPrice: summaryNullableNumber(values, "averageAskingPrice"),
+      medianAskingPrice: summaryNullableNumber(values, "medianAskingPrice"),
+      averageDaysLive: summaryNullableNumber(values, "averageDaysLive"),
+      dealerLeaderboard: [],
+      makeModelSoldCounts: [],
+      activeStockByDealer: [],
+      removedTrend: [],
+      sampleLimited: false,
+    };
+  }
+
   const [totalRows, activeCount, removedCount] = await Promise.all([
     getUnfilteredTotalCount(),
     countForStatus("Active"),
