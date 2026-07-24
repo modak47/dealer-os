@@ -9,6 +9,7 @@ import {
   sortMarketRows,
   text,
   type MarketFilters,
+  type MarketAnalytics,
 } from "@/lib/market-intelligence";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +128,16 @@ async function getExactFilteredCount(filters: MarketFilters) {
   return count || 0;
 }
 
+async function getUnfilteredTotalCount() {
+  const { data, error } = await getSupabaseAdmin().rpc("get_autotrader_listing_count");
+  if (!error) return Number(data || 0);
+  return getExactFilteredCount({ page: 1, pageSize: 50, sort: "lastSeen", direction: "desc" });
+}
+
+async function countForStatus(status: "Active" | "Removed") {
+  return getExactFilteredCount({ page: 1, pageSize: 50, sort: "lastSeen", direction: "desc", listingStatus: status });
+}
+
 function hasAnalysisFilters(filters: MarketFilters) {
   return Boolean(filters.from || filters.to || filters.listingStatus || filters.dealerPrivate || filters.dealerName || filters.make || filters.model || filters.derivative || filters.year || filters.minPrice || filters.maxPrice || filters.minMileage || filters.maxMileage || filters.location);
 }
@@ -145,10 +156,27 @@ async function loadAllFilteredRows(filters: MarketFilters, exactCount: number, s
   return rows;
 }
 
-async function loadSummaryAnalytics(filters: MarketFilters, exactFilteredCount: number) {
-  const rawRows = await loadAllFilteredRows(filters, exactFilteredCount);
-  const normalized = rawRows.map((row, index) => normalizeMarketListing(row, index));
-  return buildMarketAnalytics(normalized, exactFilteredCount, false);
+async function loadSummaryAnalytics(): Promise<MarketAnalytics> {
+  const [totalRows, activeCount, removedCount] = await Promise.all([
+    getUnfilteredTotalCount(),
+    countForStatus("Active"),
+    countForStatus("Removed"),
+  ]);
+  return {
+    totalRows,
+    filteredRows: totalRows,
+    activeCount,
+    removedCount,
+    dealerCount: 0,
+    averageAskingPrice: null,
+    medianAskingPrice: null,
+    averageDaysLive: null,
+    dealerLeaderboard: [],
+    makeModelSoldCounts: [],
+    activeStockByDealer: [],
+    removedTrend: [],
+    sampleLimited: false,
+  };
 }
 
 const csvHeaders = ["Listing ID", "Status", "Dealer/Private", "Dealer Name", "Make", "Model", "Derivative", "Year", "Price", "Mileage", "Location", "Postcode", "First Seen", "Last Seen", "Days Live", "Advert URL"];
@@ -231,7 +259,7 @@ export async function GET(request: Request) {
     if (format === "csv") return csvResponse(filters, exactFilteredCount);
 
     if (!canLoadAnalysis) {
-      const analytics = await loadSummaryAnalytics(filters, exactFilteredCount);
+      const analytics = await loadSummaryAnalytics();
       return NextResponse.json({
         filters,
         analytics,
