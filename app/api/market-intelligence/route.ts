@@ -15,7 +15,6 @@ export const dynamic = "force-dynamic";
 
 const FETCH_CHUNK_SIZE = 1000;
 const FILTER_OPTION_SELECT = '"Dealer Name","Dealer or Private","Make","Model","Year"';
-const ANALYTICS_SELECT = '"Listing ID","Listing Status","Dealer or Private","Dealer Name","Make","Model","Derivative","Year","Listed Price","Mileage","Location","Postcode","First Seen Date","Last Seen Date","Days Live","Advert URL"';
 
 type MarketFilterQuery = {
   eq(column: string, value: unknown): MarketFilterQuery;
@@ -147,7 +146,7 @@ async function loadAllFilteredRows(filters: MarketFilters, exactCount: number, s
 }
 
 async function loadSummaryAnalytics(filters: MarketFilters, exactFilteredCount: number) {
-  const rawRows = await loadAllFilteredRows(filters, exactFilteredCount, ANALYTICS_SELECT);
+  const rawRows = await loadAllFilteredRows(filters, exactFilteredCount);
   const normalized = rawRows.map((row, index) => normalizeMarketListing(row, index));
   return buildMarketAnalytics(normalized, exactFilteredCount, false);
 }
