@@ -63,7 +63,7 @@ function SignaturePad({ label, onChange }: { label: string; onChange: (value: st
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#ffffff";
+    ctx.strokeStyle = "#080c0f";
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
     emit();
@@ -89,6 +89,7 @@ export function PdiForm({ bike, initialChecklist = defaultPdiChecklist }: { bike
   const [customerSignature, setCustomerSignature] = useState("");
   const [completionConfirmed, setCompletionConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -100,12 +101,44 @@ export function PdiForm({ bike, initialChecklist = defaultPdiChecklist }: { bike
     setChecklist((rows) => rows.map((row) => ({ ...row, checked: true, result: "pass" })));
   }
 
+  function payload() {
+    return { checklist, technicianName, signatureDataUrl: technicianSignature, customerName, customerSignatureDataUrl: customerSignature };
+  }
+
+  async function printPdiPdf() {
+    setPreviewBusy(true); setError(""); setMessage("");
+    const previewWindow = window.open("", "_blank");
+    const response = await fetch(`/api/stock/${bike.id}/pdi/preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload()),
+    });
+    if (!response.ok) {
+      previewWindow?.close();
+      const body = await response.json().catch(() => ({ error: "Unable to generate PDI preview." }));
+      setError(body.error || "Unable to generate PDI preview.");
+      setPreviewBusy(false);
+      return;
+    }
+    const url = URL.createObjectURL(await response.blob());
+    if (previewWindow) previewWindow.location.href = url;
+    else {
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      link.click();
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    setPreviewBusy(false);
+  }
+
   async function completePdi() {
     setBusy(true); setError(""); setMessage("");
     const response = await fetch(`/api/stock/${bike.id}/pdi`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ checklist, technicianName, signatureDataUrl: technicianSignature, customerName, customerSignatureDataUrl: customerSignature, completionConfirmed }),
+      body: JSON.stringify({ ...payload(), completionConfirmed }),
     });
     const body = await response.json();
     if (response.ok) setMessage("PDI completed. PDF saved to stock attachments and workshop task marked complete.");
@@ -116,7 +149,7 @@ export function PdiForm({ bike, initialChecklist = defaultPdiChecklist }: { bike
   const rows = Math.max(...pdiSections.map((section) => checklist.filter((item) => item.section === section).length));
 
   return <div className="admin-page pdi-page yesmoto-pdi-page">
-    <div className="stock-editor-heading pdi-editor-heading"><div><Link href={`/admin/stock/${bike.id}`}>← Back to stock bike</Link><h1>Used bike PDI sheet</h1><p>{[bike.year, bike.make, bike.model, bike.registration].filter(Boolean).join(" · ")}</p></div><div className="pdi-actions"><button type="button" onClick={() => window.print()}>Print form</button><button type="button" onClick={tickAllChecks}>Tick all checks</button><button className="admin-primary" onClick={() => void completePdi()} disabled={busy}>{busy ? "Generating PDI..." : "Complete PDI"}</button></div></div>
+    <div className="stock-editor-heading pdi-editor-heading"><div><Link href={`/admin/stock/${bike.id}`}>← Back to stock bike</Link><h1>Used bike PDI sheet</h1><p>{[bike.year, bike.make, bike.model, bike.registration].filter(Boolean).join(" · ")}</p></div><div className="pdi-actions"><button type="button" onClick={() => void printPdiPdf()} disabled={previewBusy}>{previewBusy ? "Generating PDF..." : "Print PDF"}</button><button type="button" onClick={tickAllChecks}>Tick all checks</button><button className="admin-primary" onClick={() => void completePdi()} disabled={busy}>{busy ? "Generating PDI..." : "Complete PDI"}</button></div></div>
     {error && <p className="invoice-error">{error}</p>}{message && <p className="invoice-success">{message}</p>}
 
     <section className="pdi-paper">
