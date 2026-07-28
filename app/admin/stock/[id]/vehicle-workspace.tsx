@@ -6,13 +6,14 @@ import { useMemo, useState } from "react";
 import type { SupabaseStockBike } from "@/lib/stock-bike-types";
 import type { VehicleWorkspaceData } from "@/lib/vehicle-workspace";
 import { STOCK_STATUS, lifecycleRank } from "@/lib/statuses";
+import { StockAttachmentsCard } from "./stock-attachments-card";
 
 type Props = {
   bike: SupabaseStockBike;
   workspace: VehicleWorkspaceData;
 };
 
-type Tab = "overview" | "advert" | "sale" | "invoice" | "workflow" | "history";
+type Tab = "overview" | "jacket" | "advert" | "sale" | "invoice" | "workflow" | "history";
 type PendingAction = "cancelReservation" | "cancelSale" | "reopenSale" | null;
 
 export function VehicleWorkspace({ bike, workspace }: Props) {
@@ -30,17 +31,20 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
   const activeSale = workspace.activeSale;
   const latestInvoice = workspace.invoices[0];
   const latestDelivery = workspace.deliveries[0];
+  const [stockState, setStockState] = useState(bike);
   const selectedCustomer = workspace.customers.find(customer => customer.id === customerId);
-  const progress = lifecycleRank(activeSale?.status ?? bike.status);
-  const isComplete = [STOCK_STATUS.SALE_COMPLETED, "Completed"].includes(String(activeSale?.status ?? bike.status));
-  const advertRows = advertStatusRows(bike);
+  const progress = lifecycleRank(activeSale?.status ?? stockState.status);
+  const isComplete = [STOCK_STATUS.SALE_COMPLETED, "Completed"].includes(String(activeSale?.status ?? stockState.status));
+  const advertRows = advertStatusRows(stockState);
+  const intake = intakeMetrics(stockState);
+  const jacket = jacketRows(stockState);
 
   const kpis = useMemo(() => [
-    ["Status", String(activeSale?.status ?? bike.status ?? "Unknown")],
+    ["Status", String(activeSale?.status ?? stockState.status ?? "Unknown")],
     ["Customer", customerName(activeSale ?? activeReservation) || customerNameFromSelect(selectedCustomer) || "-"],
-    ["Invoice", latestInvoice ? `${latestInvoice.invoice_number ?? "Invoice"} - ${money(latestInvoice.balance)} due` : "Not created"],
-    ["Payments", money(workspace.payments.reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0))],
-  ], [activeReservation, activeSale, bike.status, latestInvoice, selectedCustomer, workspace.payments]);
+    ["Days in stock", `${intake.daysInStock} day${intake.daysInStock === 1 ? "" : "s"}`],
+    ["Expected margin", `${money(intake.expectedProfit)} (${intake.marginPercent == null ? "-" : `${intake.marginPercent.toFixed(1)}%`})`],
+  ], [activeReservation, activeSale, stockState.status, latestInvoice, selectedCustomer, workspace.payments, intake.daysInStock, intake.expectedProfit, intake.marginPercent]);
 
   async function run(action: string, payload: Record<string, unknown> = {}) {
     setBusy(action);
@@ -64,26 +68,43 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
     }
   }
 
-  const canReserve = !activeReservation && !activeSale && ["In Stock", "On Forecourt", "Available", "Prep"].includes(String(bike.status ?? ""));
-  const canStartSale = !activeReservation && !activeSale && !isComplete && ["In Stock", "On Forecourt", "Available", "Prep"].includes(String(bike.status ?? ""));
+  async function updateStock(updates: Record<string, unknown>) {
+    setBusy("stock-checklist");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/stock/${stockState.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) });
+      const result = await response.json() as { stock?: SupabaseStockBike; error?: string };
+      if (!response.ok || !result.stock) throw new Error(result.error || "Unable to update stock record.");
+      setStockState(result.stock);
+      setMessage("Stock checklist updated.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update stock record.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const canReserve = !activeReservation && !activeSale && ["In Stock", "On Forecourt", "Available", "Prep"].includes(String(stockState.status ?? ""));
+  const canStartSale = !activeReservation && !activeSale && !isComplete && ["In Stock", "On Forecourt", "Available", "Prep"].includes(String(stockState.status ?? ""));
 
   return <div className="admin-page dms-vehicle-workspace">
     <header className="dms-vehicle-hero">
       <div className="dms-vehicle-hero-media" style={{ backgroundImage: `url("${bike.primary_image_url || "/bike-placeholder.svg"}")` }} />
       <div>
         <Link href="/admin/stock" className="dms-vehicle-back">Back to Stock</Link>
-        <h1>{[bike.year, bike.make, bike.model, bike.variant].filter(Boolean).join(" ") || "Motorcycle"}</h1>
-        <p>{bike.registration || "Registration pending"} - {bike.stock_number || `Stock #${bike.id}`}</p>
+        <h1>{[stockState.year, stockState.make, stockState.model, stockState.variant].filter(Boolean).join(" ") || "Motorcycle"}</h1>
+        <p>{stockState.registration || "Registration pending"} - {stockState.stock_number || `Stock #${stockState.id}`}</p>
         <div className="dms-vehicle-stage">
           {["In Stock", "Reserved", "Sale Pending", "Sold", "Sale Completed"].map((stage, index) => <span className={index <= progress ? "done" : ""} key={stage}>{stage}</span>)}
         </div>
       </div>
       <nav>
-        {bike.show_on_website && <Link href={`/used-bikes/${bike.id}`} target="_blank">View Advert</Link>}
-        <Link href={`/admin/stock/${bike.id}?edit=1`}>Edit Advert</Link>
-        <Link href={`/admin/stock/${bike.id}?edit=1`}>Edit Stock</Link>
-        <Link href={`/admin/stock/${bike.id}/pdi`}>PDI</Link>
-        <Link href={`/admin/stock-ledger/${bike.id}`}>Stock Ledger</Link>
+        {stockState.show_on_website && <Link href={`/used-bikes/${stockState.id}`} target="_blank">View Advert</Link>}
+        <Link href={`/admin/stock/${stockState.id}?edit=1`}>Edit Advert</Link>
+        <Link href={`/admin/stock/${stockState.id}?edit=1`}>Edit Stock</Link>
+        <Link href={`/admin/stock/${stockState.id}/pdi`}>PDI</Link>
+        <Link href={`/admin/stock-ledger/${stockState.id}`}>Stock Ledger</Link>
         {activeSale && <Link href={`/admin/sales/${activeSale.id}`}>Open Sale</Link>}
         {latestInvoice && <Link href={`/admin/accounts/invoices/${latestInvoice.id}/document`} target="_blank">Open Invoice</Link>}
       </nav>
@@ -97,10 +118,21 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
     </section>
 
     <nav className="dms-vehicle-tabs">
-      {(["overview", "advert", "sale", "invoice", "workflow", "history"] as Tab[]).map(value => <button type="button" className={tab === value ? "active" : ""} onClick={() => setTab(value)} key={value}>{label(value)}</button>)}
+      {(["overview", "jacket", "advert", "sale", "invoice", "workflow", "history"] as Tab[]).map(value => <button type="button" className={tab === value ? "active" : ""} onClick={() => setTab(value)} key={value}>{label(value)}</button>)}
     </nav>
 
     {tab === "overview" && <section className="dms-vehicle-grid">
+      <section className="dms-vehicle-card dms-intake-summary-card">
+        <h2>Stock Intake Summary</h2>
+        <div className="dms-intake-meter"><i style={{ width: `${Math.min(100, jacket.completed / jacket.total * 100)}%` }} /></div>
+        <dl>
+          <div><dt>Purchase price</dt><dd>{money(stockState.purchase_price)}</dd></div>
+          <div><dt>Total cost basis</dt><dd>{money(intake.totalCost)}</dd></div>
+          <div><dt>Target retail</dt><dd>{money(stockState.target_retail_price ?? stockState.price)}</dd></div>
+          <div><dt>Expected profit</dt><dd>{money(intake.expectedProfit)}</dd></div>
+          <div><dt>Missing checks</dt><dd>{jacket.missing || "Complete"}</dd></div>
+        </dl>
+      </section>
       <ActionPanel title="Reserve Bike" disabled={!canReserve} disabledText="Bike is not available to reserve">
         <CustomerPicker customers={workspace.customers} value={customerId} onChange={setCustomerId} />
         <Field label="Deposit" value={deposit} onChange={setDeposit} type="number" />
@@ -116,19 +148,39 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
       <StatusPanel title="Current Sale" rows={activeSale ? saleRows(activeSale) : [["Sale", "None active"]]} />
     </section>}
 
+    {tab === "jacket" && <section className="dms-vehicle-jacket">
+      <section className="dms-vehicle-card dms-jacket-checklist">
+        <h2>Vehicle File</h2>
+        <p>Keep the purchase pack tight before the bike reaches the forecourt.</p>
+        <div className="dms-intake-meter"><i style={{ width: `${Math.min(100, jacket.completed / jacket.total * 100)}%` }} /></div>
+        <div className="dms-jacket-items">
+          {jacket.items.map(item => <label className={item.done ? "done" : ""} key={item.key}><input type="checkbox" checked={item.done} disabled={busy === "stock-checklist"} onChange={event => void updateStock({ [item.key]: event.target.checked })} /><span>{item.label}</span></label>)}
+          <label><span>Keys received</span><input type="number" min="0" value={stockState.keys_received ?? ""} disabled={busy === "stock-checklist"} onChange={event => void updateStock({ keys_received: event.target.value })} /></label>
+          <label><span>Engine number</span><input value={stockState.engine_number ?? ""} disabled={busy === "stock-checklist"} onChange={event => void updateStock({ engine_number: event.target.value })} /></label>
+        </div>
+      </section>
+      <section className="dms-vehicle-card dms-jacket-docs">
+        <h2>Required Documents</h2>
+        <dl>{documentRows(stockState).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>
+      </section>
+      <div className="dms-jacket-attachments">
+        <StockAttachmentsCard stockBikeId={String(stockState.id)} compact />
+      </div>
+    </section>}
+
     {tab === "advert" && <section className="dms-vehicle-grid">
       <section className="dms-vehicle-card dms-advert-card">
         <h2>Advert Control</h2>
         <p>{bike.show_on_website ? "This bike is published on the customer-facing website." : "This bike is currently hidden from the customer-facing website."}</p>
         <div className="dms-vehicle-actions">
-          {bike.show_on_website && <Link href={`/used-bikes/${bike.id}`} target="_blank">View Live Advert</Link>}
-          <Link href={`/admin/stock/${bike.id}?edit=1`}>Edit Advert Content</Link>
+          {stockState.show_on_website && <Link href={`/used-bikes/${stockState.id}`} target="_blank">View Live Advert</Link>}
+          <Link href={`/admin/stock/${stockState.id}?edit=1`}>Edit Advert Content</Link>
           <Link href={`/admin/settings?section=advert-templates`}>Advert Templates</Link>
         </div>
       </section>
       <StatusPanel title="Advert Readiness" rows={advertRows} />
-      <StatusPanel title="Bike Details" rows={bikeDetailRows(bike)} />
-      <StatusPanel title="Preparation" rows={prepRows(bike)} />
+      <StatusPanel title="Bike Details" rows={bikeDetailRows(stockState)} />
+      <StatusPanel title="Preparation" rows={prepRows(stockState)} />
     </section>}
 
     {tab === "sale" && <section className="dms-vehicle-grid">
@@ -194,7 +246,7 @@ function Field({ label, value, onChange, type = "text" }: { label: string; value
 }
 
 function label(tab: Tab) {
-  return ({ overview: "Overview", advert: "Advert", sale: "Sale", invoice: "Invoices", workflow: "Workflow", history: "History" } as Record<Tab, string>)[tab];
+  return ({ overview: "Overview", jacket: "Jacket", advert: "Advert", sale: "Sale", invoice: "Invoices", workflow: "Workflow", history: "History" } as Record<Tab, string>)[tab];
 }
 
 function pendingLabel(action: Exclude<PendingAction, null>) {
@@ -259,6 +311,50 @@ function prepRows(bike: SupabaseStockBike) {
     ["V5 received", yesNo(bike.v5_received)],
     ["Service history", yesNo(bike.service_history_received)],
     ["HPI complete", yesNo(bike.hpi_completed)],
+  ];
+}
+
+function intakeMetrics(bike: SupabaseStockBike) {
+  const purchase = Number(bike.purchase_price ?? 0);
+  const prep = Number(bike.estimated_preparation_cost ?? bike.actual_preparation_cost ?? 0);
+  const transport = Number(bike.estimated_transport_cost ?? bike.actual_transport_cost ?? 0);
+  const other = Number(bike.other_estimated_costs ?? bike.other_actual_costs ?? 0) + Number(bike.hpi_cost ?? 0) + Number(bike.workshop_cost ?? 0) + Number(bike.parts_cost ?? 0) + Number(bike.labour_cost ?? 0) + Number(bike.valeting_cost ?? 0) + Number(bike.photography_cost ?? 0) + Number(bike.miscellaneous_cost ?? 0);
+  const totalCost = Number(bike.total_stock_cost ?? 0) || purchase + prep + transport + other;
+  const retail = Number(bike.target_retail_price ?? bike.price ?? 0);
+  const expectedProfit = retail - totalCost;
+  const marginPercent = retail > 0 ? expectedProfit / retail * 100 : null;
+  const start = bike.date_in_stock || bike.purchase_date || bike.created_at;
+  const parsed = start ? new Date(start) : null;
+  const daysInStock = parsed && !Number.isNaN(parsed.getTime()) ? Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 86400000)) : 0;
+  return { totalCost, expectedProfit, marginPercent, daysInStock };
+}
+
+function jacketRows(bike: SupabaseStockBike) {
+  const items = [
+    { key: "v5_received", label: "V5/logbook seen", done: Boolean(bike.v5_received) },
+    { key: "service_history_received", label: "Service history received", done: Boolean(bike.service_history_received) },
+    { key: "hpi_completed", label: "HPI check completed", done: Boolean(bike.hpi_completed) },
+  ] as const;
+  const staticChecks = [
+    { label: "VIN recorded", done: Boolean(bike.vin) },
+    { label: "Engine number recorded", done: Boolean(bike.engine_number) },
+    { label: "Seller recorded", done: Boolean(bike.seller_name) },
+    { label: "Purchase price recorded", done: Number(bike.purchase_price ?? 0) > 0 },
+    { label: "Keys counted", done: Number(bike.keys_received ?? 0) > 0 },
+  ];
+  const completed = items.filter(item => item.done).length + staticChecks.filter(item => item.done).length;
+  const all = [...items.map(item => ({ label: item.label, done: item.done })), ...staticChecks];
+  return { items, completed, total: all.length, missing: all.filter(item => !item.done).map(item => item.label).join(", ") };
+}
+
+function documentRows(bike: SupabaseStockBike) {
+  return [
+    ["Purchase invoice", bike.purchase_price ? "Generated after book-in" : "Purchase details missing"],
+    ["V5/logbook", bike.v5_received ? "Received" : "Awaiting confirmation"],
+    ["HPI report", bike.hpi_completed ? "Complete" : "Required before sale"],
+    ["MOT certificate", bike.mot_expiry ? date(bike.mot_expiry) : "Check required"],
+    ["PDI form", bike.workshop_status === "PDI complete" ? "Complete" : "Open digital PDI"],
+    ["Service history", bike.service_history_received ? "Received" : "Not confirmed"],
   ];
 }
 

@@ -16,7 +16,7 @@ export default async function PurchaseDocument({ params }: { params: Promise<{ i
   const notes = String(d.purchase.notes ?? "");
 
   return <main className="invoice-document-page">
-    <PurchaseDocumentActions stockId={d.bike.id} />
+    <PurchaseDocumentActions stockId={d.bike.id} sellerEmail={supplierEmail} subject={`${d.documentNumber} - ${d.bikeName}`} />
     <article className="invoice-document purchase-document">
       <header><img src="/yesmoto-logo.png" alt={d.settings.business_name} /><div><span>Purchase invoice</span><h1>{d.documentNumber}</h1></div></header>
       <section className="invoice-document-meta"><div><small>Purchase date</small><b>{dateText(d.purchase.purchase_date)}</b></div><div><small>Stock number</small><b>{String(d.bike.stock_number ?? d.bike.id ?? "")}</b></div><div><small>Payment status</small><b>{String(d.purchase.payment_status ?? "unpaid").replaceAll("_", " ")}</b></div></section>

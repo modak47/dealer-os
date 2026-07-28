@@ -108,14 +108,24 @@ export function StockBookingForm() {
   }
 
   if (result) {
+    const bikeTitle = [form.year, form.make, form.model, form.variant].filter(Boolean).join(" ") || "Motorcycle";
+    const sellerEmail = String(form.seller_email ?? "");
+    const purchaseSubject = `${result.stock_number} purchase invoice - ${bikeTitle}`;
     return <section className="stock-booking-success">
       <span>Booked</span>
-      <h2>{result.stock_number}</h2>
-      <p>The motorcycle, purchase record, ledger entries and preparation workflow are connected.</p>
-      <div>
+      <h2>{result.stock_number} - {bikeTitle}</h2>
+      <p>The motorcycle, purchase record, ledger entries, preparation workflow and purchase paperwork are connected.</p>
+      <div className="stock-intake-summary">
+        <article><span>Seller</span><b>{String(form.seller_name ?? "Unknown seller")}</b><small>{sellerEmail || String(form.seller_phone ?? "") || "Contact not recorded"}</small></article>
+        <article><span>Purchase price</span><b>{money(Number(form.purchase_price ?? 0))}</b><small>{String(form.payment_status ?? "unpaid").replaceAll("_", " ")}</small></article>
+        <article><span>Target retail</span><b>{money(retail)}</b><small>Expected profit {money(estimatedProfit)}</small></article>
+        <article><span>Checks to complete</span><b>{["VIN/frame", "Engine no.", "V5", "HPI", "Signed invoice"].join(" / ")}</b><small>Finish these in the vehicle jacket.</small></article>
+      </div>
+      <div className="stock-booking-success-actions">
         <Link className="admin-primary" href={`/admin/stock/${result.stock_bike_id}`}>Open stock record</Link>
         {result.purchase_id && <Link href={`/admin/stock/purchases/${result.purchase_id}/document?print=1`} target="_blank">Print purchase invoice</Link>}
         {result.purchase_id && <Link href={`/admin/stock/purchases/${result.purchase_id}/document`} target="_blank">Open purchase invoice</Link>}
+        {sellerEmail && result.purchase_id && <a href={`mailto:${encodeURIComponent(sellerEmail)}?subject=${encodeURIComponent(purchaseSubject)}&body=${encodeURIComponent("Hi,\n\nPlease find the purchase invoice for your motorcycle attached.\n\nKind regards,\nYesMoto")}`}>Email seller</a>}
         <Link href="/workflow">Open workflow</Link>
         <Link href="/admin/stock-ledger">Stock ledger</Link>
         <button type="button" onClick={() => { setResult(null); setForm(current => ({ ...current, idempotency_key: crypto.randomUUID() })); }}>Book another motorcycle</button>
