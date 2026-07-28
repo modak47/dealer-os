@@ -114,6 +114,8 @@ export function StockBookingForm() {
       <p>The motorcycle, purchase record, ledger entries and preparation workflow are connected.</p>
       <div>
         <Link className="admin-primary" href={`/admin/stock/${result.stock_bike_id}`}>Open stock record</Link>
+        {result.purchase_id && <Link href={`/admin/stock/purchases/${result.purchase_id}/document?print=1`} target="_blank">Print purchase invoice</Link>}
+        {result.purchase_id && <Link href={`/admin/stock/purchases/${result.purchase_id}/document`} target="_blank">Open purchase invoice</Link>}
         <Link href="/workflow">Open workflow</Link>
         <Link href="/admin/stock-ledger">Stock ledger</Link>
         <button type="button" onClick={() => { setResult(null); setForm(current => ({ ...current, idempotency_key: crypto.randomUUID() })); }}>Book another motorcycle</button>
