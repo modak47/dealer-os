@@ -58,13 +58,27 @@ export function StockBookingForm() {
       const make = pickVehicleText(vehicle, "make", "display_name", "map_id");
       const model = pickVehicleText(vehicle, "model", "genericModel");
       const year = String(vehicle.year ?? vehicle.manufactureYear ?? "");
+      const vin = textValue(vehicle.vin);
+      const colour = textValue(vehicle.colour);
+      const fuel = textValue(vehicle.fuel ?? vehicle.fuelType);
+      const transmission = textValue(vehicle.transmission);
+      const engineCc = textValue(vehicle.engine_size ?? vehicle.engineCapacity);
+      const registrationDate = dateOnly(vehicle.firstRegistered ?? vehicle.registrationDate);
+      const motExpiry = dateOnly(vehicle.lastMOTExpiry ?? vehicle.motExpiryDate);
+      const lastMotMileage = textValue(vehicle.mileageLastMot);
+      const previousKeepers = textValue(vehicle.previousKeepersCount);
       if (make) update("make", make);
       if (model) update("model", model);
       if (year) update("year", year);
-      if (vehicle.colour) update("colour", String(vehicle.colour));
-      if (vehicle.fuelType) update("fuel", String(vehicle.fuelType));
-      if (vehicle.transmission) update("transmission", String(vehicle.transmission));
-      if (vehicle.engineCapacity) update("engine_cc", String(vehicle.engineCapacity));
+      if (vin) update("vin", vin.toUpperCase());
+      if (colour) update("colour", colour);
+      if (fuel) update("fuel", fuel);
+      if (transmission) update("transmission", transmission);
+      if (engineCc) update("engine_cc", engineCc);
+      if (registrationDate) update("registration_date", registrationDate);
+      if (motExpiry) update("mot_expiry", motExpiry);
+      if (lastMotMileage && !form.mileage) update("mileage", lastMotMileage);
+      if (previousKeepers) update("previous_owners", previousKeepers);
       setLookupMessage("Lookup completed. Check and correct the details before booking.");
     } catch (caught) {
       setLookupMessage(caught instanceof Error ? caught.message : "Lookup unavailable. Enter details manually.");
@@ -210,6 +224,16 @@ function pickVehicleText(vehicle: Record<string, unknown>, key: string, ...neste
     }
   }
   return "";
+}
+
+function textValue(value: unknown) {
+  return typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
+}
+
+function dateOnly(value: unknown) {
+  const text = textValue(value);
+  const match = text.match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : "";
 }
 
 const checkboxKeys = ["workshop_required", "pdi_required", "service_required", "mot_required", "diagnostic_required", "repair_required", "valet_required", "detail_required", "cosmetic_required", "photos_required", "video_required", "hpi_check_required", "documents_required", "spare_key_required", "transport_required"];
