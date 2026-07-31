@@ -1,6 +1,6 @@
 export const WEBSITE_LEAD_STATUSES = ["new", "reviewing", "contacted", "offer_made", "accepted", "declined", "purchased", "closed", "purchase_agreed", "purchase_cancelled", "referred_to_dealer"] as const;
 export const WEBSITE_VALUATION_STATUSES = ["pending", "in_progress", "valued", "offer_ready", "needs_review", "complete"] as const;
-export const WEBSITE_LEAD_SOURCES = ["bikebuyeruk", "sellyourmotorbike", "motorcyclebuyer"] as const;
+export const WEBSITE_LEAD_SOURCES = ["bikebuyeruk", "sellyourmotorbike", "motorcyclebuyer", "bike_buyer_uk", "sell_your_motorbike"] as const;
 
 export type WebsiteLeadStatus = typeof WEBSITE_LEAD_STATUSES[number];
 export type WebsiteValuationStatus = typeof WEBSITE_VALUATION_STATUSES[number] | string;
@@ -8,6 +8,10 @@ export type WebsiteLeadSource = typeof WEBSITE_LEAD_SOURCES[number] | string;
 
 export type WebsiteLead = {
   id: number;
+  public_id?: string | null;
+  external_submission_id?: string | null;
+  lead_source?: WebsiteLeadSource | null;
+  form_name?: string | null;
   owner: string | null;
   reg: string | null;
   make: string | null;
@@ -25,6 +29,8 @@ export type WebsiteLead = {
   mot: string | null;
   extras: string | null;
   price: string | null;
+  finance_information?: string | null;
+  customer_message?: string | null;
   fname: string | null;
   lname: string | null;
   email: string | null;
@@ -81,6 +87,11 @@ export type WebsiteLead = {
   offer_made_at: string | null;
   purchased_at: string | null;
   internal_notes: string | null;
+  raw_payload?: Record<string, unknown> | null;
+  consent_marketing?: boolean | null;
+  consent_terms?: boolean | null;
+  consent_source?: string | null;
+  submitted_at?: string | null;
   created_at: string | null;
   updated_at: string | null;
   resolved_images?: string[];
