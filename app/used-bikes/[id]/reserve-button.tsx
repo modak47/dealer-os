@@ -104,7 +104,7 @@ export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", l
 
   const modal = open ? <div className="reservation-modal reservation-builder-modal" role="dialog" aria-modal="true" aria-label={`Reserve ${bike}`} onMouseDown={event => { if (event.target === event.currentTarget) closeModal(); }}>
     <form onSubmit={submit}>
-      <header><div><span>SECURE ONLINE RESERVATION</span><h2>Reserve {bike}</h2><p>Build your reservation, choose any extras, then pay the {money(reservationFee)} reservation fee securely through Stripe.</p></div><button type="button" aria-label="Close" onClick={closeModal} disabled={busy}>x</button></header>
+      <header><div><span>SECURE ONLINE RESERVATION</span><h2>Reserve {bike}</h2><p>Build your reservation, choose any extras, then pay the {money(reservationFee)} reservation fee securely through Stripe.</p></div><button type="button" aria-label="Close" onClick={closeModal} disabled={busy}><CloseIcon /></button></header>
       <div className="reservation-progress">{steps.map((item, index) => <button type="button" key={item} className={index === step ? "active" : index < step ? "done" : ""} onClick={() => { if (index < step) setStep(index); }} disabled={busy || index > step}><b>{index + 1}</b><span>{item}</span></button>)}</div>
       {step === 0 && <section className="reservation-step reservation-details-step"><h3>Your details</h3><div className="reservation-form-grid"><label><span>First name</span><input value={firstName} onChange={event => setFirstName(event.target.value)} autoComplete="given-name" /></label><label><span>Last name</span><input value={lastName} onChange={event => setLastName(event.target.value)} autoComplete="family-name" /></label><label><span>Email</span><input value={email} onChange={event => setEmail(event.target.value)} type="email" autoComplete="email" /></label><label><span>Phone</span><input value={phone} onChange={event => setPhone(event.target.value)} type="tel" inputMode="tel" autoComplete="tel" /></label></div></section>}
       {step === 1 && <AddonStep title="Protect your investment" subtitle="Extend your warranty for extra peace of mind." addons={warranty} selected={selectedWarrantyId} onSelect={setSelectedWarranty} loading={addonsLoading} />}
@@ -121,6 +121,10 @@ export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", l
 
 function AddonStep({ title, subtitle, addons, selected, onSelect, loading }: { title: string; subtitle: string; addons: ReservationAddon[]; selected: string; onSelect: (id: string) => void; loading: boolean }) {
   return <section className="reservation-step"><h3>{title}</h3><p>{subtitle}</p>{loading ? <div className="reservation-option-loading">Loading options...</div> : <div className="reservation-option-grid">{addons.map(addon => <button type="button" key={addon.id} className={`${addon.id === selected ? "selected" : ""} ${addon.category}`} onClick={() => onSelect(addon.id)}><AddonArt addon={addon} />{addon.badge && <em>{addon.badge}</em>}<b>{addon.name}</b><small>{descriptionLead(addon.description)}</small><AddonBenefits description={addon.description} /><strong>{priceLabel(addon)}</strong></button>)}</div>}</section>;
+}
+
+function CloseIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M6 6l12 12M18 6 6 18" /></svg>;
 }
 
 function AddonBenefits({ description }: { description: string | null }) {
