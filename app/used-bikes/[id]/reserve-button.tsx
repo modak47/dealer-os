@@ -124,7 +124,7 @@ function AddonStep({ title, subtitle, addons, selected, onSelect, loading }: { t
 }
 
 function WarrantyStep({ addons, selected, onSelect, loading }: { addons: ReservationAddon[]; selected: string; onSelect: (id: string) => void; loading: boolean }) {
-  return <section className="reservation-step warranty-upgrade-step"><div className="warranty-step-hero"><span>Peace of mind. Every mile.</span><h3>Protect your <em>investment.</em></h3><p>Every YesMoto motorcycle includes Elite Warranty with FREE UK Roadside Assistance as standard. Extend your cover today and keep riding with complete confidence.</p></div>{loading ? <div className="reservation-option-loading">Loading warranty options...</div> : <div className="warranty-option-grid">{addons.map(addon => <WarrantyCard addon={addon} selected={addon.id === selected} onSelect={() => onSelect(addon.id)} key={addon.id} />)}</div>}<div className="warranty-feature-strip"><span>FREE Roadside Assistance</span><span>Any VAT Garage</span><span>£1,000 Claim Limit</span><span>£75 Per Hour Labour Rate</span><span>UK Wide Cover</span></div><p className="warranty-powered">Powered by <b>Warranty<span>First</span></b></p></section>;
+  return <section className="reservation-step warranty-upgrade-step"><div className="warranty-step-hero"><span>Peace of mind. Every mile.</span><h3>Protect your <em>investment.</em></h3><p>Every YesMoto motorcycle includes Elite Warranty with FREE UK Roadside Assistance as standard. Extend your cover today and keep riding with complete confidence.</p></div>{loading ? <div className="reservation-option-loading">Loading warranty options...</div> : <div className="warranty-option-grid">{addons.map(addon => <WarrantyCard addon={addon} selected={addon.id === selected} onSelect={() => onSelect(addon.id)} key={addon.id} />)}</div>}<WarrantyFeatureStrip /><p className="warranty-powered">Powered by <b>Warranty<span>First</span></b></p></section>;
 }
 
 function WarrantyCard({ addon, selected, onSelect }: { addon: ReservationAddon; selected: boolean; onSelect: () => void }) {
@@ -132,15 +132,41 @@ function WarrantyCard({ addon, selected, onSelect }: { addon: ReservationAddon; 
   const save = saveAmount(addon.badge);
   const was = save && Number(addon.price) > 0 ? Number(addon.price) + save : null;
   const monthly = Number(addon.price) > 0 ? Number(addon.price) / 10 : 0;
-  return <button type="button" className={`warranty-upgrade-card ${selected ? "selected" : ""} ${isIncluded ? "included" : ""}`} onClick={onSelect}>
+  return <button type="button" className={`warranty-upgrade-card ${selected ? "selected" : ""} ${isIncluded ? "selected included" : ""}`} onClick={onSelect}>
     {addon.badge && !isIncluded && <em>{addon.badge}</em>}
-    <AddonArt addon={addon} />
+    <WarrantyIcon addon={addon} />
     {isIncluded && <span className="warranty-included-label">Included</span>}
     <b>{warrantyTitle(addon)}</b>
     <small>{durationLabel(addon)}</small>
     <WarrantyBenefits description={addon.description} />
     {isIncluded ? <strong>Included as standard</strong> : <div className="warranty-price-panel">{was && <span>Was {money(was)}</span>}<strong>{money(Number(addon.price))}</strong><small>inc VAT</small><i>or</i><p>{save ? `Save ${money(save)}` : "Pay monthly"}<b>{money(monthly)} per month</b><span>for 10 months 0% interest with Bumper</span></p></div>}
   </button>;
+}
+
+const warrantyFeatures = [
+  ["truck", "FREE Roadside Assistance"],
+  ["garage", "Any VAT Garage"],
+  ["pound", "£1,000 Claim Limit"],
+  ["clock", "£75 Per Hour Labour Rate"],
+  ["map", "UK Wide Cover"],
+] as const;
+
+function WarrantyFeatureStrip() {
+  return <div className="warranty-feature-strip">{warrantyFeatures.map(([icon, label]) => <span key={label}><WarrantyFeatureIcon icon={icon} />{label}</span>)}</div>;
+}
+
+function WarrantyIcon({ addon }: { addon: ReservationAddon }) {
+  const key = `${addon.name} ${addon.icon ?? ""}`.toLowerCase();
+  const mark = Number(addon.price) === 0 ? "check" : key.includes("24") || key.includes("ultimate") || key.includes("crown") ? "double" : "plus";
+  return <span className="warranty-svg-icon" aria-hidden="true"><svg viewBox="0 0 64 64" focusable="false"><path className="shield" d="M32 5 52 13v17c0 13.5-8.4 23.3-20 29-11.6-5.7-20-15.5-20-29V13l20-8Z" />{mark === "check" && <path className="mark" d="m22 32 7 7 15-17" />}{mark === "plus" && <path className="mark" d="M32 21v22M21 32h22" />}{mark === "double" && <><path className="mark" d="M25 22v20M15 32h20" /><path className="mark" d="M43 22v20M33 32h20" /></>}</svg></span>;
+}
+
+function WarrantyFeatureIcon({ icon }: { icon: (typeof warrantyFeatures)[number][0] }) {
+  if (icon === "truck") return <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M7 30V14h24v16M31 20h7l4 6v4h-5M14 34a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm22 0a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM18 30h14" /></svg>;
+  if (icon === "garage") return <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 23 24 10l18 13M12 21v19h24V21M17 40V27h14v13M17 32h14" /></svg>;
+  if (icon === "pound") return <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="18" /><path d="M29 16c-6-3-12 0-10 8l2 8-5 1h15M17 25h10" /></svg>;
+  if (icon === "clock") return <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="25" r="17" /><path d="M24 13v13l9 5M18 5h12" /></svg>;
+  return <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 8 7 13v27l11-5 12 5 11-5V8L30 13 18 8Zm0 0v27m12-22v27" /></svg>;
 }
 
 function CloseIcon() {
