@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 const imageKey=(value:string)=>{try{const url=new URL(value);return `${url.origin}${url.pathname}`.toLowerCase()}catch{return value.split("?")[0].toLowerCase()}};
 function GalleryChevron({direction}:{direction:"previous"|"next"}){
-  const path=direction==="previous"?"M15 18l-6-6 6-6":"M9 6l6 6-6 6";
+  const path=direction==="previous"?"M19 12H5m0 0 6-6m-6 6 6 6":"M5 12h14m0 0-6-6m6 6-6 6";
   return <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d={path}/></svg>;
 }
 export function BikeGallery({images,alt}:{images:string[];alt:string}){
