@@ -74,7 +74,7 @@ export function WebsitePagesEditor({ initialPages, migrationReady }: { initialPa
     setSaving(true);
     setMessage("");
     try {
-      const cleanSections = draft.body_sections.filter(section => section.heading.trim() || section.body.trim());
+      const cleanSections = draft.slug === "home" ? draft.body_sections : draft.body_sections.filter(section => section.heading.trim() || section.body.trim());
       const response = await fetch("/api/website-pages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...draft, body_sections: cleanSections }) });
       const result = await response.json() as { page?: WebsitePage; error?: string };
       if (!response.ok || !result.page) throw new Error(result.error || "Unable to save page.");
@@ -116,14 +116,50 @@ export function WebsitePagesEditor({ initialPages, migrationReady }: { initialPa
         <label className="website-checkbox"><input type="checkbox" checked={draft.show_in_footer} onChange={event => update("show_in_footer", event.target.checked)} /> Show in footer</label>
       </div>
       <div className="website-section-editor">
+        {draft.slug === "home" ? <HomepageSectionEditor sections={draft.body_sections} onChange={sections => update("body_sections", sections)} /> : <>
         <div className="panel-title"><h2>Managed page sections</h2><button type="button" onClick={() => update("body_sections", [...draft.body_sections, emptySection()])}>Add section</button></div>
         {draft.body_sections.map((section, index) => <article key={index}>
           <label><span>Heading</span><input value={section.heading} onChange={event => updateSection(index, { heading: event.target.value })} /></label>
           <label><span>Body</span><textarea rows={5} value={section.body} onChange={event => updateSection(index, { body: event.target.value })} /></label>
           <div><label><span>CTA label</span><input value={section.cta_label ?? ""} onChange={event => updateSection(index, { cta_label: event.target.value })} /></label><label><span>CTA link</span><input value={section.cta_href ?? ""} onChange={event => updateSection(index, { cta_href: event.target.value })} /></label></div>
           <button type="button" onClick={() => update("body_sections", draft.body_sections.filter((_, i) => i !== index))}>Remove section</button>
-        </article>)}
+        </article>)}</>}
       </div>
     </section>
   </div>;
+}
+
+function HomepageSectionEditor({ sections, onChange }: { sections: WebsitePageSection[]; onChange: (sections: WebsitePageSection[]) => void }) {
+  function updateSection(index: number, value: Partial<WebsitePageSection>) {
+    onChange(sections.map((section, i) => i === index ? { ...section, ...value } : section));
+  }
+  function updateItem(sectionIndex: number, itemIndex: number, value: Partial<WebsitePageSection>) {
+    onChange(sections.map((section, i) => i === sectionIndex ? { ...section, items: (section.items ?? []).map((item, j) => j === itemIndex ? { ...item, ...value } : item) } : section));
+  }
+  return <>
+    <div className="panel-title"><h2>Homepage content sections</h2><span>Edit the homepage copy, cards, images and buttons.</span></div>
+    {sections.map((section, index) => <article className="homepage-section-editor" key={section.key ?? index}>
+      <div className="homepage-section-title"><div><b>{sectionLabel(section)}</b><span>{section.key}</span></div><label><input type="checkbox" checked={section.enabled !== false} onChange={event => updateSection(index, { enabled: event.target.checked })} /> Enabled</label></div>
+      <div className="stock-form-grid compact">
+        <label><span>Eyebrow / kicker</span><input value={section.kicker ?? ""} onChange={event => updateSection(index, { kicker: event.target.value })} /></label>
+        <label><span>Heading</span><input value={section.heading} onChange={event => updateSection(index, { heading: event.target.value })} /></label>
+        <label className="full"><span>Subtitle / intro</span><textarea rows={2} value={section.subtitle ?? section.body ?? ""} onChange={event => updateSection(index, section.key === "why_yesmoto" ? { body: event.target.value } : { subtitle: event.target.value })} /></label>
+        <label><span>Button text</span><input value={section.cta_label ?? ""} onChange={event => updateSection(index, { cta_label: event.target.value })} /></label>
+        <label><span>Button link</span><input value={section.cta_href ?? ""} onChange={event => updateSection(index, { cta_href: event.target.value })} /></label>
+      </div>
+      {!!section.items?.length && <div className="homepage-card-editor">{section.items.map((item, itemIndex) => <section key={`${item.heading}-${itemIndex}`}>
+        <div><b>Card {itemIndex + 1}</b><label><input type="checkbox" checked={item.enabled !== false} onChange={event => updateItem(index, itemIndex, { enabled: event.target.checked })} /> Enabled</label></div>
+        <label><span>Eyebrow</span><input value={item.kicker ?? ""} onChange={event => updateItem(index, itemIndex, { kicker: event.target.value })} /></label>
+        <label><span>Heading</span><input value={item.heading} onChange={event => updateItem(index, itemIndex, { heading: event.target.value })} /></label>
+        <label><span>Text</span><textarea rows={3} value={item.body} onChange={event => updateItem(index, itemIndex, { body: event.target.value })} /></label>
+        <label><span>Image URL</span><input value={item.image_url ?? ""} onChange={event => updateItem(index, itemIndex, { image_url: event.target.value })} /></label>
+        <label><span>Image position</span><input value={item.image_position ?? ""} onChange={event => updateItem(index, itemIndex, { image_position: event.target.value })} placeholder="center 50%" /></label>
+        <div><label><span>CTA label</span><input value={item.cta_label ?? ""} onChange={event => updateItem(index, itemIndex, { cta_label: event.target.value })} /></label><label><span>CTA link</span><input value={item.cta_href ?? ""} onChange={event => updateItem(index, itemIndex, { cta_href: event.target.value })} /></label></div>
+      </section>)}</div>}
+    </article>)}
+  </>;
+}
+
+function sectionLabel(section: WebsitePageSection) {
+  return section.heading || section.kicker || section.key || "Homepage section";
 }
