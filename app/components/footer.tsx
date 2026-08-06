@@ -19,7 +19,7 @@ export async function Footer() {
       <div><h3>Get in touch</h3><p><a href={phoneHref}>{phone}</a><br /><a href={`mailto:${email}`}>{email}</a><br />{dealerAddress(settings)}<br />{settings.opening_hours}</p><Link href="/contact">Contact {settings.business_name}</Link></div>
     </div>
     <div className="wide copyright">© 2026 {settings.legal_name || settings.trading_name} <span>{settings.website}</span><span>Privacy · Cookies · Terms</span></div>
-    <a className="floating-whatsapp" href={whatsappHref} target="_blank" rel="noreferrer" aria-label={`Chat with ${settings.business_name} on WhatsApp`}><WhatsAppIcon /><span>WhatsApp</span></a>
+    <a className="floating-whatsapp" href={whatsappHref} target="_blank" rel="noreferrer" aria-label="Contact YesMoto on WhatsApp" title="Contact us on WhatsApp"><WhatsAppIcon /></a>
   </footer>;
 }
 
