@@ -14,11 +14,14 @@ export async function POST(request:Request){try{
   if(existing)return NextResponse.json({invoice_id:existing.id,existing:true});
   const customer=Array.isArray(r.customer)?r.customer[0]:r.customer;const bike=Array.isArray(r.bike)?r.bike[0]:r.bike;
   const {data:number,error:numberError}=await db.rpc("crm_next_invoice_number");if(numberError)throw numberError;
-  const delivery=Math.max(0,Number(body.delivery_charge??r.delivery_charge??0));const price=Math.max(0,Number(bike?.price??0));
-  const {data:invoice,error}=await db.from("crm_invoices").insert({invoice_number:number,sale_id:null,reservation_id:r.id,customer_id:r.customer_id,stock_bike_id:r.stock_bike_id,subtotal:price+delivery,total:price+delivery,paid:0,balance:price+delivery,status:"draft",due_at:body.due_at||new Date(Date.now()+settings.payment_terms_days*86400000).toISOString(),delivery_charge:delivery,customer_snapshot:customer??{},bike_snapshot:bike??{}}).select("id").single();
+  const {data:extras,error:extrasError}=await db.from("reservation_addon_selections").select("category,name_snapshot,price_snapshot,quantity").eq("reservation_id",r.id).order("created_at");
+  if(extrasError&&!["42P01","42703"].includes(extrasError.code??""))throw extrasError;
+  const addonItems=(extras??[]).map((item,index)=>({invoice_id:"",description:String(item.name_snapshot),quantity:Number(item.quantity??1),unit_price:Number(item.price_snapshot??0),item_type:String(item.category??"addon"),sort_order:10+index}));
+  const legacyDelivery=Math.max(0,Number(body.delivery_charge??r.delivery_charge??0));const extrasTotal=addonItems.reduce((sum,item)=>sum+item.quantity*item.unit_price,0);const delivery=addonItems.some(item=>item.item_type==="delivery")?0:legacyDelivery;const price=Math.max(0,Number(bike?.price??0));const total=price+extrasTotal+delivery;
+  const {data:invoice,error}=await db.from("crm_invoices").insert({invoice_number:number,sale_id:null,reservation_id:r.id,customer_id:r.customer_id,stock_bike_id:r.stock_bike_id,subtotal:total,total,paid:0,balance:total,status:"draft",due_at:body.due_at||new Date(Date.now()+settings.payment_terms_days*86400000).toISOString(),delivery_charge:delivery,customer_snapshot:customer??{},bike_snapshot:bike??{}}).select("id").single();
   if(error)throw error;
   const bikeName=[bike?.year,bike?.make,bike?.model,bike?.variant,bike?.registration&&`(${bike.registration})`].filter(Boolean).join(" ");
-  const items=[{invoice_id:invoice.id,description:bikeName||"Motorcycle",quantity:1,unit_price:price,item_type:"motorcycle",sort_order:0},...(delivery>0?[{invoice_id:invoice.id,description:"Motorcycle delivery",quantity:1,unit_price:delivery,item_type:"delivery",sort_order:10}]:[])];
+  const items=[{invoice_id:invoice.id,description:bikeName||"Motorcycle",quantity:1,unit_price:price,item_type:"motorcycle",sort_order:0},...addonItems.map(item=>({...item,invoice_id:invoice.id})),...(delivery>0?[{invoice_id:invoice.id,description:"Motorcycle delivery",quantity:1,unit_price:delivery,item_type:"delivery",sort_order:100}]:[])];
   const {error:itemError}=await db.from("crm_invoice_items").insert(items);if(itemError)throw itemError;
   await db.from("crm_payments").update({invoice_id:invoice.id}).eq("reservation_id",r.id).eq("status","Completed");
   await db.rpc("crm_refresh_invoice",{p_invoice_id:invoice.id});

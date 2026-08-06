@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cleanEmail, cleanPhone, cleanText, stockId } from "@/lib/crm-validation";
+import { getReservationAddonSnapshots } from "@/lib/reservation-addons";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getStripe, reservationAmountPence } from "@/lib/stripe";
 
@@ -16,12 +17,14 @@ export async function POST(request: Request) {
     if(!validation.emailValid)throw new Error("Enter a valid email address.");
     if(!validation.phoneValid)throw new Error("Enter a valid phone number, for example +447904443965.");
     if(!validation.acceptedTerms)throw new Error("Please accept the reservation terms.");
+    const addonIds = Array.isArray(body.addon_ids) ? body.addon_ids.map(value => cleanText(value, 80)).filter(Boolean) : [];
     const db = getSupabaseAdmin();
+    const selectedAddons = await getReservationAddonSnapshots(addonIds);
     const { data: bike, error: bikeError } = await db.from("stock_bikes").select("id,make,model,variant,year,registration,status,price,reserve_enabled,show_on_website").eq("id", bikeId).maybeSingle();
     if (bikeError) throw bikeError; if (!bike) throw new Error("Motorcycle not found.");
     if (!["in stock", "on forecourt", "available"].includes(String(bike.status).toLowerCase()) || bike.reserve_enabled === false) throw new Error("This motorcycle is no longer available to reserve.");
     const amount = reservationAmountPence(); const expiresAt = new Date(Date.now() + 31 * 60 * 1000);
-    const pending = await db.from("stripe_reservation_checkouts").insert({ stock_bike_id: bike.id, amount_pence: amount, status: "Pending", customer_first_name: firstName, customer_last_name: lastName, customer_email: email, customer_phone: phone, expires_at: expiresAt.toISOString() }).select("id").single();
+    const pending = await db.from("stripe_reservation_checkouts").insert({ stock_bike_id: bike.id, amount_pence: amount, status: "Pending", customer_first_name: firstName, customer_last_name: lastName, customer_email: email, customer_phone: phone, expires_at: expiresAt.toISOString(), selected_addons: selectedAddons }).select("id").single();
     if (pending.error) { if (pending.error.code === "23505") throw new Error("Another customer is currently reserving this motorcycle. Please contact us if you need help."); throw pending.error; }
     const createdCheckoutId = String(pending.data.id); checkoutId = createdCheckoutId;
     const stripe = getStripe(); const origin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin).replace(/\/$/, "");

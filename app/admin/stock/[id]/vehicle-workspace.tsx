@@ -44,7 +44,7 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
     ["Customer", customerName(activeSale ?? activeReservation) || customerNameFromSelect(selectedCustomer) || "-"],
     ["Days in stock", `${intake.daysInStock} day${intake.daysInStock === 1 ? "" : "s"}`],
     ["Expected margin", `${money(intake.expectedProfit)} (${intake.marginPercent == null ? "-" : `${intake.marginPercent.toFixed(1)}%`})`],
-  ], [activeReservation, activeSale, stockState.status, latestInvoice, selectedCustomer, workspace.payments, intake.daysInStock, intake.expectedProfit, intake.marginPercent]);
+  ], [activeReservation, activeSale, stockState.status, selectedCustomer, intake.daysInStock, intake.expectedProfit, intake.marginPercent]);
 
   async function run(action: string, payload: Record<string, unknown> = {}) {
     setBusy(action);
@@ -263,7 +263,9 @@ function customerNameFromSelect(customer?: VehicleWorkspaceData["customers"][num
 }
 
 function reservationRows(record: Record<string, unknown>) {
-  return [["Status", String(record.status ?? "-")], ["Customer", customerName(record)], ["Deposit", money(record.deposit_amount)], ["Expires", date(record.expires_at)]];
+  const extras = Array.isArray(record.selected_extras) ? record.selected_extras as Record<string, unknown>[] : [];
+  const extrasTotal = extras.reduce((sum, item) => sum + Number(item.price_snapshot ?? 0) * Number(item.quantity ?? 1), 0);
+  return [["Status", String(record.status ?? "-")], ["Customer", customerName(record)], ["Reservation paid", money(record.deposit_amount)], ["Selected extras", extras.length ? extras.map(item => `${String(item.name_snapshot)} ${money(item.price_snapshot)}`).join(", ") : "-"], ["Extras total", money(extrasTotal)], ["Expires", date(record.expires_at)]];
 }
 
 function saleRows(record: Record<string, unknown>) {

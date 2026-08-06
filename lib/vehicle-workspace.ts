@@ -15,6 +15,15 @@ export type VehicleWorkspaceData = {
   migrationReady: boolean;
 };
 
+type AddonSelectionRow = {
+  id: string;
+  reservation_id: string;
+  category: string;
+  name_snapshot: string;
+  price_snapshot: number;
+  quantity: number;
+};
+
 export async function getVehicleWorkspace(stockBikeId: number): Promise<VehicleWorkspaceData> {
   const db = getSupabaseAdmin();
   const [
@@ -43,6 +52,14 @@ export async function getVehicleWorkspace(stockBikeId: number): Promise<VehicleW
 
   const reservationRows = (reservations.data ?? []) as Record<string, unknown>[];
   const saleRows = (sales.data ?? []) as Record<string, unknown>[];
+  if (reservationRows.length) {
+    const reservationIds = reservationRows.map(row => String(row.id)).filter(Boolean);
+    const selections = await db.from("reservation_addon_selections").select("id,reservation_id,category,name_snapshot,price_snapshot,quantity").in("reservation_id", reservationIds).order("created_at");
+    if (selections.error && !["42P01", "42703"].includes(selections.error.code ?? "")) throw selections.error;
+    const byReservation = new Map<string, AddonSelectionRow[]>();
+    for (const selection of (selections.data ?? []) as AddonSelectionRow[]) byReservation.set(selection.reservation_id, [...(byReservation.get(selection.reservation_id) ?? []), selection]);
+    for (const row of reservationRows) row.selected_extras = byReservation.get(String(row.id)) ?? [];
+  }
 
   return {
     reservations: reservationRows,
