@@ -25,3 +25,20 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
     return NextResponse.json({stock:normalizeSupabaseStockBike(data as SupabaseStockBike)});
   }catch(error){console.error("Invalid stock update request",error);return NextResponse.json({error:"Invalid stock data."},{status:400})}
 }
+
+export async function DELETE(_request:Request,{params}:{params:Promise<{id:string}>}){
+  try{
+    const {id}=await params;
+    const db=getSupabaseAdmin();
+    const {data:bike,error:loadError}=await db.from("stock_bikes").select("id,make,model,registration,status").eq("id",id).maybeSingle();
+    if(loadError){console.error("Unable to validate stock bike delete",loadError);return NextResponse.json({error:"Unable to validate stock bike."},{status:500})}
+    if(!bike)return NextResponse.json({error:"Stock bike not found."},{status:404});
+    const {error}=await db.from("stock_bikes").delete().eq("id",id);
+    if(error){
+      console.error("Unable to delete stock bike",error);
+      const linked=/foreign key|violates|restrict|still referenced/i.test(`${error.message} ${error.details??""}`);
+      return NextResponse.json({error:linked?"This stock record is linked to sales, reservations, payments, collections or other history, so it cannot be deleted. Change the status instead.":`Unable to delete stock bike: ${error.message}`},{status:linked?409:500});
+    }
+    return NextResponse.json({success:true});
+  }catch(error){console.error("Invalid stock delete request",error);return NextResponse.json({error:"Unable to delete stock bike."},{status:500})}
+}
