@@ -53,6 +53,12 @@ export type OpportunityPatch = Partial<UserManagedOpportunityFields>;
 export type ScannerStatus = {
   last_run: string;
   opportunity_count: number;
+  job_name?: string;
+  last_started?: string | null;
+  last_finished?: string | null;
+  status?: "unknown" | "running" | "success" | "failed";
+  duration_ms?: number | null;
+  last_error?: string | null;
 };
 
 export type OpportunityActivity = {

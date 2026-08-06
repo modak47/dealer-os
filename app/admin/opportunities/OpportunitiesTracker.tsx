@@ -115,7 +115,7 @@ export default function OpportunitiesTracker({
     [],
   );
 
-  async function refreshScannerData() {
+  const refreshScannerData = useCallback(async () => {
     const [opportunitiesResponse, statusResponse] = await Promise.all([
       fetch("/api/opportunities", { cache: "no-store" }),
       fetch("/api/scanner-status", { cache: "no-store" }),
@@ -129,7 +129,21 @@ export default function OpportunitiesTracker({
     if (statusResponse.ok) {
       setScannerStatus((await statusResponse.json()) as ScannerStatus);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void refreshScannerData().catch((refreshError: unknown) =>
+        setError(
+          refreshError instanceof Error
+            ? refreshError.message
+            : "Unable to refresh opportunities",
+        ),
+      );
+    }, 60_000);
+
+    return () => window.clearInterval(interval);
+  }, [refreshScannerData]);
 
   async function runScan() {
     setScanning(true);
@@ -300,6 +314,15 @@ export default function OpportunitiesTracker({
   const selectedOpportunity = opportunities.find(
     (opportunity) => opportunity["Listing ID"] === selectedListingId,
   );
+  const lastFinished = scannerStatus?.last_finished ?? scannerStatus?.last_run ?? null;
+  const lastStarted = scannerStatus?.last_started ?? null;
+  const durationSeconds =
+    typeof scannerStatus?.duration_ms === "number"
+      ? `${Math.round(scannerStatus.duration_ms / 1000)}s`
+      : "Unknown";
+  const statusLabel = scannerStatus?.status
+    ? scannerStatus.status.charAt(0).toUpperCase() + scannerStatus.status.slice(1)
+    : "Unknown";
 
   return (
     <main className="dealer-module min-h-screen text-white">
@@ -309,7 +332,7 @@ export default function OpportunitiesTracker({
             <h1 className="text-3xl font-bold md:text-4xl">Buying Opportunities</h1>
             {scannerStatus && (
               <p className="mt-2 text-sm text-gray-400">
-                Last Scan: {new Date(scannerStatus.last_run).toLocaleString("en-GB")} •{" "}
+                Last Scan: {lastFinished ? new Date(lastFinished).toLocaleString("en-GB") : "Unknown"} •{" "}
                 {scannerStatus.opportunity_count} Opportunities
               </p>
             )}
@@ -341,6 +364,20 @@ export default function OpportunitiesTracker({
           <KpiCard title="Avg Score" value={stats.avgScore.toFixed(0)} />
           <KpiCard title="Total Potential Profit" value={formatMoney(stats.totalProfit)} />
         </section>
+
+        {scannerStatus && (
+          <section className="mb-6 grid gap-3 rounded-xl border border-gray-800 bg-[#111111] p-4 md:grid-cols-4" aria-label="Opportunity scanner status">
+            <KpiCard title="Scanner Status" value={statusLabel} />
+            <KpiCard title="Last Started" value={lastStarted ? new Date(lastStarted).toLocaleString("en-GB") : "Unknown"} />
+            <KpiCard title="Last Finished" value={lastFinished ? new Date(lastFinished).toLocaleString("en-GB") : "Unknown"} />
+            <KpiCard title="Duration" value={durationSeconds} />
+            {scannerStatus.last_error && (
+              <p className="md:col-span-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                {scannerStatus.last_error}
+              </p>
+            )}
+          </section>
+        )}
 
         <section className="mb-8 rounded-xl border border-gray-800 bg-[#111111] p-4" aria-label="Opportunity filters">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

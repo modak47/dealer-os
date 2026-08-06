@@ -2,8 +2,10 @@ import requests
 import statistics
 import time
 import os
+import atexit
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 from pathlib import Path
 from urllib.parse import urlparse
@@ -45,6 +47,59 @@ supabase = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
 )
+
+AUTOMATION_JOB_NAME = "opportunity_scanner"
+def utc_timestamp():
+    return datetime.now(timezone.utc).isoformat()
+
+
+SCAN_STARTED_AT = utc_timestamp()
+SCAN_STARTED_MONOTONIC = time.monotonic()
+scan_completed = False
+
+
+def update_automation_job(status, last_error=None):
+    try:
+        payload = {
+            "job_name": AUTOMATION_JOB_NAME,
+            "status": status,
+            "updated_at": utc_timestamp(),
+        }
+
+        if status == "running":
+            payload.update({
+                "last_started": SCAN_STARTED_AT,
+                "last_error": None,
+                "duration_ms": None,
+            })
+        else:
+            payload.update({
+                "last_finished": utc_timestamp(),
+                "duration_ms": int((time.monotonic() - SCAN_STARTED_MONOTONIC) * 1000),
+                "last_error": last_error,
+            })
+
+        supabase.table("automation_jobs").upsert(
+            payload,
+            on_conflict="job_name"
+        ).execute()
+    except Exception as status_error:
+        print(f"WARNING: Could not update automation job status: {status_error}")
+
+
+def mark_scan_failed_if_needed():
+    if scan_completed:
+        return
+
+    error_type, error, _ = sys.exc_info()
+    if error_type is None:
+        return
+
+    update_automation_job("failed", str(error))
+
+
+atexit.register(mark_scan_failed_if_needed)
+update_automation_job("running")
 
 SOURCE_COLUMNS = ",".join([
     '"Listing ID"',
@@ -942,6 +997,9 @@ print(f"Current active opportunities: {remaining_opportunity_count}")
 
 supabase.table("scanner_status").upsert({
     "id": 1,
-    "last_run": datetime.now().isoformat(),
+    "last_run": utc_timestamp(),
     "opportunity_count": remaining_opportunity_count
 }).execute()
+
+update_automation_job("success")
+scan_completed = True
