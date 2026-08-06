@@ -120,7 +120,7 @@ export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", l
 }
 
 function AddonStep({ title, subtitle, addons, selected, onSelect, loading }: { title: string; subtitle: string; addons: ReservationAddon[]; selected: string; onSelect: (id: string) => void; loading: boolean }) {
-  return <section className="reservation-step"><h3>{title}</h3><p>{subtitle}</p>{loading ? <div className="reservation-option-loading">Loading options...</div> : <div className="reservation-option-grid">{addons.map(addon => <button type="button" key={addon.id} className={addon.id === selected ? "selected" : ""} onClick={() => onSelect(addon.id)}><span className="reservation-option-icon">{icon(addon.icon)}</span>{addon.badge && <em>{addon.badge}</em>}<b>{addon.name}</b><small>{descriptionLead(addon.description)}</small><AddonBenefits description={addon.description} /><strong>{priceLabel(addon)}</strong></button>)}</div>}</section>;
+  return <section className="reservation-step"><h3>{title}</h3><p>{subtitle}</p>{loading ? <div className="reservation-option-loading">Loading options...</div> : <div className="reservation-option-grid">{addons.map(addon => <button type="button" key={addon.id} className={`${addon.id === selected ? "selected" : ""} ${addon.category}`} onClick={() => onSelect(addon.id)}><AddonArt addon={addon} />{addon.badge && <em>{addon.badge}</em>}<b>{addon.name}</b><small>{descriptionLead(addon.description)}</small><AddonBenefits description={addon.description} /><strong>{priceLabel(addon)}</strong></button>)}</div>}</section>;
 }
 
 function AddonBenefits({ description }: { description: string | null }) {
@@ -141,6 +141,13 @@ function priceLabel(addon: ReservationAddon) {
   return `+${money(Number(addon.price))}`;
 }
 
-function icon(name: string | null) {
-  return ({ shield: "S", star: "*", crown: "U", store: "C", truck: "D", map: "N" } as Record<string, string>)[name ?? ""] ?? "+";
+function AddonArt({ addon }: { addon: ReservationAddon }) {
+  const key = `${addon.category} ${addon.name} ${addon.icon ?? ""}`.toLowerCase();
+  if (addon.category === "delivery") {
+    if (key.includes("nationwide") || key.includes("map")) return <span className="reservation-card-art delivery-art nationwide"><i /><b /><small /></span>;
+    if (key.includes("local") || key.includes("truck")) return <span className="reservation-card-art delivery-art local"><i /><b /><small /></span>;
+    return <span className="reservation-card-art collection-art"><i /><b /><small /></span>;
+  }
+  const level = key.includes("ultimate") || key.includes("gold") || key.includes("crown") ? "ultimate" : key.includes("plus") || key.includes("silver") || key.includes("star") ? "plus" : key.includes("essential") || key.includes("bronze") ? "essential" : "standard";
+  return <span className={`reservation-card-art warranty-art ${level}`}><i /><b /><small /></span>;
 }
