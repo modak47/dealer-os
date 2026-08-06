@@ -107,7 +107,7 @@ export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", l
       <header><div><span>SECURE ONLINE RESERVATION</span><h2>Reserve {bike}</h2><p>Build your reservation, choose any extras, then pay the {money(reservationFee)} reservation fee securely through Stripe.</p></div><button type="button" aria-label="Close" onClick={closeModal} disabled={busy}><CloseIcon /></button></header>
       <div className="reservation-progress">{steps.map((item, index) => <button type="button" key={item} className={index === step ? "active" : index < step ? "done" : ""} onClick={() => { if (index < step) setStep(index); }} disabled={busy || index > step}><b>{index + 1}</b><span>{item}</span></button>)}</div>
       {step === 0 && <section className="reservation-step reservation-details-step"><h3>Your details</h3><div className="reservation-form-grid"><label><span>First name</span><input value={firstName} onChange={event => setFirstName(event.target.value)} autoComplete="given-name" /></label><label><span>Last name</span><input value={lastName} onChange={event => setLastName(event.target.value)} autoComplete="family-name" /></label><label><span>Email</span><input value={email} onChange={event => setEmail(event.target.value)} type="email" autoComplete="email" /></label><label><span>Phone</span><input value={phone} onChange={event => setPhone(event.target.value)} type="tel" inputMode="tel" autoComplete="tel" /></label></div></section>}
-      {step === 1 && <AddonStep title="Protect your investment" subtitle="Extend your warranty for extra peace of mind." addons={warranty} selected={selectedWarrantyId} onSelect={setSelectedWarranty} loading={addonsLoading} />}
+      {step === 1 && <WarrantyStep addons={warranty} selected={selectedWarrantyId} onSelect={setSelectedWarranty} loading={addonsLoading} />}
       {step === 2 && <AddonStep title="Delivery Options" subtitle="Choose how you would like to receive your motorcycle." addons={delivery} selected={selectedDeliveryId} onSelect={setSelectedDelivery} loading={addonsLoading} />}
       {step === 3 && <section className="reservation-step reservation-review-step"><h3>Order summary</h3><div className="reservation-summary"><SummaryRow label={bike} value={money(Number(price || 0))} /><SummaryRow label="Reservation Fee" value={`${money(reservationFee)} Today`} highlight />{selectedAddons.map(addon => <SummaryRow key={addon.id} label={addon.name} value={`+${money(Number(addon.price || 0))}`} />)}<hr /><SummaryRow label="Total Purchase" value={money(purchaseTotal)} strong /><SummaryRow label="Pay Today" value={money(reservationFee)} strong /><SummaryRow label="Remaining Balance" value={money(remaining)} /></div><p className="reservation-payment-note">Only the {money(reservationFee)} reservation fee is charged today. Optional extras will be added to your final motorcycle invoice.</p><label className="reservation-consent"><input checked={acceptedTerms} onChange={event => setAcceptedTerms(event.target.checked)} type="checkbox" /><span>I agree to the <a href="/reserve-online" target="_blank">reservation terms</a>. The {money(reservationFee)} fee is deducted from the final purchase price.</span></label></section>}
       {error && <p className="auth-message reservation-error">{error}</p>}
@@ -123,12 +123,37 @@ function AddonStep({ title, subtitle, addons, selected, onSelect, loading }: { t
   return <section className="reservation-step"><h3>{title}</h3><p>{subtitle}</p>{loading ? <div className="reservation-option-loading">Loading options...</div> : <div className="reservation-option-grid">{addons.map(addon => <button type="button" key={addon.id} className={`${addon.id === selected ? "selected" : ""} ${addon.category}`} onClick={() => onSelect(addon.id)}><AddonArt addon={addon} />{addon.badge && <em>{addon.badge}</em>}<b>{addon.name}</b><small>{descriptionLead(addon.description)}</small><AddonBenefits description={addon.description} /><strong>{priceLabel(addon)}</strong></button>)}</div>}</section>;
 }
 
+function WarrantyStep({ addons, selected, onSelect, loading }: { addons: ReservationAddon[]; selected: string; onSelect: (id: string) => void; loading: boolean }) {
+  return <section className="reservation-step warranty-upgrade-step"><div className="warranty-step-hero"><span>Peace of mind. Every mile.</span><h3>Protect your <em>investment.</em></h3><p>Every YesMoto motorcycle includes Elite Warranty with FREE UK Roadside Assistance as standard. Extend your cover today and keep riding with complete confidence.</p></div>{loading ? <div className="reservation-option-loading">Loading warranty options...</div> : <div className="warranty-option-grid">{addons.map(addon => <WarrantyCard addon={addon} selected={addon.id === selected} onSelect={() => onSelect(addon.id)} key={addon.id} />)}</div>}<div className="warranty-feature-strip"><span>FREE Roadside Assistance</span><span>Any VAT Garage</span><span>£1,000 Claim Limit</span><span>£75 Per Hour Labour Rate</span><span>UK Wide Cover</span></div><p className="warranty-powered">Powered by <b>Warranty<span>First</span></b></p></section>;
+}
+
+function WarrantyCard({ addon, selected, onSelect }: { addon: ReservationAddon; selected: boolean; onSelect: () => void }) {
+  const isIncluded = Number(addon.price) === 0;
+  const save = saveAmount(addon.badge);
+  const was = save && Number(addon.price) > 0 ? Number(addon.price) + save : null;
+  const monthly = Number(addon.price) > 0 ? Number(addon.price) / 10 : 0;
+  return <button type="button" className={`warranty-upgrade-card ${selected ? "selected" : ""} ${isIncluded ? "included" : ""}`} onClick={onSelect}>
+    {addon.badge && !isIncluded && <em>{addon.badge}</em>}
+    <AddonArt addon={addon} />
+    {isIncluded && <span className="warranty-included-label">Included</span>}
+    <b>{warrantyTitle(addon)}</b>
+    <small>{durationLabel(addon)}</small>
+    <WarrantyBenefits description={addon.description} />
+    {isIncluded ? <strong>Included as standard</strong> : <div className="warranty-price-panel">{was && <span>Was {money(was)}</span>}<strong>{money(Number(addon.price))}</strong><small>inc VAT</small><i>or</i><p>{save ? `Save ${money(save)}` : "Pay monthly"}<b>{money(monthly)} per month</b><span>for 10 months 0% interest with Bumper</span></p></div>}
+  </button>;
+}
+
 function CloseIcon() {
   return <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M6 6l12 12M18 6 6 18" /></svg>;
 }
 
 function AddonBenefits({ description }: { description: string | null }) {
   const lines = (description ?? "").split(/\n+/).map(line => line.trim()).filter(Boolean).slice(1);
+  return lines.length ? <ul>{lines.map(line => <li key={line}>{line}</li>)}</ul> : null;
+}
+
+function WarrantyBenefits({ description }: { description: string | null }) {
+  const lines = (description ?? "").split(/\n+/).map(line => line.trim()).filter(Boolean);
   return lines.length ? <ul>{lines.map(line => <li key={line}>{line}</li>)}</ul> : null;
 }
 
@@ -143,6 +168,20 @@ function descriptionLead(description: string | null) {
 function priceLabel(addon: ReservationAddon) {
   if (Number(addon.price) === 0) return addon.category === "delivery" ? "FREE" : "Included";
   return `+${money(Number(addon.price))}`;
+}
+
+function durationLabel(addon: ReservationAddon) {
+  if (addon.duration_months) return `${addon.duration_months} months`;
+  return descriptionLead(addon.description);
+}
+
+function warrantyTitle(addon: ReservationAddon) {
+  return addon.name.replace(/\s+(12|24|36)\s+months?$/i, "");
+}
+
+function saveAmount(badge: string | null) {
+  const match = badge?.match(/save\s*£?(\d+)/i);
+  return match ? Number(match[1]) : 0;
 }
 
 function AddonArt({ addon }: { addon: ReservationAddon }) {
