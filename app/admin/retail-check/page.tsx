@@ -6,6 +6,22 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type RetailCheck = Record<string, any> & { id?: string | number; Status?: string };
+type LookupVehicle = {
+  registration?: string;
+  make?: string;
+  model?: string;
+  derivative?: string;
+  derivativeId?: string;
+  vehicleId?: string;
+  year?: number;
+  mileage?: number;
+  fuelType?: string;
+  transmission?: string;
+  engineSize?: number | string;
+  bodyType?: string;
+  colour?: string;
+  taxonomyData?: Record<string, unknown>;
+};
 
 const terminalStatuses = new Set(["Checked", "Manual Review", "Failed", "Cancelled"]);
 
@@ -71,6 +87,9 @@ export default function RetailCheckPage() {
   const [askingPrice, setAskingPrice] = useState("");
   const [offerPrice, setOfferPrice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState("");
+  const [identifiedVehicle, setIdentifiedVehicle] = useState<LookupVehicle | null>(null);
   const [submitError, setSubmitError] = useState("");
   const [showManualSearch, setShowManualSearch] = useState(false);
   const [recordId, setRecordId] = useState(searchParams.get("recordId") ?? "");
@@ -233,32 +252,33 @@ export default function RetailCheckPage() {
     );
 
   async function lookupRegistration() {
-
-  const response = await fetch(
-    "/api/vrm-lookup",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        vrm: registration,
-      }),
+    setLookupLoading(true);
+    setLookupMessage("");
+    setSubmitError("");
+    try {
+      const response = await fetch("/api/autotrader/vehicle-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vrm: registration }),
+      });
+      const data = await response.json() as { vehicle?: LookupVehicle; error?: string };
+      if (!response.ok || !data.vehicle) throw new Error(data.error || "Auto Trader lookup failed.");
+      const vehicle = data.vehicle;
+      setIdentifiedVehicle(vehicle);
+      setRegistration(String(vehicle.registration || registration).toUpperCase().replace(/\s+/g, ""));
+      if (vehicle.make) setSelectedMake(vehicle.make);
+      if (vehicle.model) setSelectedModel(vehicle.model);
+      if (vehicle.year) setYear(String(vehicle.year));
+      if (vehicle.mileage && !mileage) setMileage(String(vehicle.mileage));
+      setDerivative(vehicle.derivative || "");
+      setDerivativeId(vehicle.derivativeId || "");
+      setLookupMessage(vehicle.derivativeId ? "Auto Trader derivative matched." : "Vehicle found. No derivative ID returned; you can continue manually.");
+    } catch (caught) {
+      setIdentifiedVehicle(null);
+      setLookupMessage(caught instanceof Error ? caught.message : "Auto Trader lookup unavailable. Continue manually.");
+    } finally {
+      setLookupLoading(false);
     }
-  );
-
-  const data = await response.json();
-
-  const vehicle = data?.vehicle ?? {};
-  const make = vehicle.make?.display_name ?? vehicle.make?.map_id ?? vehicle.make ?? "";
-  const model = vehicle.model ?? vehicle.genericModel?.display_name ?? "";
-  setSelectedMake(String(make));
-  setSelectedModel(String(model));
-  setYear(String(vehicle.year ?? vehicle.manufactureYear ?? ""));
-
-  setDerivative(String(vehicle.derivative ?? vehicle.variant ?? ""));
-  setDerivativeId(String(vehicle.derivativeId ?? vehicle.derivative_id ?? ""));
-
 }
 
   async function checkMarket() {
@@ -291,6 +311,10 @@ export default function RetailCheckPage() {
           askingPrice,
           leadId: websiteLeadId || undefined,
           requestId: nextRequestId,
+          derivative,
+          derivativeId,
+          autotraderVehicleId: identifiedVehicle?.vehicleId,
+          autotraderTaxonomyData: identifiedVehicle?.taxonomyData,
         }),
       });
 
@@ -405,6 +429,14 @@ export default function RetailCheckPage() {
                 }
                 className="flex-1 p-4 rounded-xl bg-black border border-zinc-700"
               />
+              <button
+                type="button"
+                onClick={() => void lookupRegistration()}
+                disabled={lookupLoading || !registration.trim()}
+                className="w-full bg-zinc-900 border border-zinc-700 text-white font-bold py-3 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {lookupLoading ? "Searching Auto Trader..." : "Search Auto Trader"}
+              </button>
 
               <input
                 type="number"
@@ -415,6 +447,27 @@ export default function RetailCheckPage() {
               />
 
             </div>
+
+            {identifiedVehicle && (
+              <div className="bg-black border border-zinc-800 rounded-xl p-4 mb-4">
+                <div className="font-bold text-white">
+                  {[identifiedVehicle.year, identifiedVehicle.make, identifiedVehicle.model, identifiedVehicle.derivative].filter(Boolean).join(" ")}
+                </div>
+                <div className="text-zinc-400 text-sm mt-1">
+                  {identifiedVehicle.registration || registration}
+                </div>
+                <div className="text-zinc-500 text-xs mt-2">
+                  {[identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "", identifiedVehicle.transmission, identifiedVehicle.fuelType].filter(Boolean).join(" / ")}
+                </div>
+                {identifiedVehicle.derivativeId && <div className="text-[#00E51D] text-xs font-bold uppercase tracking-wide mt-3">Derivative matched</div>}
+              </div>
+            )}
+
+            {lookupMessage && (
+              <div className="text-zinc-400 text-sm mb-4">
+                {lookupMessage}
+              </div>
+            )}
 
             {derivative && (
               <div className="text-green-400 text-sm mt-2">

@@ -5,6 +5,24 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type BookingResult = { stock_bike_id: number; stock_number: string; purchase_id?: string; existing?: boolean };
+type LookupVehicle = {
+  registration?: string;
+  vin?: string;
+  make?: string;
+  model?: string;
+  derivative?: string;
+  derivativeId?: string;
+  vehicleId?: string;
+  year?: number;
+  mileage?: number;
+  fuelType?: string;
+  transmission?: string;
+  engineSize?: number | string;
+  bodyType?: string;
+  colour?: string;
+  firstRegistrationDate?: string;
+  taxonomyData?: Record<string, unknown>;
+};
 
 const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value || 0);
 
@@ -13,6 +31,7 @@ export function StockBookingForm() {
   const [lookupReg, setLookupReg] = useState("");
   const [lookupMessage, setLookupMessage] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [identifiedVehicle, setIdentifiedVehicle] = useState<LookupVehicle | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<BookingResult | null>(null);
@@ -45,42 +64,39 @@ export function StockBookingForm() {
     setForm(current => ({ ...current, [key]: value }));
   }
 
+  function updateIfBlank(key: string, value: string | number | undefined | null) {
+    if (value === undefined || value === null || value === "") return;
+    setForm(current => current[key] ? current : { ...current, [key]: String(value) });
+  }
+
   async function lookupVehicle() {
     setLookupLoading(true);
     setLookupMessage("");
     setError("");
     try {
-      const response = await fetch("/api/vrm-lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vrm: lookupReg }) });
-      const data = await response.json() as Record<string, unknown>;
-      if (!response.ok) throw new Error(String(data.error || "Lookup failed."));
-      const vehicle = data.vehicle && typeof data.vehicle === "object" ? data.vehicle as Record<string, unknown> : data;
-      update("registration", lookupReg.toUpperCase().replace(/\s+/g, ""));
-      const make = pickVehicleText(vehicle, "make", "display_name", "map_id");
-      const model = pickVehicleText(vehicle, "model", "genericModel");
-      const year = String(vehicle.year ?? vehicle.manufactureYear ?? "");
-      const vin = textValue(vehicle.vin);
-      const colour = textValue(vehicle.colour);
-      const fuel = textValue(vehicle.fuel ?? vehicle.fuelType);
-      const transmission = textValue(vehicle.transmission);
-      const engineCc = textValue(vehicle.engine_size ?? vehicle.engineCapacity);
-      const registrationDate = dateOnly(vehicle.firstRegistered ?? vehicle.registrationDate);
-      const motExpiry = dateOnly(vehicle.lastMOTExpiry ?? vehicle.motExpiryDate);
-      const lastMotMileage = textValue(vehicle.mileageLastMot);
-      const previousKeepers = textValue(vehicle.previousKeepersCount);
-      if (make) update("make", make);
-      if (model) update("model", model);
-      if (year) update("year", year);
-      if (vin) update("vin", vin.toUpperCase());
-      if (colour) update("colour", colour);
-      if (fuel) update("fuel", fuel);
-      if (transmission) update("transmission", transmission);
-      if (engineCc) update("engine_cc", engineCc);
-      if (registrationDate) update("registration_date", registrationDate);
-      if (motExpiry) update("mot_expiry", motExpiry);
-      if (lastMotMileage && !form.mileage) update("mileage", lastMotMileage);
-      if (previousKeepers) update("previous_owners", previousKeepers);
-      setLookupMessage("Lookup completed. Check and correct the details before booking.");
+      const response = await fetch("/api/autotrader/vehicle-lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vrm: lookupReg }) });
+      const data = await response.json() as { vehicle?: LookupVehicle; error?: string };
+      if (!response.ok || !data.vehicle) throw new Error(data.error || "Lookup failed.");
+      const vehicle = data.vehicle;
+      setIdentifiedVehicle(vehicle);
+      update("registration", String(vehicle.registration || lookupReg).toUpperCase().replace(/\s+/g, ""));
+      updateIfBlank("make", vehicle.make);
+      updateIfBlank("model", vehicle.model);
+      updateIfBlank("variant", vehicle.derivative);
+      updateIfBlank("derivative_id", vehicle.derivativeId);
+      updateIfBlank("autotrader_vehicle_id", vehicle.vehicleId);
+      updateIfBlank("year", vehicle.year);
+      updateIfBlank("vin", vehicle.vin?.toUpperCase());
+      updateIfBlank("colour", vehicle.colour);
+      updateIfBlank("fuel", vehicle.fuelType);
+      updateIfBlank("transmission", vehicle.transmission);
+      updateIfBlank("engine_cc", vehicle.engineSize);
+      updateIfBlank("body_style", vehicle.bodyType);
+      updateIfBlank("registration_date", vehicle.firstRegistrationDate);
+      updateIfBlank("mileage", vehicle.mileage);
+      setLookupMessage(vehicle.derivativeId ? "Auto Trader lookup completed and derivative matched. Check and correct the details before booking." : "Auto Trader found the vehicle but did not return a derivative ID. You can continue manually.");
     } catch (caught) {
+      setIdentifiedVehicle(null);
       setLookupMessage(caught instanceof Error ? caught.message : "Lookup unavailable. Enter details manually.");
     } finally {
       setLookupLoading(false);
@@ -94,6 +110,7 @@ export function StockBookingForm() {
     try {
       const payload = Object.fromEntries(new FormData(event.currentTarget));
       payload.idempotency_key = String(form.idempotency_key);
+      if (identifiedVehicle?.taxonomyData) payload.autotrader_taxonomy_data = JSON.stringify(identifiedVehicle.taxonomyData);
       for (const key of checkboxKeys) payload[key] = String(Boolean(form[key]));
       const response = await fetch("/api/stock/book-into-stock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json() as { booking?: BookingResult; error?: string };
@@ -138,8 +155,14 @@ export function StockBookingForm() {
       <header><span>1</span><div><h2>Vehicle Lookup</h2><p>Use VRM lookup where available, then confirm the details manually.</p></div></header>
       <div className="stock-booking-lookup">
         <input value={lookupReg} onChange={event => setLookupReg(event.target.value.toUpperCase())} placeholder="Registration" />
-        <button type="button" onClick={() => void lookupVehicle()} disabled={lookupLoading || !lookupReg.trim()}>{lookupLoading ? "Looking up..." : "Lookup Vehicle"}</button>
+        <button type="button" onClick={() => void lookupVehicle()} disabled={lookupLoading || !lookupReg.trim()}>{lookupLoading ? "Searching Auto Trader..." : "Lookup Vehicle"}</button>
       </div>
+      {identifiedVehicle && <div className="stock-booking-message">
+        <b>{[identifiedVehicle.year, identifiedVehicle.make, identifiedVehicle.model, identifiedVehicle.derivative].filter(Boolean).join(" ")}</b>
+        <span>{identifiedVehicle.registration || lookupReg}</span>
+        <small>{[identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "", identifiedVehicle.transmission, identifiedVehicle.fuelType].filter(Boolean).join(" / ")}</small>
+        {identifiedVehicle.derivativeId && <em>Auto Trader derivative matched</em>}
+      </div>}
       {lookupMessage && <p className="stock-booking-message">{lookupMessage}</p>}
     </section>
 
@@ -152,10 +175,12 @@ export function StockBookingForm() {
         <Field name="model" label="Model" form={form} update={update} required />
         <Field name="variant" label="Derivative / variant" form={form} update={update} />
         <Field name="derivative_id" label="Derivative ID" form={form} update={update} />
+        <Field name="autotrader_vehicle_id" label="Auto Trader vehicle ID" form={form} update={update} />
         <Field name="year" label="Year" form={form} update={update} type="number" />
         <Field name="mileage" label="Mileage" form={form} update={update} type="number" />
         <Field name="engine_cc" label="Engine capacity" form={form} update={update} type="number" />
         <Field name="colour" label="Colour" form={form} update={update} />
+        <Field name="body_style" label="Body type" form={form} update={update} />
         <Field name="fuel" label="Fuel type" form={form} update={update} />
         <Field name="transmission" label="Transmission" form={form} update={update} />
         <Field name="previous_owners" label="Previous owners" form={form} update={update} type="number" />
@@ -223,29 +248,6 @@ function Select({ name, label, form, update, options }: { name: string; label: s
 function numberValue(value: unknown) {
   const parsed = Number(value || 0);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function pickVehicleText(vehicle: Record<string, unknown>, key: string, ...nestedKeys: string[]) {
-  const value = vehicle[key];
-  if (typeof value === "string" || typeof value === "number") return String(value);
-  if (value && typeof value === "object") {
-    const object = value as Record<string, unknown>;
-    for (const nestedKey of nestedKeys) {
-      const nested = object[nestedKey];
-      if (typeof nested === "string" || typeof nested === "number") return String(nested);
-    }
-  }
-  return "";
-}
-
-function textValue(value: unknown) {
-  return typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
-}
-
-function dateOnly(value: unknown) {
-  const text = textValue(value);
-  const match = text.match(/^\d{4}-\d{2}-\d{2}/);
-  return match ? match[0] : "";
 }
 
 const checkboxKeys = ["workshop_required", "pdi_required", "service_required", "mot_required", "diagnostic_required", "repair_required", "valet_required", "detail_required", "cosmetic_required", "photos_required", "video_required", "hpi_check_required", "documents_required", "spare_key_required", "transport_required"];

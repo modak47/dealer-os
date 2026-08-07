@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createRetailCheck, extractRetailCheckWebsiteLeadUpdates, waitForRetailCheck } from "@/lib/retail-checks";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
-import { normaliseRegistration, lookupVrm, vehicleField } from "@/lib/vrm-lookup";
+import { lookupVehicleByVrm } from "@/lib/autotrader-vehicle-lookup";
+import { normaliseRegistration } from "@/lib/vrm-lookup";
 import type { WebsiteLead } from "@/types/website-lead";
 
 export const dynamic = "force-dynamic";
@@ -36,17 +37,21 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   try {
     let lookup;
     try {
-      lookup = await lookupVrm(registration);
+      lookup = await lookupVehicleByVrm(registration);
     } catch (lookupError) {
       throw new Error(`VRM lookup failed: ${lookupError instanceof Error ? lookupError.message : "service unavailable"}`);
     }
     const retailCheck = await createRetailCheck({
       registration,
-      make: vehicleField(lookup, "make") || lead.make,
-      model: vehicleField(lookup, "model") || lead.model,
-      year: vehicleField(lookup, "year") || lead.year,
+      make: lookup.make || lead.make,
+      model: lookup.model || lead.model,
+      year: lookup.year ? String(lookup.year) : lead.year,
       mileage: lead.mileage,
       askingPrice: lead.price,
+      derivative: lookup.derivative,
+      derivativeId: lookup.derivativeId,
+      autotraderVehicleId: lookup.vehicleId,
+      autotraderTaxonomyData: lookup.taxonomyData,
     });
     await supabase.from("website_leads").update({ retail_check_id: String(retailCheck.id), updated_at: new Date().toISOString() }).eq("id", id);
     const completed = await waitForRetailCheck(retailCheck.id);

@@ -397,11 +397,11 @@ def process_retail_check(record, worker_id, supabase_client=None, max_attempts=M
         verify_claim(record_id, worker_id, client)
         update_progress(record_id, "VRM Lookup", "Looking up the motorcycle details.", 15, worker_id, client)
         vrm = lookup_registration(registration)
-        make = vrm["make"]
-        model = vrm["model"]
-        derivative = vrm["derivative"]
-        derivative_id = vrm["derivative_id"]
-        bike_year = vrm["bike_year"]
+        make = str(fields.get("Make") or vrm["make"] or "").strip()
+        model = str(fields.get("Model") or vrm["model"] or "").strip()
+        derivative = str(fields.get("Derivative") or vrm["derivative"] or "").strip()
+        derivative_id = str(fields.get("Derivative ID") or vrm["derivative_id"] or "").strip()
+        bike_year = safe_int(fields.get("Year"), 0) or vrm["bike_year"]
         bike_mileage = safe_int(fields.get("Mileage"), 0)
 
         update_progress(record_id, "Loading Market Listings", "Finding current dealer listings.", 30, worker_id, client)

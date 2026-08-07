@@ -11,6 +11,10 @@ export type RetailCheckInput = {
   mileage?: string | null;
   askingPrice?: string | null;
   requestId?: string | null;
+  derivative?: string | null;
+  derivativeId?: string | null;
+  autotraderVehicleId?: string | null;
+  autotraderTaxonomyData?: Record<string, unknown> | null;
 };
 
 export async function createRetailCheck(input: RetailCheckInput): Promise<RetailCheckRecord> {
@@ -29,6 +33,10 @@ export async function createRetailCheck(input: RetailCheckInput): Promise<Retail
     Year: String(input.year ?? ""),
     Mileage: String(input.mileage ?? ""),
     "Asking Price": String(input.askingPrice ?? ""),
+    "Derivative": input.derivative ?? "",
+    "Derivative ID": input.derivativeId ?? "",
+    "Auto Trader Vehicle ID": input.autotraderVehicleId ?? "",
+    "Auto Trader Taxonomy Data": input.autotraderTaxonomyData ?? {},
     Status: "Pending",
     "Progress Stage": "Queued",
     "Progress Message": "Your retail check has been queued.",

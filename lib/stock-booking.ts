@@ -19,7 +19,9 @@ export async function bookMotorcycleIntoStock(input: Record<string, unknown>) {
   const userId = await getCurrentUserId();
   const { data, error } = await getSupabaseAdmin().rpc("book_motorcycle_into_stock", { p_payload: payload, p_user_id: userId });
   if (error) throw new Error(error.message);
-  return data as StockBookingResult;
+  const result = data as StockBookingResult;
+  await saveAutotraderStockFields(result.stock_bike_id, payload);
+  return result;
 }
 
 function normaliseBookingPayload(input: Record<string, unknown>) {
@@ -57,12 +59,15 @@ function normaliseBookingPayload(input: Record<string, unknown>) {
     model,
     variant: text(input.variant, 160) || null,
     derivative_id: text(input.derivative_id, 120) || null,
+    autotrader_vehicle_id: text(input.autotrader_vehicle_id, 120) || null,
+    autotrader_taxonomy_data: object(input.autotrader_taxonomy_data),
     year,
     mileage,
     engine_cc: optionalInteger(input.engine_cc, "Engine capacity"),
     colour: text(input.colour, 80) || null,
     fuel: text(input.fuel, 60) || null,
     transmission: text(input.transmission, 80) || null,
+    body_style: text(input.body_style, 80) || null,
     previous_owners: optionalInteger(input.previous_owners, "Previous owners"),
     registration_date: dateOnly(input.registration_date, "Date of first registration"),
     first_registration_date: dateOnly(input.registration_date, "Date of first registration"),
@@ -128,6 +133,16 @@ function normaliseBookingPayload(input: Record<string, unknown>) {
   };
 }
 
+async function saveAutotraderStockFields(stockBikeId: number, payload: Record<string, unknown>) {
+  const updates: Record<string, unknown> = {};
+  if (payload.autotrader_vehicle_id) updates.autotrader_vehicle_id = payload.autotrader_vehicle_id;
+  if (payload.autotrader_taxonomy_data && typeof payload.autotrader_taxonomy_data === "object") updates.autotrader_taxonomy_data = payload.autotrader_taxonomy_data;
+  if (payload.body_style) updates.body_style = payload.body_style;
+  if (!Object.keys(updates).length) return;
+  const { error } = await getSupabaseAdmin().from("stock_bikes").update(updates).eq("id", stockBikeId);
+  if (error) throw new Error(error.message);
+}
+
 function cost(category: string, description: string, amount: number | null, method: unknown) {
   if (!amount || amount <= 0) return null;
   return { category: costCategories.has(category) ? category : "other", description, amount, payment_status: "unpaid", payment_method: text(method, 80) || null };
@@ -165,4 +180,17 @@ function dateOnly(value: unknown, label: string) {
 
 function bool(value: unknown) {
   return value === true || value === "true" || value === "on" || value === "1";
+}
+
+function object(value: unknown) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
 }
