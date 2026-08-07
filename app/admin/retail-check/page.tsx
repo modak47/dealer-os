@@ -20,6 +20,9 @@ type LookupVehicle = {
   engineSize?: number | string;
   bodyType?: string;
   colour?: string;
+  motExpiry?: string;
+  motTests?: unknown;
+  history?: unknown;
   taxonomyData?: Record<string, unknown>;
 };
 
@@ -315,6 +318,7 @@ export default function RetailCheckPage() {
           derivativeId,
           autotraderVehicleId: identifiedVehicle?.vehicleId,
           autotraderTaxonomyData: identifiedVehicle?.taxonomyData,
+          autotraderMotData: identifiedVehicle ? { motTests: identifiedVehicle.motTests ?? null, history: identifiedVehicle.history ?? null } : undefined,
         }),
       });
 
@@ -459,6 +463,7 @@ export default function RetailCheckPage() {
                 <div className="text-zinc-500 text-xs mt-2">
                   {[identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "", identifiedVehicle.transmission, identifiedVehicle.fuelType].filter(Boolean).join(" / ")}
                 </div>
+                {identifiedVehicle.motExpiry && <div className="text-zinc-500 text-xs mt-1">MOT expires {identifiedVehicle.motExpiry}</div>}
                 {identifiedVehicle.derivativeId && <div className="text-[#00E51D] text-xs font-bold uppercase tracking-wide mt-3">Derivative matched</div>}
               </div>
             )}

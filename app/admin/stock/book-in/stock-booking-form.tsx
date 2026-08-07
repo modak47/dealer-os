@@ -18,9 +18,23 @@ type LookupVehicle = {
   fuelType?: string;
   transmission?: string;
   engineSize?: number | string;
+  power?: number | string;
+  torque?: number | string;
+  co2?: number | string;
+  roadTax?: number | string;
+  topSpeed?: number | string;
+  gears?: number;
+  lengthMm?: number;
+  widthMm?: number;
+  weightKg?: number;
+  euroEmissions?: string;
+  previousOwners?: number;
   bodyType?: string;
   colour?: string;
   firstRegistrationDate?: string;
+  motExpiry?: string;
+  motTests?: unknown;
+  history?: unknown;
   taxonomyData?: Record<string, unknown>;
 };
 
@@ -91,8 +105,20 @@ export function StockBookingForm() {
       updateIfBlank("fuel", vehicle.fuelType);
       updateIfBlank("transmission", vehicle.transmission);
       updateIfBlank("engine_cc", vehicle.engineSize);
+      updateIfBlank("bhp", vehicle.power);
+      updateIfBlank("torque", vehicle.torque);
+      updateIfBlank("co2", vehicle.co2);
+      updateIfBlank("road_tax", vehicle.roadTax);
+      updateIfBlank("top_speed", vehicle.topSpeed);
+      updateIfBlank("number_of_gears", vehicle.gears);
+      updateIfBlank("length_mm", vehicle.lengthMm);
+      updateIfBlank("width_mm", vehicle.widthMm);
+      updateIfBlank("weight_kg", vehicle.weightKg);
+      updateIfBlank("euro_emissions", vehicle.euroEmissions);
+      updateIfBlank("previous_owners", vehicle.previousOwners);
       updateIfBlank("body_style", vehicle.bodyType);
       updateIfBlank("registration_date", vehicle.firstRegistrationDate);
+      updateIfBlank("mot_expiry", vehicle.motExpiry);
       updateIfBlank("mileage", vehicle.mileage);
       setLookupMessage(vehicle.derivativeId ? "Auto Trader lookup completed and derivative matched. Check and correct the details before booking." : "Auto Trader found the vehicle but did not return a derivative ID. You can continue manually.");
     } catch (caught) {
@@ -111,6 +137,7 @@ export function StockBookingForm() {
       const payload = Object.fromEntries(new FormData(event.currentTarget));
       payload.idempotency_key = String(form.idempotency_key);
       if (identifiedVehicle?.taxonomyData) payload.autotrader_taxonomy_data = JSON.stringify(identifiedVehicle.taxonomyData);
+      if (identifiedVehicle?.motTests || identifiedVehicle?.history) payload.autotrader_mot_data = JSON.stringify({ motTests: identifiedVehicle.motTests ?? null, history: identifiedVehicle.history ?? null });
       for (const key of checkboxKeys) payload[key] = String(Boolean(form[key]));
       const response = await fetch("/api/stock/book-into-stock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json() as { booking?: BookingResult; error?: string };
@@ -161,6 +188,7 @@ export function StockBookingForm() {
         <b>{[identifiedVehicle.year, identifiedVehicle.make, identifiedVehicle.model, identifiedVehicle.derivative].filter(Boolean).join(" ")}</b>
         <span>{identifiedVehicle.registration || lookupReg}</span>
         <small>{[identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "", identifiedVehicle.transmission, identifiedVehicle.fuelType].filter(Boolean).join(" / ")}</small>
+        {identifiedVehicle.motExpiry && <small>MOT expires {identifiedVehicle.motExpiry}</small>}
         {identifiedVehicle.derivativeId && <em>Auto Trader derivative matched</em>}
       </div>}
       {lookupMessage && <p className="stock-booking-message">{lookupMessage}</p>}
@@ -183,6 +211,16 @@ export function StockBookingForm() {
         <Field name="body_style" label="Body type" form={form} update={update} />
         <Field name="fuel" label="Fuel type" form={form} update={update} />
         <Field name="transmission" label="Transmission" form={form} update={update} />
+        <Field name="bhp" label="BHP" form={form} update={update} type="number" />
+        <Field name="torque" label="Torque" form={form} update={update} />
+        <Field name="co2" label="CO2" form={form} update={update} />
+        <Field name="road_tax" label="Road tax" form={form} update={update} />
+        <Field name="top_speed" label="Top speed" form={form} update={update} />
+        <Field name="number_of_gears" label="Gears" form={form} update={update} type="number" />
+        <Field name="length_mm" label="Length (mm)" form={form} update={update} type="number" />
+        <Field name="width_mm" label="Width (mm)" form={form} update={update} type="number" />
+        <Field name="weight_kg" label="Weight (kg)" form={form} update={update} type="number" />
+        <Field name="euro_emissions" label="Euro emissions" form={form} update={update} />
         <Field name="previous_owners" label="Previous owners" form={form} update={update} type="number" />
         <Field name="registration_date" label="Date first registered" form={form} update={update} type="date" />
         <Field name="mot_expiry" label="MOT expiry" form={form} update={update} type="date" />

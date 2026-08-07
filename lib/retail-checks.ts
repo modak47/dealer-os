@@ -15,6 +15,7 @@ export type RetailCheckInput = {
   derivativeId?: string | null;
   autotraderVehicleId?: string | null;
   autotraderTaxonomyData?: Record<string, unknown> | null;
+  autotraderMotData?: Record<string, unknown> | null;
 };
 
 export async function createRetailCheck(input: RetailCheckInput): Promise<RetailCheckRecord> {
@@ -37,6 +38,7 @@ export async function createRetailCheck(input: RetailCheckInput): Promise<Retail
     "Derivative ID": input.derivativeId ?? "",
     "Auto Trader Vehicle ID": input.autotraderVehicleId ?? "",
     "Auto Trader Taxonomy Data": input.autotraderTaxonomyData ?? {},
+    "Auto Trader MOT Data": input.autotraderMotData ?? {},
     Status: "Pending",
     "Progress Stage": "Queued",
     "Progress Message": "Your retail check has been queued.",

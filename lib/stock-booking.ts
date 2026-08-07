@@ -61,9 +61,20 @@ function normaliseBookingPayload(input: Record<string, unknown>) {
     derivative_id: text(input.derivative_id, 120) || null,
     autotrader_vehicle_id: text(input.autotrader_vehicle_id, 120) || null,
     autotrader_taxonomy_data: object(input.autotrader_taxonomy_data),
+    autotrader_mot_data: object(input.autotrader_mot_data),
     year,
     mileage,
     engine_cc: optionalInteger(input.engine_cc, "Engine capacity"),
+    bhp: optionalMoney(input.bhp, "BHP"),
+    torque: text(input.torque, 80) || null,
+    co2: text(input.co2, 80) || null,
+    road_tax: text(input.road_tax, 80) || null,
+    top_speed: text(input.top_speed, 80) || null,
+    number_of_gears: optionalInteger(input.number_of_gears, "Number of gears"),
+    length_mm: optionalMoney(input.length_mm, "Length"),
+    width_mm: optionalMoney(input.width_mm, "Width"),
+    weight_kg: optionalMoney(input.weight_kg, "Weight"),
+    euro_emissions: text(input.euro_emissions, 80) || null,
     colour: text(input.colour, 80) || null,
     fuel: text(input.fuel, 60) || null,
     transmission: text(input.transmission, 80) || null,
@@ -137,7 +148,11 @@ async function saveAutotraderStockFields(stockBikeId: number, payload: Record<st
   const updates: Record<string, unknown> = {};
   if (payload.autotrader_vehicle_id) updates.autotrader_vehicle_id = payload.autotrader_vehicle_id;
   if (payload.autotrader_taxonomy_data && typeof payload.autotrader_taxonomy_data === "object") updates.autotrader_taxonomy_data = payload.autotrader_taxonomy_data;
+  if (payload.autotrader_mot_data && typeof payload.autotrader_mot_data === "object") updates.autotrader_mot_data = payload.autotrader_mot_data;
   if (payload.body_style) updates.body_style = payload.body_style;
+  for (const field of ["bhp", "torque", "co2", "road_tax", "top_speed", "number_of_gears", "length_mm", "width_mm", "weight_kg", "euro_emissions"]) {
+    if (payload[field] !== null && payload[field] !== undefined && payload[field] !== "") updates[field] = payload[field];
+  }
   if (!Object.keys(updates).length) return;
   const { error } = await getSupabaseAdmin().from("stock_bikes").update(updates).eq("id", stockBikeId);
   if (error) throw new Error(error.message);

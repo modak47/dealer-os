@@ -58,12 +58,25 @@ describe("Auto Trader Connect client", () => {
       firstRegistrationDate: "2022-04-15",
       engineCapacityCC: 125,
       enginePowerBHP: 14,
+      enginePowerPS: 15,
+      engineTorqueLBFT: 31,
+      co2EmissionGPKM: 79,
+      topSpeedMPH: 85,
+      vehicleExciseDutyWithoutSupplementGBP: 59,
+      gears: 6,
+      lengthMM: 2145,
+      widthMM: 754,
+      minimumKerbWeightKG: 172,
+      emissionClass: "Euro 5",
+      owners: 1,
       fuelType: "Petrol",
       transmissionType: "Automatic",
       bodyType: "Scooter",
       colour: "Blue",
       seats: 2,
       generation: "XMAX (2021 - 2023)",
+      motTests: [{ completedDate: "2026-01-01", expiryDate: "2027-01-01" }],
+      history: { previousOwners: 1 },
     });
 
     assert.deepEqual({
@@ -76,12 +89,26 @@ describe("Auto Trader Connect client", () => {
       year: vehicle.year,
       engineSize: vehicle.engineSize,
       power: vehicle.power,
+      powerPs: vehicle.powerPs,
+      torque: vehicle.torque,
+      co2: vehicle.co2,
+      roadTax: vehicle.roadTax,
+      topSpeed: vehicle.topSpeed,
+      gears: vehicle.gears,
+      lengthMm: vehicle.lengthMm,
+      widthMm: vehicle.widthMm,
+      weightKg: vehicle.weightKg,
+      euroEmissions: vehicle.euroEmissions,
+      previousOwners: vehicle.previousOwners,
       fuelType: vehicle.fuelType,
       transmission: vehicle.transmission,
       bodyType: vehicle.bodyType,
       colour: vehicle.colour,
       seats: vehicle.seats,
       generation: vehicle.generation,
+      motExpiry: vehicle.motExpiry,
+      motTests: vehicle.motTests,
+      history: vehicle.history,
     }, {
       registration: "AB12CDE",
       make: "Yamaha",
@@ -92,12 +119,26 @@ describe("Auto Trader Connect client", () => {
       year: 2022,
       engineSize: 125,
       power: 14,
+      powerPs: 15,
+      torque: 31,
+      co2: 79,
+      roadTax: 59,
+      topSpeed: 85,
+      gears: 6,
+      lengthMm: 2145,
+      widthMm: 754,
+      weightKg: 172,
+      euroEmissions: "Euro 5",
+      previousOwners: 1,
       fuelType: "Petrol",
       transmission: "Automatic",
       bodyType: "Scooter",
       colour: "Blue",
       seats: 2,
       generation: "XMAX (2021 - 2023)",
+      motExpiry: "2027-01-01",
+      motTests: [{ completedDate: "2026-01-01", expiryDate: "2027-01-01" }],
+      history: { previousOwners: 1 },
     });
   });
 
@@ -113,7 +154,7 @@ describe("Auto Trader Connect client", () => {
       requests.push(url);
       if (url.endsWith("/authenticate")) return jsonResponse({ access_token: "token-123", expires_at: "2099-01-01T00:00:00.000Z" });
       assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer token-123");
-      assert.equal(url, "https://api-sandbox.autotrader.co.uk/vehicles?advertiserId=10014506&registration=AB12CDE");
+      assert.equal(url, "https://api-sandbox.autotrader.co.uk/vehicles?advertiserId=10014506&registration=AB12CDE&motTests=true&history=true");
       return jsonResponse({
         vehicle: {
           registration: "AB12CDE",
@@ -124,6 +165,7 @@ describe("Auto Trader Connect client", () => {
           engineCapacityCC: 125,
           fuelType: "Petrol",
           transmissionType: "Automatic",
+          motTests: [{ expiryDate: "2027-02-03" }],
         },
       });
     };
@@ -133,6 +175,7 @@ describe("Auto Trader Connect client", () => {
     assert.equal(vehicle.registration, "AB12CDE");
     assert.equal(vehicle.derivativeId, "derivative-123");
     assert.equal(vehicle.engineSize, 125);
+    assert.equal(vehicle.motExpiry, "2027-02-03");
     assert.equal(requests.length, 2);
   });
 });

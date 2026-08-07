@@ -20,11 +20,25 @@ export type DealerOsVehicle = {
   doors?: number;
   seats?: number;
   power?: number | string;
+  powerPs?: number | string;
+  torque?: number | string;
+  co2?: number | string;
+  roadTax?: number | string;
+  topSpeed?: number | string;
+  gears?: number;
+  lengthMm?: number;
+  widthMm?: number;
+  weightKg?: number;
+  euroEmissions?: string;
+  previousOwners?: number;
   manufacturer?: string;
   modelRange?: string;
   generation?: string;
   vehicleType?: string;
   trim?: string;
+  motExpiry?: string;
+  motTests?: unknown;
+  history?: unknown;
   taxonomyData?: Record<string, unknown>;
 };
 
@@ -39,7 +53,7 @@ export async function lookupVehicleByVrm(vrmInput: string): Promise<DealerOsVehi
   if (!isValidVrm(vrm)) throw new AutotraderVehicleLookupError("Invalid VRM.", 400, "invalid_vrm");
 
   const config = getAutotraderConfig();
-  const params = new URLSearchParams({ advertiserId: config.advertiserId, registration: vrm });
+  const params = new URLSearchParams({ advertiserId: config.advertiserId, registration: vrm, motTests: "true", history: "true" });
   const response = await autotraderFetch(`/vehicles?${params.toString()}`);
   const payload = await readJson<AutotraderVehicleResponse>(response);
 
@@ -80,11 +94,25 @@ export function normaliseAutotraderVehicle(vehicle: Record<string, unknown>, pay
   setNumber(result, "doors", vehicle.doors);
   setNumber(result, "seats", vehicle.seats);
   setValue(result, "power", vehicle.enginePowerBHP ?? vehicle.enginePowerPS);
+  setValue(result, "powerPs", vehicle.enginePowerPS);
+  setValue(result, "torque", vehicle.engineTorqueLBFT ?? vehicle.engineTorqueNM);
+  setValue(result, "co2", vehicle.co2EmissionGPKM);
+  setValue(result, "roadTax", vehicle.vehicleExciseDutyWithoutSupplementGBP ?? vehicle.vehicleExciseDutyGBP);
+  setValue(result, "topSpeed", vehicle.topSpeedMPH);
+  setNumber(result, "gears", vehicle.gears);
+  setNumber(result, "lengthMm", vehicle.lengthMM);
+  setNumber(result, "widthMm", vehicle.widthMM);
+  setNumber(result, "weightKg", vehicle.minimumKerbWeightKG ?? vehicle.payloadWeightKG ?? vehicle.grossVehicleWeightKG);
+  setText(result, "euroEmissions", vehicle.emissionClass);
+  setNumber(result, "previousOwners", vehicle.owners ?? objectValue(vehicle.history)?.previousOwners);
   setText(result, "manufacturer", vehicle.manufacturer ?? objectText(vehicle.oem, "make"));
   setText(result, "modelRange", vehicle.modelRange);
   setText(result, "generation", vehicle.generation);
   setText(result, "vehicleType", vehicle.vehicleType);
   setText(result, "trim", vehicle.trim);
+  setText(result, "motExpiry", findMotExpiry(vehicle, payload));
+  setRaw(result, "motTests", vehicle.motTests ?? payload.motTests);
+  setRaw(result, "history", vehicle.history ?? payload.history);
   result.taxonomyData = payload;
   return result;
 }
@@ -148,6 +176,39 @@ function setValue(target: DealerOsVehicle, key: keyof DealerOsVehicle, value: un
   const nextText = text(value);
   const nextNumber = number(value);
   if (nextText) (target as Record<string, unknown>)[key] = nextNumber ?? nextText;
+}
+
+function setRaw(target: DealerOsVehicle, key: keyof DealerOsVehicle, value: unknown) {
+  if (value !== undefined && value !== null) (target as Record<string, unknown>)[key] = value;
+}
+
+function findMotExpiry(vehicle: Record<string, unknown>, payload: Record<string, unknown>) {
+  for (const key of ["motExpiry", "motExpiryDate", "motTestExpiryDate", "lastMOTExpiry", "latestMotExpiryDate"]) {
+    const direct = dateOnly(vehicle[key] ?? payload[key]);
+    if (direct) return direct;
+  }
+
+  const candidates = [
+    vehicle.motTests,
+    payload.motTests,
+    objectValue(vehicle.motTests)?.results,
+    objectValue(payload.motTests)?.results,
+    objectValue(vehicle.motTests)?.tests,
+    objectValue(payload.motTests)?.tests,
+  ];
+  const expiries = candidates.flatMap(value => Array.isArray(value) ? value : [])
+    .map(item => objectValue(item))
+    .filter(Boolean)
+    .map(item => dateOnly(item?.expiryDate ?? item?.motExpiryDate ?? item?.testExpiryDate ?? item?.expiresAt))
+    .filter(Boolean)
+    .sort();
+  return expiries.at(-1) ?? "";
+}
+
+function dateOnly(value: unknown) {
+  const raw = text(value);
+  const match = raw.match(/^\d{4}-\d{2}-\d{2}/);
+  return match?.[0] ?? "";
 }
 
 function errorMessage(payload: unknown, fallback: string) {
