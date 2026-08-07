@@ -50,6 +50,7 @@ describe("Auto Trader Connect client", () => {
   it("normalises Auto Trader vehicle taxonomy data into the dealerOS vehicle shape", () => {
     const vehicle = normaliseAutotraderVehicle({
       registration: "AB12CDE",
+      engineNumber: "E123456",
       make: "Yamaha",
       model: "XMAX",
       derivative: "125 Tech MAX",
@@ -81,6 +82,7 @@ describe("Auto Trader Connect client", () => {
 
     assert.deepEqual({
       registration: vehicle.registration,
+      engineNumber: vehicle.engineNumber,
       make: vehicle.make,
       model: vehicle.model,
       derivative: vehicle.derivative,
@@ -111,6 +113,7 @@ describe("Auto Trader Connect client", () => {
       history: vehicle.history,
     }, {
       registration: "AB12CDE",
+      engineNumber: "E123456",
       make: "Yamaha",
       model: "XMAX",
       derivative: "125 Tech MAX",

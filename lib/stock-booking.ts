@@ -20,7 +20,7 @@ export async function bookMotorcycleIntoStock(input: Record<string, unknown>) {
   const { data, error } = await getSupabaseAdmin().rpc("book_motorcycle_into_stock", { p_payload: payload, p_user_id: userId });
   if (error) throw new Error(error.message);
   const result = data as StockBookingResult;
-  await saveAutotraderStockFields(result.stock_bike_id, payload);
+  if (!result.existing) await saveAutotraderStockFields(result.stock_bike_id, payload);
   return result;
 }
 
@@ -55,6 +55,7 @@ function normaliseBookingPayload(input: Record<string, unknown>) {
     idempotency_key: idempotencyKey,
     registration,
     vin: vin || null,
+    engine_number: text(input.engine_number, 80).toUpperCase() || null,
     make,
     model,
     variant: text(input.variant, 160) || null,
@@ -150,6 +151,9 @@ async function saveAutotraderStockFields(stockBikeId: number, payload: Record<st
   if (payload.autotrader_taxonomy_data && typeof payload.autotrader_taxonomy_data === "object") updates.autotrader_taxonomy_data = payload.autotrader_taxonomy_data;
   if (payload.autotrader_mot_data && typeof payload.autotrader_mot_data === "object") updates.autotrader_mot_data = payload.autotrader_mot_data;
   if (payload.body_style) updates.body_style = payload.body_style;
+  if (payload.engine_number) updates.engine_number = payload.engine_number;
+  const autotraderSpecifications = buildAutotraderSpecifications(payload);
+  if (autotraderSpecifications) updates.specifications = { auto_trader: autotraderSpecifications };
   for (const field of ["bhp", "torque", "co2", "road_tax", "top_speed", "number_of_gears", "length_mm", "width_mm", "weight_kg", "euro_emissions"]) {
     if (payload[field] !== null && payload[field] !== undefined && payload[field] !== "") updates[field] = payload[field];
   }
@@ -195,6 +199,38 @@ function dateOnly(value: unknown, label: string) {
 
 function bool(value: unknown) {
   return value === true || value === "true" || value === "on" || value === "1";
+}
+
+function buildAutotraderSpecifications(payload: Record<string, unknown>) {
+  const taxonomy = object(payload.autotrader_taxonomy_data);
+  const motData = object(payload.autotrader_mot_data);
+  const vehicle = object(taxonomy.vehicle);
+  if (!Object.keys(vehicle).length && !Object.keys(taxonomy).length && !Object.keys(motData).length) return null;
+  return {
+    captured_at: new Date().toISOString(),
+    source: "auto_trader_connect",
+    vehicle,
+    vehicle_flat: flattenScalars(vehicle),
+    full_response: taxonomy,
+    mot_and_history: motData,
+  };
+}
+
+function flattenScalars(value: unknown, prefix = "", output: Record<string, string | number | boolean | null> = {}) {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    if (prefix) output[prefix] = value;
+    return output;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => flattenScalars(item, prefix ? `${prefix}.${index}` : String(index), output));
+    return output;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      flattenScalars(child, prefix ? `${prefix}.${key}` : key, output);
+    }
+  }
+  return output;
 }
 
 function object(value: unknown) {

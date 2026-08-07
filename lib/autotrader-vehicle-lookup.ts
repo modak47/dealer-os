@@ -4,6 +4,7 @@ import { normaliseRegistration } from "@/lib/vrm-lookup";
 export type DealerOsVehicle = {
   registration?: string;
   vin?: string;
+  engineNumber?: string;
   make?: string;
   model?: string;
   derivative?: string;
@@ -78,6 +79,7 @@ export function normaliseAutotraderVehicle(vehicle: Record<string, unknown>, pay
   const result: DealerOsVehicle = {};
   setText(result, "registration", vehicle.registration);
   setText(result, "vin", vehicle.vin);
+  setText(result, "engineNumber", vehicle.engineNumber ?? vehicle.engine_number);
   setText(result, "make", vehicle.make);
   setText(result, "model", vehicle.model);
   setText(result, "derivative", vehicle.derivative);

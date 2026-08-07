@@ -8,6 +8,7 @@ type BookingResult = { stock_bike_id: number; stock_number: string; purchase_id?
 type LookupVehicle = {
   registration?: string;
   vin?: string;
+  engineNumber?: string;
   make?: string;
   model?: string;
   derivative?: string;
@@ -101,6 +102,7 @@ export function StockBookingForm() {
       updateIfBlank("autotrader_vehicle_id", vehicle.vehicleId);
       updateIfBlank("year", vehicle.year);
       updateIfBlank("vin", vehicle.vin?.toUpperCase());
+      updateIfBlank("engine_number", vehicle.engineNumber?.toUpperCase());
       updateIfBlank("colour", vehicle.colour);
       updateIfBlank("fuel", vehicle.fuelType);
       updateIfBlank("transmission", vehicle.transmission);
@@ -199,6 +201,7 @@ export function StockBookingForm() {
       <div className="stock-booking-grid">
         <Field name="registration" label="Registration" form={form} update={update} />
         <Field name="vin" label="VIN" form={form} update={update} />
+        <Field name="engine_number" label="Engine number" form={form} update={update} />
         <Field name="make" label="Make" form={form} update={update} required />
         <Field name="model" label="Model" form={form} update={update} required />
         <Field name="variant" label="Derivative / variant" form={form} update={update} />
