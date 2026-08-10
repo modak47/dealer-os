@@ -3,7 +3,7 @@ import requests
 import os
 import re
 from datetime import datetime, timezone
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 from dotenv import load_dotenv
 
 # Load the fixed project environment file before any os.environ reads. Using
@@ -48,7 +48,7 @@ unsold_regs = set()
 reserved_regs = set()
 dealer5_visible_regs = set()
 FORCE_REFRESH_IMAGES = os.environ.get("FORCE_REFRESH_IMAGES", "").strip().lower() in {"1", "true", "yes"}
-MINIMUM_COMPLETE_GALLERY_IMAGES = int(os.environ.get("MINIMUM_COMPLETE_GALLERY_IMAGES", "12"))
+MINIMUM_COMPLETE_GALLERY_IMAGES = int(os.environ.get("MINIMUM_COMPLETE_GALLERY_IMAGES", "50"))
 
 
 def utc_timestamp():
@@ -120,6 +120,67 @@ def permanent_dealer_images(values):
         item for item in dedupe_images(values, canonical_output=True)
         if is_permanent_dealer_image(item)
     ]
+
+
+def extract_dealer5_gallery_images(page):
+    """Collect image URLs from Dealer5's image tab, including lazy-loaded fields."""
+    for _ in range(8):
+        page.evaluate("""
+            () => {
+                const gallery = document.querySelector("#image_gallery");
+                if (gallery) gallery.scrollTop = gallery.scrollHeight;
+                window.scrollTo(0, document.body.scrollHeight);
+            }
+        """)
+        page.wait_for_timeout(600)
+
+    candidates = page.evaluate("""
+        () => {
+            const root = document.querySelector("#image_gallery") || document;
+            const values = [];
+            const push = value => {
+                if (value && typeof value === "string") values.push(value.trim());
+            };
+            root.querySelectorAll("img, a, source, [style]").forEach(element => {
+                [
+                    "src",
+                    "data-src",
+                    "data-original",
+                    "data-full",
+                    "data-large",
+                    "data-url",
+                    "href"
+                ].forEach(attribute => push(element.getAttribute(attribute)));
+
+                const srcset = element.getAttribute("srcset");
+                if (srcset) {
+                    srcset.split(",").forEach(item => push(item.trim().split(/\\s+/)[0]));
+                }
+
+                const style = element.getAttribute("style") || "";
+                const match = style.match(/url\\(["']?([^"')]+)["']?\\)/i);
+                if (match) push(match[1]);
+            });
+            return values;
+        }
+    """)
+
+    images = []
+    seen = set()
+    for raw in candidates:
+        if not raw:
+            continue
+        src = urljoin(page.url, raw)
+        if "CD5-" in src or "login5" in src:
+            continue
+        if "/originals/" not in src.lower():
+            continue
+        src = canonical_image_url(src)
+        if not src or src in seen or is_probably_promo_image(src):
+            continue
+        seen.add(src)
+        images.append({"url": src})
+    return images
 
 # =========================================
 # LOGGING
@@ -863,85 +924,20 @@ def scrape_current_page(page, context, forced_status=None, registration_set=None
                         '#image_gallery .image-container img.cursor-pointer'
                     )
 
-                    img_count = gallery_imgs.count() if should_scrape_images else 0
+                    visible_img_count = gallery_imgs.count()
+                    fetched_images = (
+                        extract_dealer5_gallery_images(page)
+                        if should_scrape_images
+                        else []
+                    )
+                    img_count = len(fetched_images) if should_scrape_images else 0
 
                     log(
-                        f"Found {img_count} images"
+                        f"Found {img_count} usable images ({visible_img_count} visible image elements)"
                     )
 
                     if not should_scrape_images:
                         log(f"{reg_key or 'UNKNOWN'} image scrape skipped; existing images retained")
-
-                    added = set()
-
-                    for x in range(img_count):
-
-                        # ============================
-                        # SKIP PROMO GRAPHICS
-                        # ============================
-
-                        if x < 10 and x % 2 == 1:
-                            continue
-
-                        try:
-
-                            src = gallery_imgs.nth(
-                                x
-                            ).get_attribute("src")
-
-
-
-                            print("RAW SRC:", src)
-
-                            if not src:
-                                continue
-
-                            if (
-                                "CD5-" in src
-                                or "login5" in src
-                            ):
-                                continue
-
-                            if (
-                                "/originals/"
-                                not in src.lower()
-                            ):
-                                continue
-
-                            if src.startswith("//"):
-
-                                src = "https:" + src
-
-                            elif src.startswith("/"):
-
-                                src = (
-                                    "https://dealers.cardealer5.co.uk"
-                                    + src
-                                )
-
-                            src = canonical_image_url(src)
-
-                            # ============================
-                            # FILTER PROMO GRAPHICS
-                            # ============================
-
-                            print("FINAL SRC:", src)
-
-                            if is_probably_promo_image(src):
-                                log(f"Skipping probable Dealer5 promo image: {src}")
-                                continue
-
-                            if src not in added:
-
-                                added.add(src)
-
-                                fetched_images.append({
-                                    "url": src
-                                })
-
-                        except Exception as e:
-
-                            print("IMAGE ERROR:", e)
 
                     fetched_images_successfully = should_scrape_images and img_count > 0
 

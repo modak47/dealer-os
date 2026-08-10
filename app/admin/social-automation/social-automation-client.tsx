@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import type { SyntheticEvent } from "react";
 import type { PublicStockBike } from "@/lib/stock";
 import type { SocialChannel, SocialQueueItem, SocialTemplate } from "@/lib/social-automation";
 
@@ -90,12 +91,12 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
       {selectedBike ? <div className={`social-creative-preview ${platform}`}>
         <div className="social-preview-art">
           <div className="social-preview-main">
-            <img src={displayImages[0] || selectedBike.image} alt={previewTitle} />
+            <img src={displayImages[0] || selectedBike.image} alt={previewTitle} onError={fallbackImage} />
             <strong>{money(selectedBike.price)}</strong>
           </div>
           <div className="social-preview-ribbon"><b>YES MOTO</b><span>Delivery · Part exchange · Finance</span></div>
           <div className="social-preview-thumbs">
-            {(displayImages.length ? displayImages : [selectedBike.image]).slice(0, 3).map((image, index) => <img src={image} alt={`${previewTitle} preview ${index + 1}`} key={`${image}-${index}`} />)}
+            {(displayImages.length ? displayImages : [selectedBike.image]).slice(0, 3).map((image, index) => <img src={image} alt={`${previewTitle} preview ${index + 1}`} onError={fallbackImage} key={`${image}-${index}`} />)}
           </div>
           <div className="social-preview-footer"><b>{previewTitle}</b><span>{selectedBike.variant || selectedBike.mileage}</span></div>
         </div>
@@ -112,7 +113,7 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
     <div className="social-admin-grid">
       <section>
         <div className="panel-title"><h2>Stock Available For Posts</h2><span>{stock.length} bikes</span></div>
-        <div className="social-stock-list">{stock.map(bike => <article key={bike.id} className={bike.id === bikeId ? "selected" : ""} onClick={() => setBikeId(bike.id)}><img src={bike.image} alt={`${bike.make} ${bike.model}`} /><div><b>{bike.year} {bike.make} {bike.model}</b><span>{bike.status} · {bike.mileage} · {money(bike.price)}</span></div></article>)}</div>
+        <div className="social-stock-list">{stock.map(bike => <article key={bike.id} className={bike.id === bikeId ? "selected" : ""} onClick={() => setBikeId(bike.id)}><img src={bike.image} alt={`${bike.make} ${bike.model}`} onError={fallbackImage} /><div><b>{bike.year} {bike.make} {bike.model}</b><span>{bike.status} · {bike.mileage} · {money(bike.price)}</span></div></article>)}</div>
       </section>
       <section>
         <div className="panel-title"><h2>Latest Queue</h2><span>{queue.length} recent</span></div>
@@ -137,4 +138,9 @@ function platformLabel(value: string) {
 
 function money(value: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(value);
+}
+
+function fallbackImage(event: SyntheticEvent<HTMLImageElement>) {
+  if (event.currentTarget.src.endsWith("/bike-placeholder.svg")) return;
+  event.currentTarget.src = "/bike-placeholder.svg";
 }

@@ -3,6 +3,7 @@ import "server-only";
 export interface StockBike {
   id: string;
   dealer5Id?: string;
+  stockNumber?: string;
   createdTime: string;
   registration: string;
   make: string;
@@ -57,6 +58,7 @@ function mapRecord(record:AirtableRecord):StockBike {
   const imageUrls=images(fields["Stock Image"]);
   return {
     id:record.id,
+    stockNumber:text(fields["Stock Number"]),
     createdTime:record.createdTime??"",
     registration:text(fields["Registration Number"]),
     make:text(fields.Make),

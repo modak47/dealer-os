@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { SupabaseStockBike } from "@/lib/stock-bike-types";
 import { compareImageAvailability, hasUsableStockImage, normalizeStockImageUrls } from "@/lib/stock-images";
@@ -44,13 +45,23 @@ function StockManagerCard({ bike }: { bike: SupabaseStockBike }) {
   const router = useRouter();
   const href = `/admin/stock/${bike.id}`;
   const images = normalizeStockImageUrls(bike.primary_image_url, bike.image_urls);
-  const image = images[0];
   const statusClass = normal(bike.status).replaceAll(" ", "-");
   const purchasePending = statusClass === "purchase-pending";
   return <article className="admin-stock-card" role="link" tabIndex={0} onClick={() => router.push(href)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); router.push(href); } }}>
-    <div className="admin-stock-photo">{image ? <img src={image} alt={`${bike.make ?? ""} ${bike.model ?? ""}`} /> : <div><b>YM</b><span>Image required</span></div>}<span className={`status ${statusClass}`}>{bike.status || "Unknown"}</span><small>{images.length} photo{images.length === 1 ? "" : "s"}</small></div>
+    <div className="admin-stock-photo"><StockCardImage images={images} alt={`${bike.make ?? ""} ${bike.model ?? ""}`} /><span className={`status ${statusClass}`}>{bike.status || "Unknown"}</span><small>{images.length} photo{images.length === 1 ? "" : "s"}</small></div>
     <div className="admin-stock-copy"><p>{bike.registration || "Registration pending"}{bike.stock_number ? ` · ${bike.stock_number}` : ""}</p><h2>{bike.make || "Make missing"} {bike.model || "Model missing"}</h2>{bike.variant && <h3>{bike.variant}</h3>}<dl><div><dt>Year</dt><dd>{bike.year || "-"}</dd></div><div><dt>Mileage</dt><dd>{bike.mileage == null ? "-" : bike.mileage.toLocaleString("en-GB")}</dd></div><div><dt>{purchasePending ? "Target" : "Price"}</dt><dd className={bike.price == null || bike.price <= 0 ? "warning" : ""}>{money(bike.price)}</dd></div>{purchasePending && <><div><dt>Arrival</dt><dd>{bike.expected_arrival_date || "-"}</dd></div><div><dt>Agreed</dt><dd>{money(bike.purchase_price ?? null)}</dd></div><div><dt>Margin</dt><dd>{money(bike.expected_gross_profit ?? null)}</dd></div></>}</dl><div className="admin-stock-actions"><Link href={href} onClick={event => event.stopPropagation()}>View</Link><Link className="primary" href={`${href}?edit=1`} onClick={event => event.stopPropagation()}>Edit</Link></div></div>
   </article>;
+}
+
+function StockCardImage({ images, alt }: { images: string[]; alt: string }) {
+  const [index, setIndex] = useState(0);
+  const image = images[index];
+  if (!image) return <div><b>YM</b><span>Image required</span></div>;
+  function failed(event: SyntheticEvent<HTMLImageElement>) {
+    if (index + 1 < images.length) setIndex(index + 1);
+    else event.currentTarget.src = "/bike-placeholder.svg";
+  }
+  return <img src={image} alt={alt} onError={failed} />;
 }
 
 export function Toggle({ on }: { on: boolean }) {

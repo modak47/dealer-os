@@ -6,12 +6,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeStockImageUrls } from "@/lib/stock-images";
+import { legacyRegistrationSlug, publicStockSlug } from "@/lib/public-stock-slug";
 
-const publicSlug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const PUBLIC_STOCK_STATUSES=["In Stock","ON FORECOURT","Available","Reserved"];
 const PUBLIC_DETAIL_FIELDS="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,advert_title,stock_number,category,body_style,fuel,transmission,description,service_history,vat_status,specifications,dealer5_data,image_urls,primary_image_url,mot_expiry,notes,created_at,plate,engine_number,number_of_gears,previous_owners,registration_date,display_status,show_on_website,is_test_record,reserve_enabled,reservation_amount,advert_sections,bhp,torque,co2,road_tax,top_speed,length_mm,width_mm,weight_kg,euro_emissions,hpi_category,workshop_status,date_in_stock,sold_date,mot_status,valeting_status,photo_status,location,updated_at,source_url,dealer5_updated_at,autotrader_vehicle_id,autotrader_taxonomy_data,autotrader_mot_data";
-const PUBLIC_INDEX_FIELDS="id,dealer5_id,registration,make,model,status,price,show_on_website,is_test_record,source_url";
-const PUBLIC_LIST_FIELDS="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,category,body_style,fuel,transmission,image_urls,primary_image_url,created_at,show_on_website,is_test_record,reserve_enabled,reservation_amount,source_url";
+const PUBLIC_INDEX_FIELDS="id,dealer5_id,stock_number,registration,make,model,status,price,show_on_website,is_test_record,source_url,created_at";
+const PUBLIC_LIST_FIELDS="id,dealer5_id,stock_number,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,category,body_style,fuel,transmission,image_urls,primary_image_url,created_at,show_on_website,is_test_record,reserve_enabled,reservation_amount,source_url";
 type PublicStockRow=Partial<SupabaseStockBike>&{id:string};
 
 const serverStockClient=()=>{try{return getSupabaseAdmin()}catch{return createClient(supabaseUrl,supabaseAnonKey,{auth:{persistSession:false,autoRefreshToken:false}})}};
@@ -38,8 +38,8 @@ export async function getSupabaseStockBikeByPublicIdentifier(identifier:string):
   const index=await loadPublicStockRows(supabase,PUBLIC_INDEX_FIELDS);
   if(index.error){console.error("[Public bike lookup] index failed",{requestedSlug:identifier,code:index.error.code});return {bike:null,method:"index-error"}}
   const rows=index.data??[];
-  let match=rows.find(row=>publicSlug([row.make,row.model,row.dealer5_id||row.id].filter(Boolean).join("-"))===requested);let method="exact-public-slug";
-  if(!match){match=rows.find(row=>publicSlug([row.make,row.model,row.registration].filter(Boolean).join("-"))===requested);method=match?"legacy-registration-slug":"exact-public-slug"}
+  let match=rows.find(row=>publicStockSlug(row)===requested);let method="exact-public-slug";
+  if(!match){match=rows.find(row=>legacyRegistrationSlug(row)===requested);method=match?"legacy-registration-slug":"exact-public-slug"}
   if(!match){const directId=requested.match(/(?:^|-)([0-9a-f-]{6,})$/i)?.[1]??(/^[0-9a-f-]+$/i.test(requested)?requested:"");if(directId){match=rows.find(row=>String(row.id).toLowerCase()===directId||String(row.dealer5_id??"").toLowerCase()===directId);method="stock-or-listing-id"}}
   if(!match){const suffix=requested.split("-").at(-1)?.replace(/[^a-z0-9]/g,"")??"";match=rows.find(row=>String(row.registration??"").toLowerCase().replace(/[^a-z0-9]/g,"")===suffix)||rows.find(row=>String(row.dealer5_id??"").toLowerCase()===suffix);method=match?"legacy-registration-or-dealer-id":"not-found"}
   if(!match)return {bike:null,method};
@@ -125,6 +125,7 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
   return {
     id:bike.id,
     dealer5Id:bike.dealer5_id??undefined,
+    stockNumber:bike.stock_number??undefined,
     createdTime:bike.created_at,
     registration:bike.registration??"",
     make:bike.make??"",

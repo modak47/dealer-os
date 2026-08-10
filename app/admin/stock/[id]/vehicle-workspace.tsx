@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import type { SyntheticEvent } from "react";
 import type { SupabaseStockBike } from "@/lib/stock-bike-types";
 import type { VehicleWorkspaceData } from "@/lib/vehicle-workspace";
 import { STOCK_STATUS, lifecycleRank } from "@/lib/statuses";
 import { StockAttachmentsCard } from "./stock-attachments-card";
+import { normalizeStockImageUrls } from "@/lib/stock-images";
 
 type Props = {
   bike: SupabaseStockBike;
@@ -87,10 +89,11 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
 
   const canReserve = !activeReservation && !activeSale && ["In Stock", "On Forecourt", "Available", "Prep"].includes(String(stockState.status ?? ""));
   const canStartSale = !activeReservation && !activeSale && !isComplete && ["In Stock", "On Forecourt", "Available", "Prep"].includes(String(stockState.status ?? ""));
+  const heroImages = normalizeStockImageUrls(stockState.primary_image_url, stockState.image_urls);
 
   return <div className="admin-page dms-vehicle-workspace">
     <header className="dms-vehicle-hero">
-      <div className="dms-vehicle-hero-media" style={{ backgroundImage: `url("${bike.primary_image_url || "/bike-placeholder.svg"}")` }} />
+      <div className="dms-vehicle-hero-media"><StockHeroImage images={heroImages} alt={`${stockState.make ?? ""} ${stockState.model ?? ""}`} /></div>
       <div>
         <Link href="/admin/stock" className="dms-vehicle-back">Back to Stock</Link>
         <h1>{[stockState.year, stockState.make, stockState.model, stockState.variant].filter(Boolean).join(" ") || "Motorcycle"}</h1>
@@ -219,6 +222,16 @@ export function VehicleWorkspace({ bike, workspace }: Props) {
       </form>
     </div>}
   </div>;
+}
+
+function StockHeroImage({images,alt}:{images:string[];alt:string}){
+  const [index,setIndex]=useState(0);
+  const image=images[index]||"/bike-placeholder.svg";
+  function failed(event:SyntheticEvent<HTMLImageElement>){
+    if(index+1<images.length)setIndex(index+1);
+    else event.currentTarget.src="/bike-placeholder.svg";
+  }
+  return <img src={image} alt={alt} onError={failed}/>;
 }
 
 function ActionPanel({ title, disabled, disabledText, children }: { title: string; disabled?: boolean; disabledText?: string; children: React.ReactNode }) {

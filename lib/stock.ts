@@ -3,6 +3,7 @@ import { getAirtableStock, type StockBike } from "@/lib/airtable";
 import { bikes as mockBikes } from "@/lib/mock-data";
 import { getSupabasePublicStockBikes, getSupabaseStockBikeByPublicIdentifier, getSupabaseStockBikes, toAdminStockBike } from "@/lib/supabase-stock";
 import { compareImageAvailability, normalizeStockImageUrls } from "@/lib/stock-images";
+import { legacyRegistrationSlug, publicStockSlug } from "@/lib/public-stock-slug";
 
 export type { StockBike } from "@/lib/airtable";
 export type CustomerStatus="In Stock"|"Reserved";
@@ -28,7 +29,6 @@ export const isReserved=(bike:StockBike)=>normaliseStockStatus(bike.status)==="r
 export const isActive=(bike:StockBike)=>ACTIVE_STATUSES.has(normaliseStockStatus(bike.status));
 export const isPublic=(bike:StockBike)=>!isTestRecord(bike)&&bike.showOnWebsite!==false&&PUBLIC_STATUSES.has(normaliseStockStatus(bike.status))&&bike.price>0&&Boolean(bike.make.trim())&&Boolean(bike.model.trim());
 export const customerStatus=(bike:StockBike):CustomerStatus=>isReserved(bike)?"Reserved":"In Stock";
-const slugify=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const text=(value:unknown)=>typeof value==="string"?value.trim():"";
 const looksInternal=(value:string)=>!value||/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(value)||/\b(?:dealer5|derivative|stock[_ -]?id|uuid)\b/i.test(value)||(!/\s/.test(value)&&value.length>22)||value.length>60;
 const customerText=(value:unknown,internalValue="")=>{const cleaned=text(value);return cleaned&&cleaned!==internalValue&&!looksInternal(cleaned)?cleaned:""};
@@ -52,7 +52,7 @@ export async function getAllStockBikes():Promise<StockBike[]>{
 }
 
 export function toPublicBike(bike:StockBike):PublicStockBike{const fields=bike.dealer5Fields??{};const field=(...names:string[])=>{for(const name of names){const value=text(fields[name]);if(value)return value}return ""};const numeric=(value:unknown,fallback=0)=>{const raw=String(value??"").replace(/[^0-9.-]/g,"");if(!raw)return fallback;const parsed=Number(raw);return Number.isFinite(parsed)?parsed:fallback};const detailedYear=numeric(field("Year of Manufacture","Year"),bike.year);const detailedMileage=numeric(field("Mileage"),bike.mileage);const detailedPrice=numeric(field("Price"),bike.price);const customerImages=normalizeStockImageUrls(bike.imageUrls,bike.image).filter(image=>image!==stockPlaceholder&&!image.includes("bike-placeholder"));const photoReady=customerImages.length>0;const images=photoReady?customerImages:[stockPlaceholder];const image=images[0]||stockPlaceholder;const confirmSpec=field("Confirm Spec","Advert Description","Full Description","Description");const safeVariant=customerText(bike.variant,bike.derivativeId);return{
-  id:bike.id,slug:slugify([bike.make,bike.model,bike.dealer5Id||bike.id].filter(Boolean).join("-"))||bike.id,createdTime:bike.createdTime,
+  id:bike.id,slug:publicStockSlug(bike)||bike.id,createdTime:bike.createdTime,
   make:customerText(field("Make")||bike.make)||"Unknown",model:customerText(field("Model")||bike.model)||"Motorcycle",year:detailedYear,
   mileage:detailedMileage?`${detailedMileage.toLocaleString("en-GB")} miles`:"Mileage unavailable",mileageValue:detailedMileage,
   price:detailedPrice,status:customerStatus(bike),image,imageUrls:images.length?images:[image],
@@ -74,7 +74,7 @@ export async function getBikeBySlugOrId(value:string):Promise<PublicStockDetailB
   const direct=await getSupabaseStockBikeByPublicIdentifier(value);console.info("[Public bike lookup]",{requestedSlug:value,lookupMethod:direct.method,found:Boolean(direct.bike)});
   if(direct.bike){const mapped=toAdminStockBike(direct.bike);if(isPublic(mapped))return toPublicDetail(mapped)}
   if(!["supabase-not-configured","index-error"].includes(direct.method)){console.info("[Public bike lookup] all lookup methods exhausted",{requestedSlug:value});return null}
-  const fallback=(await getAllStockBikes()).filter(isPublic).find(b=>b.id===value||toPublicBike(b).slug===value||slugify([b.make,b.model,b.registration].filter(Boolean).join("-"))===value);
+  const fallback=(await getAllStockBikes()).filter(isPublic).find(b=>b.id===value||toPublicBike(b).slug===value||legacyRegistrationSlug(b)===value);
   console.info("[Public bike lookup fallback]",{requestedSlug:value,found:Boolean(fallback)});return fallback?toPublicDetail(fallback):null;
 }
 export async function getStockStats():Promise<StockStats>{const all=(await getAllStockBikes()).filter(bike=>!isTestRecord(bike));const active=all.filter(isActive);return{

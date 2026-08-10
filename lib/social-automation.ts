@@ -55,14 +55,15 @@ export async function getSocialAutomationData(): Promise<SocialAutomationData> {
     getPublicStockBikes(),
   ]);
   const missing = [channels, templates, queue].find(result => ["42P01", "42703"].includes(result.error?.code ?? ""));
-  if (missing?.error) return { channels: [], templates: [], queue: [], eligibleStock: stock.slice(0, 12), migrationReady: false, error: missing.error.message };
+  const postReadyStock = stock.filter(bike => bike.photoReady);
+  if (missing?.error) return { channels: [], templates: [], queue: [], eligibleStock: postReadyStock.slice(0, 12), migrationReady: false, error: missing.error.message };
   const hardError = [channels, templates, queue].find(result => result.error);
   if (hardError?.error) throw hardError.error;
   return {
     channels: (channels.data ?? []) as SocialChannel[],
     templates: (templates.data ?? []) as SocialTemplate[],
     queue: (queue.data ?? []) as SocialQueueItem[],
-    eligibleStock: stock,
+    eligibleStock: postReadyStock,
     migrationReady: true,
     error: null,
   };
