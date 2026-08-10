@@ -21,8 +21,18 @@ export function sanitiseStockPayload(body:Record<string,unknown>){
 function normaliseDate(value:unknown,key:string){
   if(value===null||value===undefined||value==="")return null;
   const raw=String(value).trim();
-  if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;
+  if(/^(?:0{4}[-/.]0{2}[-/.]0{2}|0{1,2}[-/.]0{1,2}[-/.]0{4})$/.test(raw))return null;
+  const iso=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(iso)return validateDateParts(iso[1],iso[2],iso[3],key);
   const uk=raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
-  if(uk)return `${uk[3]}-${uk[2].padStart(2,"0")}-${uk[1].padStart(2,"0")}`;
+  if(uk)return validateDateParts(uk[3],uk[2].padStart(2,"0"),uk[1].padStart(2,"0"),key);
   throw new Error(`${key} must be a valid date.`);
+}
+
+function validateDateParts(year:string,month:string,day:string,key:string){
+  const y=Number(year),m=Number(month),d=Number(day);
+  if(y===0&&m===0&&d===0)return null;
+  const date=new Date(Date.UTC(y,m-1,d));
+  if(date.getUTCFullYear()!==y||date.getUTCMonth()!==m-1||date.getUTCDate()!==d)throw new Error(`${key} must be a valid date.`);
+  return `${year}-${month}-${day}`;
 }
