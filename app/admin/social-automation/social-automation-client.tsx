@@ -49,6 +49,26 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
     }
   }
 
+  async function updateQueueItem(id: string, status: "approved" | "cancelled") {
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/crm/social-posts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Unable to update post.");
+      setMessage(status === "approved" ? "Post approved for the Pinterest worker." : "Post cancelled.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update post.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return <div className="social-automation">
     <section className="social-status-grid">
       {channels.map(channel => <article key={channel.id}><span>{platformLabel(channel.platform)}</span><b>{channel.display_name}</b><em className={channel.status}>{channel.status.replaceAll("_", " ")}</em><small>{channel.posting_enabled ? "Posting enabled" : "Manual setup required"}</small></article>)}
@@ -94,7 +114,16 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
       </section>
       <section>
         <div className="panel-title"><h2>Latest Queue</h2><span>{queue.length} recent</span></div>
-        <div className="social-queue-list">{queue.length ? queue.map(item => <article key={item.id}><b>{platformLabel(item.platform)} - {item.status}</b><span>{item.caption}</span><small>{item.scheduled_for ? new Date(item.scheduled_for).toLocaleString("en-GB") : new Date(item.created_at).toLocaleString("en-GB")}</small></article>) : <p>No draft posts queued yet.</p>}</div>
+        <div className="social-queue-list">{queue.length ? queue.map(item => <article key={item.id}>
+          <b>{platformLabel(item.platform)} - {item.status}</b>
+          <span>{item.caption}</span>
+          {item.error ? <small>{item.error}</small> : null}
+          <small>{item.scheduled_for ? new Date(item.scheduled_for).toLocaleString("en-GB") : new Date(item.created_at).toLocaleString("en-GB")}</small>
+          <div className="social-queue-actions">
+            {["draft", "failed"].includes(item.status) ? <button type="button" onClick={() => void updateQueueItem(item.id, "approved")} disabled={busy}>{item.status === "failed" ? "Retry" : "Approve"}</button> : null}
+            {["draft", "approved", "failed"].includes(item.status) ? <button type="button" onClick={() => void updateQueueItem(item.id, "cancelled")} disabled={busy}>Cancel</button> : null}
+          </div>
+        </article>) : <p>No draft posts queued yet.</p>}</div>
       </section>
     </div>
   </div>;

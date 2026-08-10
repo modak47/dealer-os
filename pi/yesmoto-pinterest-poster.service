@@ -1,0 +1,16 @@
+[Unit]
+Description=YesMoto Pinterest Poster Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yesmoto
+WorkingDirectory=/home/yesmoto/dealerbot
+EnvironmentFile=/home/yesmoto/dealerbot/.env
+ExecStart=/usr/bin/xvfb-run -a /usr/bin/env node /home/yesmoto/dealerbot/pinterest_supabase_poster.js --worker --publish
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
