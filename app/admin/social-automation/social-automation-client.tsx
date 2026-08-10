@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { SyntheticEvent } from "react";
 import type { PublicStockBike } from "@/lib/stock";
-import type { SocialChannel, SocialPublishingBike, SocialPublishingStatus, SocialQueueItem, SocialTemplate } from "@/lib/social-automation";
+import type { SocialChannel, SocialPublishingBike, SocialPublishingStatus, SocialQueueItem, SocialStockSetting, SocialTemplate } from "@/lib/social-automation";
 
 type Panel = "stock" | "create" | "status" | "automation" | "templates" | "queue";
 
-export function SocialAutomationClient({ channels, templates, queue, stock, publishingOverview }: { channels: SocialChannel[]; templates: SocialTemplate[]; queue: SocialQueueItem[]; stock: PublicStockBike[]; publishingOverview: SocialPublishingBike[] }) {
+export function SocialAutomationClient({ channels, templates, queue, stock, publishingOverview, stockSettings }: { channels: SocialChannel[]; templates: SocialTemplate[]; queue: SocialQueueItem[]; stock: PublicStockBike[]; publishingOverview: SocialPublishingBike[]; stockSettings: SocialStockSetting[] }) {
   const router = useRouter();
   const [panel, setPanel] = useState<Panel>("stock");
   const [bikeId, setBikeId] = useState(stock[0]?.id ?? "");
@@ -18,8 +18,9 @@ export function SocialAutomationClient({ channels, templates, queue, stock, publ
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCount, setShowCount] = useState(10);
   const [sortMode, setSortMode] = useState("newest");
-  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [settings, setSettings] = useState<Record<string, SocialStockSetting>>(() => Object.fromEntries(stockSettings.map(setting => [String(setting.stock_bike_id), setting])));
   const [busy, setBusy] = useState(false);
+  const [settingsBusy, setSettingsBusy] = useState<string>("");
   const [message, setMessage] = useState("");
   const activeTemplates = templates.filter(template => template.active);
   const selectedBike = stock.find(bike => bike.id === bikeId);
@@ -31,10 +32,10 @@ export function SocialAutomationClient({ channels, templates, queue, stock, publ
     const rows = stock.filter(bike => {
       const matchesSearch = !term || `${bike.year} ${bike.make} ${bike.model} ${bike.variant} ${bike.price}`.toLowerCase().includes(term);
       const matchesStatus = statusFilter === "all" || bike.status.toLowerCase() === statusFilter;
-      return matchesSearch && matchesStatus && !excluded.has(bike.id);
+      return matchesSearch && matchesStatus;
     });
     return rows.sort((a, b) => sortMode === "price_high" ? b.price - a.price : sortMode === "price_low" ? a.price - b.price : sortMode === "oldest" ? Date.parse(a.createdTime || "0") - Date.parse(b.createdTime || "0") : Date.parse(b.createdTime || "0") - Date.parse(a.createdTime || "0")).slice(0, showCount);
-  }, [excluded, search, showCount, sortMode, statusFilter, stock]);
+  }, [search, showCount, sortMode, statusFilter, stock]);
   const preview = useMemo(() => {
     if (!selectedBike || !selectedTemplate) return "";
     return selectedTemplate.caption_template
@@ -90,6 +91,48 @@ export function SocialAutomationClient({ channels, templates, queue, stock, publ
     }
   }
 
+  async function saveStockSetting(stockBikeId: string, patch: Partial<SocialStockSetting>) {
+    const current = settings[stockBikeId];
+    const optimistic = {
+      id: current?.id ?? `pending-${stockBikeId}`,
+      stock_bike_id: Number(stockBikeId),
+      include_in_rotation: current?.include_in_rotation ?? true,
+      priority: current?.priority ?? false,
+      preferred_platform: current?.preferred_platform ?? null,
+      preferred_template_id: current?.preferred_template_id ?? null,
+      preferred_post_time: current?.preferred_post_time ?? null,
+      max_posts_per_bike: current?.max_posts_per_bike ?? 6,
+      last_queued_at: current?.last_queued_at ?? null,
+      notes: current?.notes ?? null,
+      updated_at: new Date().toISOString(),
+      ...patch,
+    } satisfies SocialStockSetting;
+    setSettings(existing => ({ ...existing, [stockBikeId]: optimistic }));
+    setSettingsBusy(stockBikeId);
+    setMessage("");
+    try {
+      const response = await fetch("/api/crm/social-stock-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stock_bike_id: stockBikeId, ...patch }),
+      });
+      const result = await response.json() as { setting?: SocialStockSetting; error?: string };
+      if (!response.ok || !result.setting) throw new Error(result.error || "Unable to save social stock setting.");
+      setSettings(existing => ({ ...existing, [stockBikeId]: result.setting as SocialStockSetting }));
+      setMessage("Stock social setting saved.");
+    } catch (error) {
+      if (current) setSettings(existing => ({ ...existing, [stockBikeId]: current }));
+      else setSettings(existing => {
+        const next = { ...existing };
+        delete next[stockBikeId];
+        return next;
+      });
+      setMessage(error instanceof Error ? error.message : "Unable to save social stock setting.");
+    } finally {
+      setSettingsBusy("");
+    }
+  }
+
   return <div className="social-automation">
     <section className="social-status-grid">
       {channels.map(channel => <article key={channel.id}><span>{platformLabel(channel.platform)}</span><b>{channel.display_name}</b><em className={channel.status}>{channel.status.replaceAll("_", " ")}</em><small>{channel.posting_enabled ? "Posting enabled" : "Manual setup required"}</small></article>)}
@@ -104,7 +147,7 @@ export function SocialAutomationClient({ channels, templates, queue, stock, publ
       <button type="button" className={panel === "queue" ? "active" : ""} onClick={() => setPanel("queue")}>Queue</button>
     </nav>
 
-    {message && <p className={message.includes("queued") || message.includes("approved") ? "stock-save-message success" : "stock-save-message"}>{message}</p>}
+    {message && <p className={message.includes("queued") || message.includes("approved") || message.includes("saved") ? "stock-save-message success" : "stock-save-message"}>{message}</p>}
 
     {panel === "stock" ? <section className="social-workspace-panel">
       <div className="social-stock-toolbar">
@@ -122,16 +165,19 @@ export function SocialAutomationClient({ channels, templates, queue, stock, publ
         <div className="social-stock-settings-row head"><span>ID</span><span>Vehicle</span><span>Price</span><span>Last post</span><span>Random list</span><span>Actions</span></div>
         {stockRows.map((bike, index) => {
           const platformStatus = getPlatformStatus(publishingOverview, bike.id, platform);
+          const setting = settings[bike.id];
+          const included = setting?.include_in_rotation !== false;
+          const priority = setting?.priority === true;
           return <div className="social-stock-settings-row" key={bike.id}>
             <span>{bike.id}</span>
             <div className="social-stock-settings-bike"><img src={bike.image} alt={`${bike.make} ${bike.model}`} onError={fallbackImage} /><b>{bike.year} {bike.make} {bike.model}</b><small>{bike.variant || bike.mileage}</small></div>
             <span>{money(bike.price)}</span>
             <span className={platformStatus.status === "posted" ? "ok" : ""}>{platformStatus.lastUpdated ? new Date(platformStatus.lastUpdated).toLocaleString("en-GB") : platformStatus.label}</span>
-            <span>{index % 2 === 0 ? "Included" : "Rotation"}</span>
+            <span className={included ? "ok" : ""}>{priority ? "Priority" : included ? (index % 2 === 0 ? "Included" : "Rotation") : "Excluded"}</span>
             <div className="social-stock-actions">
-              <button type="button" onClick={() => { setBikeId(bike.id); void queueBikePost(bike.id); }} disabled={busy}>Add Priority</button>
+              <button type="button" onClick={() => void saveStockSetting(bike.id, { include_in_rotation: true, priority: true, preferred_platform: platform, preferred_template_id: templateId })} disabled={settingsBusy === bike.id}>{priority ? "Priority On" : "Add Priority"}</button>
               <button type="button" onClick={() => { setBikeId(bike.id); setPanel("create"); }}>Create</button>
-              <button type="button" onClick={() => setExcluded(current => new Set(current).add(bike.id))}>Exclude</button>
+              <button type="button" onClick={() => void saveStockSetting(bike.id, included ? { include_in_rotation: false, priority: false } : { include_in_rotation: true })} disabled={settingsBusy === bike.id}>{included ? "Exclude" : "Include"}</button>
             </div>
           </div>;
         })}
