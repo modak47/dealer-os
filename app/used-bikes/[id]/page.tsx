@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { dealership } from "@/config/dealership";
 import { absoluteUrl } from "@/lib/site-url";
@@ -81,6 +81,7 @@ export default async function Detail({ params }: { params: Promise<{ id: string 
   const { id } = await params;
   const bike = await getBikeBySlugOrId(id);
   if (!bike) notFound();
+  if (id !== bike.slug) redirect(`/used-bikes/${bike.slug}`);
   const related = await getPublicStockBikes();
   const structuredData = bikeStructuredData(bike);
   return <>
