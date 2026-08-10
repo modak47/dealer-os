@@ -2,11 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { SyntheticEvent } from "react";
+import type { CSSProperties, SyntheticEvent } from "react";
 import type { PublicStockBike } from "@/lib/stock";
 import type { SocialChannel, SocialPublishingBike, SocialPublishingStatus, SocialQueueItem, SocialStockSetting, SocialTemplate } from "@/lib/social-automation";
 
 type Panel = "stock" | "create" | "status" | "automation" | "templates" | "queue";
+type TemplateDesign = {
+  layout: "single" | "multi" | "spotlight";
+  accent: string;
+  background: "light" | "dark";
+  badge: string;
+  headline: string;
+  subline: string;
+  showPrice: boolean;
+  showBrand: boolean;
+  showThumbs: boolean;
+};
 
 export function SocialAutomationClient({ channels, templates, queue, stock, publishingOverview, stockSettings }: { channels: SocialChannel[]; templates: SocialTemplate[]; queue: SocialQueueItem[]; stock: PublicStockBike[]; publishingOverview: SocialPublishingBike[]; stockSettings: SocialStockSetting[] }) {
   const router = useRouter();
@@ -208,7 +219,7 @@ export function SocialAutomationClient({ channels, templates, queue, stock, publ
 
     {panel === "status" ? <PublishingStatus channels={channels} publishingOverview={publishingOverview} /> : null}
     {panel === "automation" ? <AutomationSettings channels={channels} /> : null}
-    {panel === "templates" ? <TemplateGrid templates={templates} selectTemplate={(id) => { setTemplateId(id); setPanel("create"); }} /> : null}
+    {panel === "templates" ? <TemplateGrid templates={templates} bike={selectedBike ?? stock[0]} selectTemplate={(id) => { setTemplateId(id); setPanel("create"); }} /> : null}
     {panel === "queue" ? <QueuePanel queue={queue} busy={busy} updateQueueItem={updateQueueItem} /> : null}
   </div>;
 }
@@ -241,11 +252,121 @@ function AutomationSettings({ channels }: { channels: SocialChannel[] }) {
   </section>;
 }
 
-function TemplateGrid({ templates, selectTemplate }: { templates: SocialTemplate[]; selectTemplate: (id: string) => void }) {
+function TemplateGrid({ templates, bike, selectTemplate }: { templates: SocialTemplate[]; bike?: PublicStockBike; selectTemplate: (id: string) => void }) {
+  const [filter, setFilter] = useState("all");
+  const [editingTemplate, setEditingTemplate] = useState<SocialTemplate | null>(null);
+  const [design, setDesign] = useState<TemplateDesign>(defaultTemplateDesign());
+  const filtered = templates.filter(template => filter === "all" || templateType(template) === filter);
+  function edit(template: SocialTemplate) {
+    setEditingTemplate(template);
+    setDesign(defaultTemplateDesign(template, bike));
+  }
   return <section className="social-workspace-panel">
-    <div className="social-template-toolbar"><b>Filter Templates:</b><span>All</span><span>Single Banner</span><span>Multiple Image</span><span>Carousel</span><button type="button">Text & Hashtags Settings</button></div>
-    <div className="social-template-grid">{templates.map(template => <article key={template.id}><div><span>{template.name}</span><strong>{template.platform ? platformLabel(template.platform) : "All channels"}</strong></div><p>{template.caption_template}</p><button type="button" onClick={() => selectTemplate(template.id)}>Create Post</button></article>)}</div>
+    <div className="social-template-toolbar">
+      <b>Filter Templates:</b>
+      {["all", "single", "multi", "spotlight"].map(option => <button type="button" className={filter === option ? "active" : ""} onClick={() => setFilter(option)} key={option}>{templateFilterLabel(option)}</button>)}
+      <button type="button" className="settings" onClick={() => templates[0] && edit(templates[0])}>Create Custom Design</button>
+    </div>
+    {editingTemplate ? <TemplateDesigner template={editingTemplate} bike={bike} design={design} setDesign={setDesign} close={() => setEditingTemplate(null)} useTemplate={() => selectTemplate(editingTemplate.id)} /> : null}
+    <div className="social-template-grid">{filtered.map(template => {
+      const type = templateType(template);
+      return <article className={`social-template-card ${type}`} key={template.id}>
+        <TemplateArtwork template={template} bike={bike} />
+        <div className="social-template-meta">
+          <span>{template.platform ? platformLabel(template.platform) : "All channels"}</span>
+          <b>{template.name}</b>
+          <small>{templateFilterLabel(type)}</small>
+        </div>
+        <p>{renderTemplateSnippet(template.caption_template, bike)}</p>
+        <div className="social-template-card-actions"><button type="button" onClick={() => edit(template)}>Edit Design</button><button type="button" onClick={() => selectTemplate(template.id)}>Use Template</button></div>
+      </article>;
+    })}</div>
   </section>;
+}
+
+function TemplateDesigner({ template, bike, design, setDesign, close, useTemplate }: { template: SocialTemplate; bike?: PublicStockBike; design: TemplateDesign; setDesign: (next: TemplateDesign) => void; close: () => void; useTemplate: () => void }) {
+  const update = <K extends keyof TemplateDesign>(key: K, value: TemplateDesign[K]) => setDesign({ ...design, [key]: value });
+  return <div className="social-template-designer">
+    <div className="designer-toolbar">
+      <div><span>Design editor</span><b>{template.name}</b></div>
+      <button type="button" onClick={close}>Close</button>
+    </div>
+    <div className="designer-grid">
+      <aside className="designer-controls">
+        <label><span>Layout</span><select value={design.layout} onChange={event => update("layout", event.target.value as TemplateDesign["layout"])}><option value="single">Single Banner</option><option value="multi">Multiple Image</option><option value="spotlight">Spotlight</option></select></label>
+        <label><span>Theme</span><select value={design.background} onChange={event => update("background", event.target.value as TemplateDesign["background"])}><option value="light">Light</option><option value="dark">Dark</option></select></label>
+        <label><span>Accent</span><input type="color" value={design.accent} onChange={event => update("accent", event.target.value)} /></label>
+        <label><span>Badge text</span><input value={design.badge} onChange={event => update("badge", event.target.value)} /></label>
+        <label><span>Headline</span><input value={design.headline} onChange={event => update("headline", event.target.value)} /></label>
+        <label><span>Subline</span><input value={design.subline} onChange={event => update("subline", event.target.value)} /></label>
+        <div className="designer-switches">
+          <label><input type="checkbox" checked={design.showPrice} onChange={event => update("showPrice", event.target.checked)} />Price</label>
+          <label><input type="checkbox" checked={design.showBrand} onChange={event => update("showBrand", event.target.checked)} />Brand</label>
+          <label><input type="checkbox" checked={design.showThumbs} onChange={event => update("showThumbs", event.target.checked)} />Thumbnails</label>
+        </div>
+        <button type="button" onClick={useTemplate}>Use This Design</button>
+      </aside>
+      <div className="designer-canvas-wrap">
+        <TemplateArtwork template={template} bike={bike} design={design} large />
+      </div>
+    </div>
+  </div>;
+}
+
+function TemplateArtwork({ template, bike, design, large = false }: { template: SocialTemplate; bike?: PublicStockBike; design?: TemplateDesign; large?: boolean }) {
+  const type = design?.layout ?? templateType(template);
+  const title = bike ? `${bike.year || ""} ${bike.make} ${bike.model}`.trim() : "Vehicle Year & Make";
+  const price = bike ? money(bike.price) : "Price";
+  const image = bike?.image || "/bike-placeholder.svg";
+  const extraImages = bike?.imageUrls?.filter(item => item && !item.includes("bike-placeholder")).slice(1, 4) ?? [];
+  const style = design ? ({ "--template-accent": design.accent } as CSSProperties) : undefined;
+  return <div className={`social-template-art ${type} ${large ? "large" : ""} ${design?.background === "dark" ? "dark" : ""}`} style={style}>
+    <div className="template-main-image"><img src={image} alt={title} onError={fallbackImage} /></div>
+    {design?.showThumbs === false || type === "single" ? null : <div className="template-side-images">
+      {(extraImages.length ? extraImages : [image, image, image]).slice(0, type === "spotlight" ? 2 : 3).map((item, index) => <img src={item} alt={`${title} template ${index + 1}`} onError={fallbackImage} key={`${item}-${index}`} />)}
+    </div>}
+    {design?.showPrice === false ? null : <div className="template-price">{price}</div>}
+    {design?.showBrand === false ? null : <div className="template-brand">{design?.badge || "YES MOTO"}</div>}
+    <div className="template-title"><b>{design?.headline || title}</b><span>{design?.subline || bike?.variant || bike?.mileage || "Vehicle Model"}</span></div>
+  </div>;
+}
+
+function defaultTemplateDesign(template?: SocialTemplate, bike?: PublicStockBike): TemplateDesign {
+  const title = bike ? `${bike.year || ""} ${bike.make} ${bike.model}`.trim() : "Vehicle Year & Make";
+  return {
+    layout: template ? templateType(template) as TemplateDesign["layout"] : "single",
+    accent: "#00e51d",
+    background: "light",
+    badge: "YES MOTO",
+    headline: title,
+    subline: bike?.variant || bike?.mileage || "Finance - Delivery - Part exchange",
+    showPrice: true,
+    showBrand: true,
+    showThumbs: true,
+  };
+}
+
+function templateType(template: SocialTemplate) {
+  const text = `${template.name} ${template.caption_template}`.toLowerCase();
+  if (/weekly|still available|multiple|carousel/.test(text)) return "multi";
+  if (/low mileage|spotlight|feature/.test(text)) return "spotlight";
+  return "single";
+}
+
+function templateFilterLabel(value: string) {
+  return ({ all: "All", single: "Single Banner", multi: "Multiple Image", spotlight: "Spotlight" } as Record<string, string>)[value] ?? value;
+}
+
+function renderTemplateSnippet(template: string, bike?: PublicStockBike) {
+  if (!bike) return template;
+  return template
+    .replaceAll("{{year}}", String(bike.year || ""))
+    .replaceAll("{{make}}", bike.make)
+    .replaceAll("{{model}}", bike.model)
+    .replaceAll("{{variant}}", bike.variant)
+    .replaceAll("{{price}}", money(bike.price))
+    .replaceAll("{{mileage}}", bike.mileage)
+    .replaceAll("{{url}}", `/used-bikes/${bike.slug}`);
 }
 
 function QueuePanel({ queue, busy, updateQueueItem }: { queue: SocialQueueItem[]; busy: boolean; updateQueueItem: (id: string, status: "approved" | "cancelled") => Promise<void> }) {
