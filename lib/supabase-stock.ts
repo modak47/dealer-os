@@ -38,9 +38,10 @@ export async function getSupabaseStockBikeByPublicIdentifier(identifier:string):
   const index=await loadPublicStockRows(supabase,PUBLIC_INDEX_FIELDS);
   if(index.error){console.error("[Public bike lookup] index failed",{requestedSlug:identifier,code:index.error.code});return {bike:null,method:"index-error"}}
   const rows=index.data??[];
-  let match=rows.find(row=>publicSlug([row.make,row.model,row.registration].filter(Boolean).join("-"))===requested);let method="exact-slug";
-  if(!match){const directId=/^\d+$/.test(requested)?requested:requested.match(/(?:^|-)(\d+)$/)?.[1];if(directId){match=rows.find(row=>String(row.id)===directId||String(row.dealer5_id??"")===directId);method="stock-or-listing-id"}}
-  if(!match){const suffix=requested.split("-").at(-1)?.replace(/[^a-z0-9]/g,"")??"";match=rows.find(row=>String(row.registration??"").toLowerCase().replace(/[^a-z0-9]/g,"")===suffix)||rows.find(row=>String(row.dealer5_id??"").toLowerCase()===suffix);method=match?"registration-or-dealer-id":"not-found"}
+  let match=rows.find(row=>publicSlug([row.make,row.model,row.dealer5_id||row.id].filter(Boolean).join("-"))===requested);let method="exact-public-slug";
+  if(!match){match=rows.find(row=>publicSlug([row.make,row.model,row.registration].filter(Boolean).join("-"))===requested);method=match?"legacy-registration-slug":"exact-public-slug"}
+  if(!match){const directId=requested.match(/(?:^|-)([0-9a-f-]{6,})$/i)?.[1]??(/^[0-9a-f-]+$/i.test(requested)?requested:"");if(directId){match=rows.find(row=>String(row.id).toLowerCase()===directId||String(row.dealer5_id??"").toLowerCase()===directId);method="stock-or-listing-id"}}
+  if(!match){const suffix=requested.split("-").at(-1)?.replace(/[^a-z0-9]/g,"")??"";match=rows.find(row=>String(row.registration??"").toLowerCase().replace(/[^a-z0-9]/g,"")===suffix)||rows.find(row=>String(row.dealer5_id??"").toLowerCase()===suffix);method=match?"legacy-registration-or-dealer-id":"not-found"}
   if(!match)return {bike:null,method};
   const detail=await supabase.from("stock_bikes").select(PUBLIC_DETAIL_FIELDS).eq("id",match.id).maybeSingle();
   if(detail.error){console.error("[Public bike lookup] detail failed",{requestedSlug:identifier,method,code:detail.error.code});return {bike:null,method:`${method}-detail-error`}}
@@ -123,6 +124,7 @@ export function toAdminStockBike(bike:SupabaseStockBike):StockBike{
   const dealer5Fields=mapped.dealer5_data&&typeof mapped.dealer5_data==="object"&&typeof (mapped.dealer5_data as {fields?:unknown}).fields==="object"?(mapped.dealer5_data as {fields:Record<string,unknown>}).fields:{};
   return {
     id:bike.id,
+    dealer5Id:bike.dealer5_id??undefined,
     createdTime:bike.created_at,
     registration:bike.registration??"",
     make:bike.make??"",

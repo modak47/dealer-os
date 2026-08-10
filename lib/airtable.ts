@@ -2,6 +2,7 @@ import "server-only";
 
 export interface StockBike {
   id: string;
+  dealer5Id?: string;
   createdTime: string;
   registration: string;
   make: string;
