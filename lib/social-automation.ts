@@ -94,11 +94,15 @@ export async function getSocialAutomationData(): Promise<SocialAutomationData> {
     db.from("social_stock_settings").select("id,stock_bike_id,include_in_rotation,priority,preferred_platform,preferred_template_id,preferred_post_time,max_posts_per_bike,last_queued_at,notes,updated_at"),
     getPublicStockBikes(),
   ]);
-  const missing = [channels, templates, queue, queueHistory, stockSettings].find(result => ["42P01", "42703"].includes(result.error?.code ?? ""));
+  const isMissingSchema = (error: { code?: string; message?: string } | null | undefined) =>
+    ["42P01", "42703", "PGRST200", "PGRST204", "PGRST205"].includes(error?.code ?? "") ||
+    /schema cache|does not exist|could not find/i.test(error?.message ?? "");
+  const missing = [channels, templates, queue, queueHistory].find(result => isMissingSchema(result.error));
   const postReadyStock = stock.filter(bike => bike.photoReady);
   if (missing?.error) return { channels: [], templates: [], queue: [], eligibleStock: postReadyStock.slice(0, 12), publishingOverview: [], stockSettings: [], migrationReady: false, error: missing.error.message };
-  const hardError = [channels, templates, queue, queueHistory, stockSettings].find(result => result.error);
+  const hardError = [channels, templates, queue, queueHistory].find(result => result.error);
   if (hardError?.error) throw hardError.error;
+  if (stockSettings.error && !isMissingSchema(stockSettings.error)) throw stockSettings.error;
   const channelRows = (channels.data ?? []) as SocialChannel[];
   const queueRows = (queueHistory.data ?? []) as SocialQueueItem[];
   return {
@@ -107,7 +111,7 @@ export async function getSocialAutomationData(): Promise<SocialAutomationData> {
     queue: (queue.data ?? []) as SocialQueueItem[],
     eligibleStock: postReadyStock,
     publishingOverview: buildPublishingOverview(postReadyStock, channelRows, queueRows),
-    stockSettings: (stockSettings.data ?? []) as SocialStockSetting[],
+    stockSettings: stockSettings.error ? [] : (stockSettings.data ?? []) as SocialStockSetting[],
     migrationReady: true,
     error: null,
   };
