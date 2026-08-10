@@ -62,7 +62,7 @@ export async function getSocialAutomationData(): Promise<SocialAutomationData> {
     channels: (channels.data ?? []) as SocialChannel[],
     templates: (templates.data ?? []) as SocialTemplate[],
     queue: (queue.data ?? []) as SocialQueueItem[],
-    eligibleStock: stock.filter(bike => bike.photoReady && bike.reserveEnabled && bike.status === "In Stock").slice(0, 12),
+    eligibleStock: stock,
     migrationReady: true,
     error: null,
   };

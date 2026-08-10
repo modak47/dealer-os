@@ -14,6 +14,8 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
   const [message, setMessage] = useState("");
   const selectedBike = stock.find(bike => bike.id === bikeId);
   const selectedTemplate = templates.find(template => template.id === templateId);
+  const selectedChannel = channels.find(channel => channel.platform === platform);
+  const displayImages = selectedBike?.imageUrls.filter(image => image && !image.includes("bike-placeholder")).slice(0, 4) ?? [];
   const preview = useMemo(() => {
     if (!selectedBike || !selectedTemplate) return "";
     return selectedTemplate.caption_template
@@ -25,6 +27,7 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
       .replaceAll("{{mileage}}", selectedBike.mileage)
       .replaceAll("{{url}}", `/used-bikes/${selectedBike.slug}`);
   }, [selectedBike, selectedTemplate]);
+  const previewTitle = selectedBike ? `${selectedBike.year || ""} ${selectedBike.make} ${selectedBike.model}`.trim() : "";
 
   async function queuePost() {
     setBusy(true);
@@ -54,7 +57,7 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
     <section className="social-compose-panel">
       <div>
         <h2>Create Draft Post</h2>
-        <p>Generate a stock post for review. This does not publish externally yet.</p>
+        <p>Generate a stock post for review. Queueing creates the draft; publishing is held until the channel connection is live.</p>
       </div>
       <div className="social-compose-form">
         <label><span>Bike</span><select value={bikeId} onChange={event => setBikeId(event.target.value)}>{stock.map(bike => <option value={bike.id} key={bike.id}>{bike.year} {bike.make} {bike.model} - {money(bike.price)}</option>)}</select></label>
@@ -62,17 +65,32 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
         <label><span>Platform</span><select value={platform} onChange={event => setPlatform(event.target.value)}>{channels.map(channel => <option value={channel.platform} key={channel.id}>{platformLabel(channel.platform)}</option>)}</select></label>
         <button type="button" onClick={() => void queuePost()} disabled={busy || !bikeId || !templateId}>{busy ? "Queueing..." : "Queue Draft"}</button>
       </div>
-      <div className="social-preview">
-        {selectedBike && <img src={selectedBike.image} alt={`${selectedBike.make} ${selectedBike.model}`} />}
-        <p>{preview || "Choose a bike and template to preview the caption."}</p>
-      </div>
+      {selectedBike ? <div className={`social-creative-preview ${platform}`}>
+        <div className="social-preview-art">
+          <div className="social-preview-main">
+            <img src={displayImages[0] || selectedBike.image} alt={previewTitle} />
+            <strong>{money(selectedBike.price)}</strong>
+          </div>
+          <div className="social-preview-ribbon"><b>YES MOTO</b><span>Delivery · Part exchange · Finance</span></div>
+          <div className="social-preview-thumbs">
+            {(displayImages.length ? displayImages : [selectedBike.image]).slice(0, 3).map((image, index) => <img src={image} alt={`${previewTitle} preview ${index + 1}`} key={`${image}-${index}`} />)}
+          </div>
+          <div className="social-preview-footer"><b>{previewTitle}</b><span>{selectedBike.variant || selectedBike.mileage}</span></div>
+        </div>
+        <div className="social-preview-copy">
+          <small>{platformLabel(platform)} draft preview</small>
+          <h3>{selectedChannel?.posting_enabled ? "Ready to publish after approval" : "Connection needed before publishing"}</h3>
+          <p>{preview || "Choose a bike and template to preview the caption."}</p>
+          <a href={`/used-bikes/${selectedBike.slug}`} target="_blank" rel="noreferrer">View website advert</a>
+        </div>
+      </div> : <div className="social-preview-empty">Choose a bike and template to preview the post.</div>}
       {message && <p className={message.includes("queued") ? "stock-save-message success" : "stock-save-message"}>{message}</p>}
     </section>
 
     <div className="social-admin-grid">
       <section>
-        <div className="panel-title"><h2>Eligible Stock</h2><span>{stock.length} ready</span></div>
-        <div className="social-stock-list">{stock.slice(0, 8).map(bike => <article key={bike.id}><img src={bike.image} alt={`${bike.make} ${bike.model}`} /><div><b>{bike.year} {bike.make} {bike.model}</b><span>{bike.mileage} - {money(bike.price)}</span></div></article>)}</div>
+        <div className="panel-title"><h2>Stock Available For Posts</h2><span>{stock.length} bikes</span></div>
+        <div className="social-stock-list">{stock.map(bike => <article key={bike.id} className={bike.id === bikeId ? "selected" : ""} onClick={() => setBikeId(bike.id)}><img src={bike.image} alt={`${bike.make} ${bike.model}`} /><div><b>{bike.year} {bike.make} {bike.model}</b><span>{bike.status} · {bike.mileage} · {money(bike.price)}</span></div></article>)}</div>
       </section>
       <section>
         <div className="panel-title"><h2>Latest Queue</h2><span>{queue.length} recent</span></div>
