@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { SyntheticEvent } from "react";
 import type { PublicStockBike } from "@/lib/stock";
-import type { SocialChannel, SocialQueueItem, SocialTemplate } from "@/lib/social-automation";
+import type { SocialChannel, SocialPublishingBike, SocialPublishingStatus, SocialQueueItem, SocialTemplate } from "@/lib/social-automation";
 
-export function SocialAutomationClient({ channels, templates, queue, stock }: { channels: SocialChannel[]; templates: SocialTemplate[]; queue: SocialQueueItem[]; stock: PublicStockBike[] }) {
+export function SocialAutomationClient({ channels, templates, queue, stock, publishingOverview }: { channels: SocialChannel[]; templates: SocialTemplate[]; queue: SocialQueueItem[]; stock: PublicStockBike[]; publishingOverview: SocialPublishingBike[] }) {
   const router = useRouter();
   const [bikeId, setBikeId] = useState(stock[0]?.id ?? "");
   const [templateId, setTemplateId] = useState(templates.find(template => template.active)?.id ?? "");
@@ -77,6 +77,28 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
       {channels.map(channel => <article key={channel.id}><span>{platformLabel(channel.platform)}</span><b>{channel.display_name}</b><em className={channel.status}>{channel.status.replaceAll("_", " ")}</em><small>{channel.posting_enabled ? "Posting enabled" : "Manual setup required"}</small></article>)}
     </section>
 
+    <section className="social-publishing-panel">
+      <div className="panel-title"><h2>Publishing Overview</h2><span>{publishingOverview.length} bikes</span></div>
+      <div className="social-publishing-table">
+        <div className="social-publishing-row social-publishing-head">
+          <span>Bike</span>
+          <span>Website</span>
+          {channels.map(channel => <span key={channel.id}>{platformLabel(channel.platform)}</span>)}
+          <span>Auto Trader</span>
+        </div>
+        {publishingOverview.map(bike => <div className="social-publishing-row" key={bike.stockBikeId}>
+          <div className="social-publishing-bike">
+            <img src={bike.image} alt={bike.title} onError={fallbackImage} />
+            <div><b>{bike.title}</b><small>{bike.status} · {money(bike.price)}</small></div>
+          </div>
+          <StatusPill item={bike.website} />
+          {bike.channels.map(item => <StatusPill item={item} key={item.platform} />)}
+          <StatusPill item={bike.autotrader} />
+        </div>)}
+        {!publishingOverview.length ? <p>No stock is ready for social posting yet.</p> : null}
+      </div>
+    </section>
+
     <section className="social-compose-panel">
       <div>
         <h2>Create Draft Post</h2>
@@ -133,7 +155,7 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
 }
 
 function platformLabel(value: string) {
-  return ({ facebook: "Facebook", instagram: "Instagram", pinterest: "Pinterest", google_business: "Google Business" } as Record<string, string>)[value] ?? value;
+  return ({ facebook: "Facebook", instagram: "Instagram", pinterest: "Pinterest", google_business: "Google Business", autotrader: "Auto Trader", website: "Website" } as Record<string, string>)[value] ?? value;
 }
 
 function money(value: number) {
@@ -143,4 +165,13 @@ function money(value: number) {
 function fallbackImage(event: SyntheticEvent<HTMLImageElement>) {
   if (event.currentTarget.src.endsWith("/bike-placeholder.svg")) return;
   event.currentTarget.src = "/bike-placeholder.svg";
+}
+
+function StatusPill({ item }: { item: SocialPublishingStatus }) {
+  const content = <span className={`social-publish-pill ${item.status}`} title={item.error ?? undefined}>
+    <b>{item.label}</b>
+    {item.lastUpdated ? <small>{new Date(item.lastUpdated).toLocaleDateString("en-GB")}</small> : null}
+  </span>;
+  if (!item.url) return content;
+  return <a className="social-publish-link" href={item.url} target="_blank" rel="noreferrer">{content}</a>;
 }

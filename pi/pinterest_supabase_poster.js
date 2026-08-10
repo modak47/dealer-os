@@ -10,6 +10,7 @@ const ENV_PATH = path.join(ROOT, ".env");
 const IMAGE_PATH = process.env.PINTEREST_IMAGE_PATH || path.join(ROOT, "pinterest-bike.jpg");
 const LOGIN_STATE_PATH = process.env.PINTEREST_LOGIN_STATE || path.join(ROOT, "pinterest-login.json");
 const BOARD_NAME = process.env.PINTEREST_BOARD_NAME || "Bike Stock";
+const PUBLIC_SITE_URL = (process.env.SOCIAL_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SOCIAL_SITE_URL || "https://yesmoto.co.uk").replace(/\/$/, "");
 const DRY_RUN = !process.argv.includes("--publish") && process.env.AUTO_PUBLISH !== "true";
 const INCLUDE_DRAFTS = process.argv.includes("--include-drafts") || process.env.PINTEREST_INCLUDE_DRAFTS === "true";
 const HEADLESS = process.argv.includes("--headed") ? false : process.env.PINTEREST_HEADLESS !== "false";
@@ -167,8 +168,17 @@ function imageUrlFromPost(post) {
 }
 
 function targetUrlFromPost(post) {
-  if (post.target_url) return post.target_url;
-  return "https://yesmoto.co.uk/used-bikes";
+  const raw = post.target_url || `${PUBLIC_SITE_URL}/used-bikes`;
+  try {
+    const url = new URL(raw);
+    const isDealerOsHost = /(^|\.)dealer-os|vercel\.app$/i.test(url.hostname);
+    if (isDealerOsHost && url.pathname.startsWith("/used-bikes")) {
+      return `${PUBLIC_SITE_URL}${url.pathname}${url.search}`;
+    }
+    return raw;
+  } catch {
+    return `${PUBLIC_SITE_URL}/used-bikes`;
+  }
 }
 
 async function downloadFile(url, destination) {

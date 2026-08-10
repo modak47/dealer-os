@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/current-user";
 import { cleanText } from "@/lib/crm-validation";
-import { renderSocialCaption } from "@/lib/social-automation";
+import { getSocialPublicOrigin, renderSocialCaption } from "@/lib/social-automation";
 import { getPublicStockBikes } from "@/lib/stock";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const bike = stock.find(item => String(item.id) === stockBikeId);
     if (!bike) return NextResponse.json({ error: "This bike is not currently eligible for public social posting." }, { status: 400 });
     if (!bike.photoReady) return NextResponse.json({ error: "This bike needs real photos before it can be queued for social posting." }, { status: 400 });
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
+    const origin = getSocialPublicOrigin(new URL(request.url).origin);
     const caption = renderSocialCaption(String(template.caption_template), bike, origin);
     const { data, error } = await db.from("social_post_queue").insert({
       stock_bike_id: Number(bike.id),

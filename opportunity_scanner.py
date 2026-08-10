@@ -126,6 +126,41 @@ AUTOTRADER_USER_AGENT = (
     "Chrome/126.0 Safari/537.36 YesMotoOpportunityScanner/1.0"
 )
 
+NEWER_STOCK_MEDIAN_CAP_RATIO = 1.12
+
+
+def median_value(values):
+    clean_values = [value for value in values if value is not None]
+    return statistics.median(clean_values) if clean_values else None
+
+
+def conservative_retail_benchmark(comparables, target_year, raw_dealer_median):
+    """Avoid overvaluing nearly-new bikes when newer/current stock inflates median."""
+    same_year_prices = [
+        comp["price"]
+        for comp in comparables
+        if comp.get("year") == target_year
+    ]
+    newer_prices = [
+        comp["price"]
+        for comp in comparables
+        if comp.get("year", 0) > target_year
+    ]
+
+    same_year_median = median_value(same_year_prices)
+
+    if (
+        same_year_median
+        and newer_prices
+        and raw_dealer_median > same_year_median * NEWER_STOCK_MEDIAN_CAP_RATIO
+    ):
+        return same_year_median, (
+            f"same-year dealer cap: median {round(raw_dealer_median)} -> "
+            f"{round(same_year_median)}"
+        )
+
+    return raw_dealer_median, ""
+
 
 def normalize_listing_id(value):
     if value is None:
@@ -770,9 +805,21 @@ for record in all_bikes:
         for c in comparables
     ]
 
-    dealer_median = statistics.median(
+    raw_dealer_median = statistics.median(
         comparable_prices
     )
+
+    dealer_median, valuation_note = conservative_retail_benchmark(
+        comparables,
+        year,
+        raw_dealer_median
+    )
+
+    if valuation_note:
+        print(
+            f"{fields.get('Make')} {fields.get('Model')} "
+            f"{fields.get('Listing ID')}: {valuation_note}"
+        )
 
     margin = (
         dealer_median - asking_price
