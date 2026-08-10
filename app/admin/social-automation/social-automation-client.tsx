@@ -15,6 +15,7 @@ type TemplateDesign = {
   headline: string;
   subline: string;
   showPrice: boolean;
+  pricePosition: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "under-title";
   showBrand: boolean;
   showThumbs: boolean;
 };
@@ -299,6 +300,7 @@ function TemplateDesigner({ template, bike, design, setDesign, close, useTemplat
         <label><span>Badge text</span><input value={design.badge} onChange={event => update("badge", event.target.value)} /></label>
         <label><span>Headline</span><input value={design.headline} onChange={event => update("headline", event.target.value)} /></label>
         <label><span>Subline</span><input value={design.subline} onChange={event => update("subline", event.target.value)} /></label>
+        <label><span>Price position</span><select value={design.pricePosition} onChange={event => update("pricePosition", event.target.value as TemplateDesign["pricePosition"])}><option value="top-right">Top right</option><option value="top-left">Top left</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="under-title">Under title</option></select></label>
         <div className="designer-switches">
           <label><input type="checkbox" checked={design.showPrice} onChange={event => update("showPrice", event.target.checked)} />Price</label>
           <label><input type="checkbox" checked={design.showBrand} onChange={event => update("showBrand", event.target.checked)} />Brand</label>
@@ -325,7 +327,7 @@ function TemplateArtwork({ template, bike, design, large = false }: { template: 
     {design?.showThumbs === false || type === "single" ? null : <div className="template-side-images">
       {(extraImages.length ? extraImages : [image, image, image]).slice(0, type === "spotlight" ? 2 : 3).map((item, index) => <img src={item} alt={`${title} template ${index + 1}`} onError={fallbackImage} key={`${item}-${index}`} />)}
     </div>}
-    {design?.showPrice === false ? null : <div className="template-price">{price}</div>}
+    {design?.showPrice === false ? null : <div className={`template-price price-${design?.pricePosition ?? "top-right"}`}>{price}</div>}
     {design?.showBrand === false ? null : <div className="template-brand">{design?.badge || "YES MOTO"}</div>}
     <div className="template-title"><b>{design?.headline || title}</b><span>{design?.subline || bike?.variant || bike?.mileage || "Vehicle Model"}</span></div>
   </div>;
@@ -333,14 +335,16 @@ function TemplateArtwork({ template, bike, design, large = false }: { template: 
 
 function defaultTemplateDesign(template?: SocialTemplate, bike?: PublicStockBike): TemplateDesign {
   const title = bike ? `${bike.year || ""} ${bike.make} ${bike.model}`.trim() : "Vehicle Year & Make";
+  const layout = template ? templateType(template) as TemplateDesign["layout"] : "single";
   return {
-    layout: template ? templateType(template) as TemplateDesign["layout"] : "single",
+    layout,
     accent: "#00e51d",
     background: "light",
     badge: "YES MOTO",
     headline: title,
     subline: bike?.variant || bike?.mileage || "Finance - Delivery - Part exchange",
     showPrice: true,
+    pricePosition: layout === "spotlight" ? "bottom-left" : "top-right",
     showBrand: true,
     showThumbs: true,
   };
