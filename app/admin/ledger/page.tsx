@@ -10,8 +10,9 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   const categories = Array.from(new Set(data.rows.map(row => row.category))).sort();
 
   return <AdminPage title="Financial Ledger" sub="Posted income, expenses, stock purchases, costs, payments and sale-completion revenue." actions={<Link className="admin-primary" href="/admin/stock/book-in">Book Into Stock</Link>}>
+    <div className="financial-ledger-page">
     {!data.migrationReady && <div className="crm-setup"><b>Financial ledger migration required</b><span>Run 20260713000100_financial_foundation_and_stock_booking.sql in Supabase.</span></div>}
-    <div className="crm-kpis">
+    <div className="crm-kpis financial-ledger-kpis">
       <article><span>Total income</span><strong>{ledgerMoney(data.kpis.income)}</strong></article>
       <article><span>Total expenses</span><strong>{ledgerMoney(data.kpis.expenses)}</strong></article>
       <article><span>Net cash movement</span><strong>{ledgerMoney(data.kpis.net)}</strong></article>
@@ -21,7 +22,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       <article><span>Refunds</span><strong>{ledgerMoney(data.kpis.refunds)}</strong></article>
       <article><span>Rows shown</span><strong>{data.rows.length}</strong></article>
     </div>
-    <form className="admin-filters" action="/admin/ledger">
+    <form className="admin-filters financial-ledger-filters" action="/admin/ledger">
       <input type="date" name="from" defaultValue={params.from ?? ""} />
       <input type="date" name="to" defaultValue={params.to ?? ""} />
       <select name="direction" defaultValue={params.direction ?? ""}><option value="">All directions</option><option value="income">Income</option><option value="expense">Expense</option></select>
@@ -29,8 +30,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       <input name="q" defaultValue={params.q ?? ""} placeholder="Search bike, customer, reference..." />
       <button>Filter</button>
     </form>
-    <div className="table-wrap">
-      <table className="crm-table">
+    <div className="table-wrap financial-ledger-table-wrap">
+      <table className="crm-table financial-ledger-table">
         <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Linked record</th><th>Method</th><th>Income</th><th>Expense</th><th>Status</th></tr></thead>
         <tbody>{data.rows.map(row => {
           const bike = [row.bike?.stock_number, row.bike?.registration, row.bike?.make, row.bike?.model].filter(Boolean).join(" ");
@@ -48,6 +49,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
         })}</tbody>
       </table>
       {data.migrationReady && !data.rows.length && <div className="crm-empty"><b>No ledger entries found.</b><span>Post purchases, costs, payments or completed sales to populate the ledger.</span></div>}
+    </div>
     </div>
   </AdminPage>;
 }
