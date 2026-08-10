@@ -30,13 +30,15 @@ export function SocialAutomationClient({ channels, templates, queue, stock }: { 
   const previewTitle = selectedBike ? `${selectedBike.year || ""} ${selectedBike.make} ${selectedBike.model}`.trim() : "";
 
   async function queuePost() {
+    const selectedBikeId = String(selectedBike?.id ?? bikeId ?? "");
     setBusy(true);
     setMessage("");
     try {
+      if (!selectedBikeId) throw new Error("Choose a bike.");
       const response = await fetch("/api/crm/social-posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stock_bike_id: bikeId, template_id: templateId, platform }),
+        body: JSON.stringify({ stock_bike_id: selectedBikeId, bike_id: selectedBikeId, template_id: templateId, platform }),
       });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "Unable to queue post.");

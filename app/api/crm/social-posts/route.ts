@@ -7,8 +7,8 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { stock_bike_id?: string; template_id?: string; platform?: string; scheduled_for?: string };
-    const stockBikeId = cleanText(body.stock_bike_id, 40);
+    const body = await request.json() as { stock_bike_id?: string | number; bike_id?: string | number; template_id?: string; platform?: string; scheduled_for?: string };
+    const stockBikeId = cleanText(String(body.stock_bike_id ?? body.bike_id ?? ""), 40);
     const templateId = cleanText(body.template_id, 40);
     const platform = cleanText(body.platform, 40) || "facebook";
     if (!stockBikeId) return NextResponse.json({ error: "Choose a bike." }, { status: 400 });
