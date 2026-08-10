@@ -327,7 +327,7 @@ function TemplateArtwork({ template, bike, design, large = false }: { template: 
     {design?.showThumbs === false || type === "single" ? null : <div className="template-side-images">
       {(extraImages.length ? extraImages : [image, image, image]).slice(0, type === "spotlight" ? 2 : 3).map((item, index) => <img src={item} alt={`${title} template ${index + 1}`} onError={fallbackImage} key={`${item}-${index}`} />)}
     </div>}
-    {design?.showPrice === false ? null : <div className={`template-price price-${design?.pricePosition ?? "top-right"}`}>{price}</div>}
+    {design?.showPrice === false ? null : <div className={`template-price price-${design?.pricePosition ?? "under-title"}`}>{price}</div>}
     {design?.showBrand === false ? null : <div className="template-brand">{design?.badge || "YES MOTO"}</div>}
     <div className="template-title"><b>{design?.headline || title}</b><span>{design?.subline || bike?.variant || bike?.mileage || "Vehicle Model"}</span></div>
   </div>;
@@ -344,7 +344,7 @@ function defaultTemplateDesign(template?: SocialTemplate, bike?: PublicStockBike
     headline: title,
     subline: bike?.variant || bike?.mileage || "Finance - Delivery - Part exchange",
     showPrice: true,
-    pricePosition: layout === "spotlight" ? "bottom-left" : "top-right",
+    pricePosition: "under-title",
     showBrand: true,
     showThumbs: true,
   };
