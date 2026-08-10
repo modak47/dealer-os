@@ -136,9 +136,17 @@ function priceText(value) {
   return `GBP ${Math.round(number).toLocaleString("en-GB")}`;
 }
 
+function cleanVariant(value) {
+  const text = cleanText(value);
+  if (!text) return "";
+  if (/^[a-f0-9]{16,}$/i.test(text)) return "";
+  if (/derivative|vehicle id|taxonomy/i.test(text)) return "";
+  return text;
+}
+
 function buildTitle(post) {
   const bike = post.bike || {};
-  const bits = [bike.year, bike.make, bike.model, bike.variant].filter(Boolean);
+  const bits = [bike.year, bike.make, bike.model, cleanVariant(bike.variant)].filter(Boolean);
   const base = cleanText(bits.join(" "));
   return base ? `${base} For Sale` : "Motorcycle For Sale at YesMoto";
 }
