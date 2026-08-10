@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       getCurrentUserId(),
     ]);
     if (templateError) throw templateError;
-    const bike = stock.find(item => item.id === stockBikeId);
+    const bike = stock.find(item => String(item.id) === stockBikeId);
     if (!bike) return NextResponse.json({ error: "This bike is not currently eligible for public social posting." }, { status: 400 });
     const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
     const caption = renderSocialCaption(String(template.caption_template), bike, origin);
