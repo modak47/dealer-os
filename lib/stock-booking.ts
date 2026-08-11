@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getCurrentUserId } from "@/lib/current-user";
+import { getSocialPublicOrigin } from "@/lib/social-automation";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normaliseRegistration } from "@/lib/vrm-lookup";
 
@@ -13,6 +14,7 @@ export type StockBookingResult = {
 
 const sellerTypes = new Set(["private_seller", "trade_supplier", "auction", "part_exchange", "existing_customer", "other"]);
 const costCategories = new Set(["parts", "workshop_labour", "external_workshop", "mot", "transport", "collection", "delivery", "valeting", "photography", "advertising", "hpi", "auction_fee", "buyer_fee", "administration", "warranty", "other"]);
+const socialPlatforms = ["facebook", "instagram", "pinterest", "google_business"] as const;
 
 export async function bookMotorcycleIntoStock(input: Record<string, unknown>) {
   const payload = normaliseBookingPayload(input);
@@ -21,6 +23,11 @@ export async function bookMotorcycleIntoStock(input: Record<string, unknown>) {
   if (error) throw new Error(error.message);
   const result = data as StockBookingResult;
   if (!result.existing) await saveAutotraderStockFields(result.stock_bike_id, payload);
+  try {
+    await queueSocialDrafts(result.stock_bike_id, payload, userId);
+  } catch (error) {
+    console.warn("Unable to queue stock booking social drafts", error);
+  }
   return result;
 }
 
@@ -133,6 +140,8 @@ function normaliseBookingPayload(input: Record<string, unknown>) {
     documents_required: bool(input.documents_required),
     spare_key_required: bool(input.spare_key_required),
     transport_required: bool(input.transport_required),
+    social_queue_required: input.social_queue_required === undefined ? true : bool(input.social_queue_required),
+    social_platforms: socialPlatforms.filter(platform => input[`social_${platform}`] === undefined ? true : bool(input[`social_${platform}`])),
     website_lead_id: optionalInteger(input.website_lead_id, "Website lead ID"),
     source_opportunity_id: optionalInteger(input.source_opportunity_id, "Buying opportunity ID"),
     source_deal_id: text(input.source_deal_id, 40) || null,
@@ -143,6 +152,78 @@ function normaliseBookingPayload(input: Record<string, unknown>) {
       cost("other", "Other immediate acquisition costs", otherImmediateCosts, input.payment_method),
     ].filter(Boolean),
   };
+}
+
+async function queueSocialDrafts(stockBikeId: number, payload: Record<string, unknown>, userId: string | null) {
+  if (!payload.social_queue_required) return;
+  const platforms = Array.isArray(payload.social_platforms) ? payload.social_platforms.filter((platform): platform is string => typeof platform === "string" && socialPlatforms.includes(platform as (typeof socialPlatforms)[number])) : [];
+  if (!platforms.length) return;
+
+  const db = getSupabaseAdmin();
+  const [bikeResult, channelsResult, templatesResult, existingResult] = await Promise.all([
+    db.from("stock_bikes").select("id,make,model,variant,year,mileage,price,target_retail_price,registration,image_urls,primary_image_url").eq("id", stockBikeId).single(),
+    db.from("social_channels").select("id,platform").in("platform", platforms),
+    db.from("social_post_templates").select("id,platform,caption_template,display_order").eq("active", true).eq("trigger_type", "new_stock").order("display_order"),
+    db.from("social_post_queue").select("platform,status").eq("stock_bike_id", stockBikeId).in("platform", platforms).in("status", ["draft", "approved", "scheduled", "posting", "posted", "failed"]),
+  ]);
+
+  if (bikeResult.error) throw bikeResult.error;
+  if (channelsResult.error) throw channelsResult.error;
+  if (templatesResult.error) throw templatesResult.error;
+  if (existingResult.error) throw existingResult.error;
+
+  const queued = new Set((existingResult.data ?? []).map(row => String(row.platform)));
+  const channels = new Map((channelsResult.data ?? []).map(row => [String(row.platform), String(row.id)]));
+  const templates = (templatesResult.data ?? []) as { id: string; platform: string | null; caption_template: string; display_order: number }[];
+  const stock = bikeResult.data as Record<string, unknown>;
+  const origin = getSocialPublicOrigin();
+  const imageUrl = text(stock.primary_image_url, 500) || (Array.isArray(stock.image_urls) ? text(stock.image_urls[0], 500) : "");
+
+  const rows = platforms.filter(platform => !queued.has(platform)).map(platform => {
+    const template = templates.find(row => row.platform === platform) ?? templates.find(row => row.platform === null) ?? null;
+    return {
+      stock_bike_id: stockBikeId,
+      channel_id: channels.get(platform) ?? null,
+      template_id: template?.id ?? null,
+      platform,
+      status: "draft",
+      caption: renderBookingSocialCaption(template?.caption_template, stock, payload, origin),
+      image_url: imageUrl || null,
+      target_url: `${origin}/used-bikes/${stockSlug(stock, payload)}`,
+      scheduled_for: null,
+      created_by: userId,
+      metadata: {
+        source: "dealeros_stock_booking",
+        queued_from: "book_into_stock",
+        requires_review: true,
+      },
+    };
+  });
+
+  if (!rows.length) return;
+  const { error } = await db.from("social_post_queue").insert(rows);
+  if (error) throw error;
+}
+
+function renderBookingSocialCaption(template: string | undefined, stock: Record<string, unknown>, payload: Record<string, unknown>, origin: string) {
+  const price = Number(stock.price ?? stock.target_retail_price ?? payload.target_retail_price ?? 0);
+  const mileage = optionalIntegerValue(stock.mileage ?? payload.mileage);
+  const values: Record<string, string> = {
+    year: text(stock.year ?? payload.year, 20),
+    make: text(stock.make ?? payload.make, 100),
+    model: text(stock.model ?? payload.model, 100),
+    variant: text(stock.variant ?? payload.variant, 160),
+    price: price > 0 ? new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(price) : "Price TBC",
+    mileage: mileage == null ? "Mileage TBC" : `${mileage.toLocaleString("en-GB")} miles`,
+    url: `${origin}/used-bikes/${stockSlug(stock, payload)}`,
+  };
+  const fallback = "New in at YesMoto: {{year}} {{make}} {{model}} {{variant}}. {{price}}. Review photos and advert before approving this post: {{url}}";
+  return (template || fallback).replace(/\{\{(\w+)\}\}/g, (_, key: string) => values[key] ?? "").replace(/\s+/g, " ").trim();
+}
+
+function stockSlug(stock: Record<string, unknown>, payload: Record<string, unknown>) {
+  const parts = [stock.make ?? payload.make, stock.model ?? payload.model, stock.registration ?? payload.registration ?? stock.id].map(part => text(part, 120)).filter(Boolean);
+  return parts.join("-").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || String(stock.id || "stock");
 }
 
 async function saveAutotraderStockFields(stockBikeId: number, payload: Record<string, unknown>) {
@@ -199,6 +280,12 @@ function dateOnly(value: unknown, label: string) {
 
 function bool(value: unknown) {
   return value === true || value === "true" || value === "on" || value === "1";
+}
+
+function optionalIntegerValue(value: unknown) {
+  if (value === "" || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
 function buildAutotraderSpecifications(payload: Record<string, unknown>) {

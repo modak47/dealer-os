@@ -49,18 +49,17 @@ async function applyAdvertFallback(vehicle: Awaited<ReturnType<typeof lookupVehi
         .maybeSingle();
       data = result.data as Record<string, unknown> | null;
     }
-    if (!data && vehicle.make && vehicle.model && vehicle.year) {
+    if (!data && vehicle.make && vehicle.year) {
       const { data: candidates } = await db
         .from("autotrader_listings")
         .select("*")
         .eq("Make", vehicle.make)
-        .eq("Model", vehicle.model)
         .eq("Year", String(vehicle.year))
         .not("HPI Category", "is", null)
         .neq("HPI Category", "")
         .order("Last Seen Date", { ascending: false })
-        .limit(2);
-      if (candidates?.length === 1) data = candidates[0] as Record<string, unknown>;
+        .limit(50);
+      data = bestAdvertMatch(vehicle, candidates ?? []);
     }
     const category = text(data?.["HPI Category"]);
     if (!category) return;
@@ -110,4 +109,23 @@ async function applyAdvertFallback(vehicle: Awaited<ReturnType<typeof lookupVehi
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+}
+
+function bestAdvertMatch(vehicle: Awaited<ReturnType<typeof lookupVehicleByVrm>>, rows: Record<string, unknown>[]) {
+  const vehicleModel = normalise(text(vehicle.model));
+  const vehicleDerivative = normalise(text(vehicle.derivative));
+  const matches = rows.filter(row => {
+    const rowModel = normalise(text(row.Model));
+    const rowVariant = normalise(text(row.Variant));
+    const rowText = `${rowModel} ${rowVariant}`.trim();
+    if (!rowText || !vehicleModel) return false;
+    return rowText.includes(vehicleModel) || vehicleModel.includes(rowModel) || rowText.split(" ").every(token => vehicleDerivative.includes(token));
+  });
+  if (matches.length === 1) return matches[0];
+  const categories = new Set(matches.map(row => text(row["HPI Category"])).filter(Boolean));
+  return matches.length > 0 && categories.size === 1 ? matches[0] : null;
+}
+
+function normalise(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }

@@ -66,6 +66,7 @@ export interface SupabaseStockBike {
   weight_kg:number|null;
   euro_emissions:string|null;
   hpi_category:string|null;
+  hpi_status?:string|null;
   website_lead_id?:number|null;
   customer_name?:string|null;
   customer_phone?:string|null;

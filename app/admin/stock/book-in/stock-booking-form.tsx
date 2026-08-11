@@ -67,6 +67,11 @@ export function StockBookingForm() {
     valet_required: true,
     hpi_check_required: true,
     documents_required: true,
+    social_queue_required: true,
+    social_facebook: true,
+    social_instagram: true,
+    social_pinterest: true,
+    social_google_business: true,
     purchase_date: new Date().toISOString().slice(0, 10),
     ...(bookingPrefill?.form ?? {}),
   }));
@@ -153,6 +158,8 @@ export function StockBookingForm() {
       if (identifiedVehicle?.taxonomyData) payload.autotrader_taxonomy_data = JSON.stringify(identifiedVehicle.taxonomyData);
       if (identifiedVehicle?.motTests || identifiedVehicle?.history || identifiedVehicle?.check) payload.autotrader_mot_data = JSON.stringify({ motTests: identifiedVehicle.motTests ?? null, history: identifiedVehicle.history ?? null, check: identifiedVehicle.check ?? null });
       for (const key of checkboxKeys) payload[key] = String(Boolean(form[key]));
+      payload.social_queue_required = String(Boolean(form.social_queue_required));
+      for (const key of socialPlatformKeys) payload[key] = String(Boolean(form[key]));
       const response = await fetch("/api/stock/book-into-stock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json() as { booking?: BookingResult; error?: string };
       if (!response.ok || !data.booking) throw new Error(data.error || "Unable to book motorcycle into stock.");
@@ -287,6 +294,10 @@ export function StockBookingForm() {
     <section>
       <header><span>5</span><div><h2>Preparation Requirements</h2><p>Initialises the existing workshop, valeting and photo workflows.</p></div></header>
       <div className="stock-booking-checks">{checkboxKeys.map(key => <label key={key}><input type="checkbox" checked={Boolean(form[key])} onChange={event => update(key, event.target.checked)} /><span>{labelFor(key)}</span></label>)}</div>
+      <div className="stock-booking-social">
+        <label><input type="checkbox" checked={Boolean(form.social_queue_required)} onChange={event => update("social_queue_required", event.target.checked)} /><span>Queue social drafts automatically</span></label>
+        <div className="stock-booking-checks">{socialPlatformKeys.map(key => <label key={key}><input type="checkbox" checked={Boolean(form[key])} disabled={!form.social_queue_required} onChange={event => update(key, event.target.checked)} /><span>{socialLabelFor(key)}</span></label>)}</div>
+      </div>
     </section>
 
     {error && <p className="stock-booking-error">{error}</p>}
@@ -322,7 +333,12 @@ function numberValue(value: unknown) {
 }
 
 const checkboxKeys = ["workshop_required", "pdi_required", "service_required", "mot_required", "diagnostic_required", "repair_required", "valet_required", "detail_required", "cosmetic_required", "photos_required", "video_required", "hpi_check_required", "documents_required", "spare_key_required", "transport_required"];
+const socialPlatformKeys = ["social_facebook", "social_instagram", "social_pinterest", "social_google_business"];
 
 function labelFor(key: string) {
   return key.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function socialLabelFor(key: string) {
+  return key.replace(/^social_/, "").replace("google_business", "Google Business").replace(/\b\w/g, letter => letter.toUpperCase());
 }
