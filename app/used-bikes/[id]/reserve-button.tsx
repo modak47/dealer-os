@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useId, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ReservationAddon } from "@/lib/reservation-addons";
 
@@ -11,6 +11,7 @@ const steps = ["Details", "Warranty", "Delivery", "Review & Pay"];
 
 export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", label = "Reserve online for \u00a399" }: { bikeId: string; slug: string; bike: string; price?: number; className?: string; label?: string }) {
   const owner = useId();
+  const modalFormRef = useRef<HTMLFormElement | null>(null);
   const [mounted] = useState(() => typeof document !== "undefined");
   const [open, setOpen] = useState(false);
   const [opening, setOpening] = useState(false);
@@ -52,6 +53,7 @@ export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", l
 
   useEffect(() => { const other = (event: Event) => { if ((event as CustomEvent<string>).detail !== owner) setOpen(false); }; window.addEventListener("yesmoto:reservation-open", other); return () => window.removeEventListener("yesmoto:reservation-open", other); }, [owner]);
   useEffect(() => { if (!open) return; document.body.classList.add("reservation-open"); const close = (event: KeyboardEvent) => { if (event.key === "Escape" && !busy) setOpen(false); }; document.addEventListener("keydown", close); return () => { document.removeEventListener("keydown", close); document.body.classList.remove("reservation-open"); }; }, [open, busy]);
+  useEffect(() => { const form = modalFormRef.current; if (!form) return; form.scrollTop = 0; form.querySelector(".reservation-step")?.scrollTo({ top: 0 }); }, [step]);
   function openModal() {
     setOpening(true);
     setError("");
@@ -103,7 +105,7 @@ export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", l
   }
 
   const modal = open ? <div className="reservation-modal reservation-builder-modal" role="dialog" aria-modal="true" aria-label={`Reserve ${bike}`} onMouseDown={event => { if (event.target === event.currentTarget) closeModal(); }}>
-    <form onSubmit={submit}>
+    <form onSubmit={submit} ref={modalFormRef}>
       <header><div><span>SECURE ONLINE RESERVATION</span><h2>Reserve {bike}</h2><p>Build your reservation, choose any extras, then pay the {money(reservationFee)} reservation fee securely through Stripe.</p></div><button type="button" aria-label="Close" onClick={closeModal} disabled={busy}><CloseIcon /></button></header>
       <div className="reservation-progress">{steps.map((item, index) => <button type="button" key={item} className={index === step ? "active" : index < step ? "done" : ""} onClick={() => { if (index < step) setStep(index); }} disabled={busy || index > step}><b>{index + 1}</b><span>{item}</span></button>)}</div>
       {step === 0 && <section className="reservation-step reservation-details-step"><h3>Your details</h3><div className="reservation-form-grid"><label><span>First name</span><input value={firstName} onChange={event => setFirstName(event.target.value)} autoComplete="given-name" /></label><label><span>Last name</span><input value={lastName} onChange={event => setLastName(event.target.value)} autoComplete="family-name" /></label><label><span>Email</span><input value={email} onChange={event => setEmail(event.target.value)} type="email" autoComplete="email" /></label><label><span>Phone</span><input value={phone} onChange={event => setPhone(event.target.value)} type="tel" inputMode="tel" autoComplete="tel" /></label></div></section>}
@@ -112,7 +114,7 @@ export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", l
       {step === 3 && <section className="reservation-step reservation-review-step"><h3>Order summary</h3><div className="reservation-summary"><SummaryRow label={bike} value={money(Number(price || 0))} /><SummaryRow label="Reservation Fee" value={`${money(reservationFee)} Today`} highlight />{selectedAddons.map(addon => <SummaryRow key={addon.id} label={addon.name} value={`+${money(Number(addon.price || 0))}`} />)}<hr /><SummaryRow label="Total Purchase" value={money(purchaseTotal)} strong /><SummaryRow label="Pay Today" value={money(reservationFee)} strong /><SummaryRow label="Remaining Balance" value={money(remaining)} /></div><p className="reservation-payment-note">Only the {money(reservationFee)} reservation fee is charged today. Optional extras will be added to your final motorcycle invoice.</p><label className="reservation-consent"><input checked={acceptedTerms} onChange={event => setAcceptedTerms(event.target.checked)} type="checkbox" /><span>I agree to the <a href="/reserve-online" target="_blank">reservation terms</a>. The {money(reservationFee)} fee is deducted from the final purchase price.</span></label></section>}
       {error && <p className="auth-message reservation-error">{error}</p>}
       <footer className="reservation-builder-actions">{step > 0 ? <button type="button" onClick={() => setStep(current => Math.max(0, current - 1))} disabled={busy}>Back</button> : <button type="button" onClick={closeModal} disabled={busy}>Close</button>}{step < steps.length - 1 ? <button type="button" onClick={next} disabled={busy || addonsLoading}>{addonsLoading ? "Loading options..." : "Continue"}</button> : <button className={busy ? "loading" : ""} disabled={busy}>{busy ? <><i />Redirecting to Stripe...</> : `Pay ${money(reservationFee)} reservation fee`}</button>}</footer>
-      <small className="reservation-secure-note">Payment details are entered securely on Stripe. YesMoto does not receive or store your card number.</small>
+      {(step === 0 || step === 3) && <small className="reservation-secure-note">Payment details are entered securely on Stripe. YesMoto does not receive or store your card number.</small>}
     </form>
   </div> : null;
 
@@ -137,6 +139,7 @@ function DeliveryStep({ addons, selected, onSelect, loading }: { addons: Reserva
       {quote ? <button type="button" className={`delivery-quote-strip ${quote.id === selected ? "selected" : ""}`} onClick={() => onSelect(quote.id)}>
         <DeliveryIcon addon={quote} />
         <div><b>{quote.name}</b><strong>{quote.badge || "Request a Quote"}</strong><small>{descriptionLead(quote.description)}</small></div>
+        <DeliveryRouteMap />
         <span>Request a quote</span>
       </button> : null}
       <div className="delivery-trust-strip"><span>Fully insured</span><span>Safe & secure</span><span>5-7 day delivery</span><span>Handover included</span></div>
@@ -229,9 +232,12 @@ function deliveryTitle(addon: ReservationAddon) {
 function DeliveryIcon({ addon }: { addon: ReservationAddon }) {
   const key = `${addon.name} ${addon.icon ?? ""}`.toLowerCase();
   const kind = key.includes("collect") || key.includes("store") ? "collect" : key.includes("local") || key.includes("20") ? "local" : key.includes("quote") || key.includes("scotland") || key.includes("ireland") ? "quote" : "mainland";
-  if (kind === "collect") return <span className="delivery-svg-icon collect" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M22 50h36M26 50V37l14-9 14 9v13M32 50V39h16v11" /><path d="M40 14c-6 0-11 5-11 11 0 9 11 20 11 20s11-11 11-20c0-6-5-11-11-11Z" /><circle cx="40" cy="25" r="3" /></svg></span>;
-  if (kind === "quote") return <span className="delivery-svg-icon quote" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M24 48c9-10 19-17 32-20M24 48l11-2 5 8 10-4 6 6M30 33h7m7-9h7" /></svg></span>;
-  return <span className={`delivery-svg-icon ${kind}`} aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M20 45V33h27v12M47 38h9l5 7v8H20v-8M30 57a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm26 0a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM27 27h14" />{kind === "mainland" && <path d="M57 24c-4 3-5 7-2 11 3 3 2 6-2 9" />}</svg></span>;
+  const src = kind === "collect" ? "/images/delivery-icons/click-collect.png" : kind === "local" ? "/images/delivery-icons/local-delivery.png" : kind === "quote" ? "/images/delivery-icons/quote-bike.png" : "/images/delivery-icons/mainland-delivery.png";
+  return <span className={`delivery-svg-icon delivery-image-icon ${kind}`} aria-hidden="true"><img src={src} alt="" /></span>;
+}
+
+function DeliveryRouteMap() {
+  return <span className="delivery-route-map" aria-hidden="true"><img src="/images/delivery-icons/quote-map.png" alt="" /></span>;
 }
 
 function warrantyTitle(addon: ReservationAddon) {
