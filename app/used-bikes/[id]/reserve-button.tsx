@@ -229,7 +229,7 @@ function deliveryTitle(addon: ReservationAddon) {
 function DeliveryIcon({ addon }: { addon: ReservationAddon }) {
   const key = `${addon.name} ${addon.icon ?? ""}`.toLowerCase();
   const kind = key.includes("collect") || key.includes("store") ? "collect" : key.includes("local") || key.includes("20") ? "local" : key.includes("quote") || key.includes("scotland") || key.includes("ireland") ? "quote" : "mainland";
-  if (kind === "collect") return <span className="delivery-svg-icon collect" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M23 47V30h34v17M29 30v-8h22v8M29 50h22M33 41l6 6 11-15" /></svg></span>;
+  if (kind === "collect") return <span className="delivery-svg-icon collect" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M22 50h36M26 50V37l14-9 14 9v13M32 50V39h16v11" /><path d="M40 14c-6 0-11 5-11 11 0 9 11 20 11 20s11-11 11-20c0-6-5-11-11-11Z" /><circle cx="40" cy="25" r="3" /></svg></span>;
   if (kind === "quote") return <span className="delivery-svg-icon quote" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M24 48c9-10 19-17 32-20M24 48l11-2 5 8 10-4 6 6M30 33h7m7-9h7" /></svg></span>;
   return <span className={`delivery-svg-icon ${kind}`} aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M20 45V33h27v12M47 38h9l5 7v8H20v-8M30 57a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm26 0a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM27 27h14" />{kind === "mainland" && <path d="M57 24c-4 3-5 7-2 11 3 3 2 6-2 9" />}</svg></span>;
 }
