@@ -33,17 +33,35 @@ export async function POST(request: Request) {
 
 async function applyAdvertFallback(vehicle: Awaited<ReturnType<typeof lookupVehicleByVrm>>) {
   const registration = String(vehicle.registration ?? "").replace(/\s+/g, "").toUpperCase();
-  if (!registration) return;
+  if (!registration && (!vehicle.make || !vehicle.model || !vehicle.year)) return;
   try {
-    const { data } = await getSupabaseAdmin()
-      .from("autotrader_listings")
-      .select("*")
-      .eq("Reg Number", registration)
-      .not("HPI Category", "is", null)
-      .neq("HPI Category", "")
-      .order("Last Seen Date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const db = getSupabaseAdmin();
+    let data: Record<string, unknown> | null = null;
+    if (registration) {
+      const result = await db
+        .from("autotrader_listings")
+        .select("*")
+        .eq("Reg Number", registration)
+        .not("HPI Category", "is", null)
+        .neq("HPI Category", "")
+        .order("Last Seen Date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      data = result.data as Record<string, unknown> | null;
+    }
+    if (!data && vehicle.make && vehicle.model && vehicle.year) {
+      const { data: candidates } = await db
+        .from("autotrader_listings")
+        .select("*")
+        .eq("Make", vehicle.make)
+        .eq("Model", vehicle.model)
+        .eq("Year", String(vehicle.year))
+        .not("HPI Category", "is", null)
+        .neq("HPI Category", "")
+        .order("Last Seen Date", { ascending: false })
+        .limit(2);
+      if (candidates?.length === 1) data = candidates[0] as Record<string, unknown>;
+    }
     const category = text(data?.["HPI Category"]);
     if (!category) return;
     vehicle.vehicleCheck = {

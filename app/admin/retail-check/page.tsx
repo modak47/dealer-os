@@ -1014,7 +1014,7 @@ export default function RetailCheckPage() {
                     ) : (
                       <div className="text-zinc-400">Search Auto Trader first, then the HPI and MOT status will show here.</div>
                     )}
-                    {currentVehicleCheck?.reportUrl && <a className="retail-report-link" href={currentVehicleCheck.reportUrl} target="_blank" rel="noreferrer">Open AutoTrader vehicle check report</a>}
+                    {currentVehicleCheck?.reportUrl && <a className="retail-report-link" href={`/api/autotrader/vehicle-check-report?url=${encodeURIComponent(currentVehicleCheck.reportUrl)}`} target="_blank" rel="noreferrer">Open AutoTrader vehicle check report</a>}
                   </div>
                 )}
                 {displayedValuation && activeTab==="comparables" && (

@@ -43,10 +43,15 @@ export function normaliseVehicleCheck(input: unknown, fallback: Partial<VehicleC
   const reportUrl = firstText(flat, ["report", "reportUrl", "vehicleCheckReport"]);
   const explicitStatus = firstText(flat, ["hpiStatus", "vehicleCheckStatus", "checkStatus", "status", "result"]);
   const riskFlags = [outstandingFinance, stolen, scrapped, exported, writtenOff, mileageDiscrepancy, highRisk];
-  const clear = category ? false : explicitClear(explicitStatus) ?? (riskFlags.some(value => value === true) ? false : riskFlags.some(value => value === false) ? true : null);
+  const requiredClearFlags = [outstandingFinance, stolen, scrapped, exported, imported, writtenOff, mileageDiscrepancy, highRisk];
+  const clear = category
+    ? false
+    : riskFlags.some(value => value === true)
+      ? false
+      : explicitClear(explicitStatus) ?? (requiredClearFlags.every(value => value === false) ? true : null);
 
   return {
-    status: category ? `Category ${category}` : explicitStatus || (clear === true ? "Clear" : clear === false ? "Requires review" : "Vehicle check returned"),
+    status: category ? `Category ${category}` : explicitStatus || (clear === true ? "Clear" : clear === false ? "Requires review" : reportUrl ? "Review report" : "Vehicle check returned"),
     clear,
     category,
     outstandingFinance,

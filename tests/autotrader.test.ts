@@ -179,6 +179,25 @@ describe("Auto Trader Connect client", () => {
     assert.equal(check.writtenOff, true);
   });
 
+  it("does not call a report-backed check clear when write-off status is missing", () => {
+    const check = normaliseVehicleCheck({
+      insuranceWriteoffCategory: null,
+      scrapped: false,
+      stolen: false,
+      imported: false,
+      exported: false,
+      highRisk: false,
+      privateFinance: false,
+      tradeFinance: false,
+      mileageDiscrepancy: false,
+      report: "https://api-sandbox.autotrader.co.uk/vehicles/vehicle-check-report/report-id",
+    });
+
+    assert.equal(check.clear, null);
+    assert.equal(check.status, "Review report");
+    assert.equal(check.writtenOff, null);
+  });
+
   it("looks up a vehicle by VRM using the Auto Trader Vehicles API", async () => {
     process.env.AUTOTRADER_API_KEY = "sandbox-key";
     process.env.AUTOTRADER_API_SECRET = "sandbox-secret";
