@@ -17,6 +17,7 @@ type TemplateDesign = {
   subline: string;
   strapline: string;
   footer: string;
+  staticImageUrl: string;
   showPrice: boolean;
   pricePosition: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "under-title" | "top" | "middle" | "bottom";
   showBrand: boolean;
@@ -201,12 +202,7 @@ export function SocialAutomationClient({ channels, templates, queue, stock, publ
         <button type="button" onClick={() => void queueBikePost()} disabled={busy || !bikeId || !templateId}>{busy ? "Queueing..." : "Queue Draft"}</button>
       </div>
       {selectedBike ? <div className={`social-creative-preview ${platform}`}>
-        <div className="social-preview-art">
-          <div className="social-preview-main"><img src={displayImages[0] || selectedBike.image} alt={previewTitle} onError={fallbackImage} /><strong>{money(selectedBike.price)}</strong></div>
-          <div className="social-preview-ribbon"><b>YES MOTO</b><span>Delivery - Part exchange - Finance</span></div>
-          <div className="social-preview-thumbs">{(displayImages.length ? displayImages : [selectedBike.image]).slice(0, 3).map((image, index) => <img src={image} alt={`${previewTitle} preview ${index + 1}`} onError={fallbackImage} key={`${image}-${index}`} />)}</div>
-          <div className="social-preview-footer"><b>{previewTitle}</b><span>{selectedBike.variant || selectedBike.mileage}</span></div>
-        </div>
+          {selectedTemplate ? <TemplateArtwork template={selectedTemplate} bike={selectedBike} large /> : <div className="social-preview-art"><div className="social-preview-main"><img src={displayImages[0] || selectedBike.image} alt={previewTitle} onError={fallbackImage} /><strong>{money(selectedBike.price)}</strong></div><div className="social-preview-ribbon"><b>YES MOTO</b><span>Delivery - Part exchange - Finance</span></div><div className="social-preview-thumbs">{(displayImages.length ? displayImages : [selectedBike.image]).slice(0, 3).map((image, index) => <img src={image} alt={`${previewTitle} preview ${index + 1}`} onError={fallbackImage} key={`${image}-${index}`} />)}</div><div className="social-preview-footer"><b>{previewTitle}</b><span>{selectedBike.variant || selectedBike.mileage}</span></div></div>}
         <div className="social-preview-copy"><small>{platformLabel(platform)} draft preview</small><h3>{selectedChannel?.posting_enabled ? "Ready to publish after approval" : "Connection needed before publishing"}</h3><p>{preview || "Choose a bike and template to preview the caption."}</p><a href={`/used-bikes/${selectedBike.slug}`} target="_blank" rel="noreferrer">View website advert</a></div>
       </div> : <div className="social-preview-empty">Choose a bike and template to preview the post.</div>}
     </section> : null}
@@ -323,6 +319,7 @@ function TemplateDesigner({ template, bike, design, setDesign, close, useTemplat
         <label><span>Subline</span><input value={design.subline} onChange={event => update("subline", event.target.value)} /></label>
         <label><span>Strapline</span><input value={design.strapline} onChange={event => update("strapline", event.target.value)} /></label>
         <label><span>Footer</span><input value={design.footer} onChange={event => update("footer", event.target.value)} /></label>
+        <label><span>Static creative image</span><input value={design.staticImageUrl} onChange={event => update("staticImageUrl", event.target.value)} placeholder="/images/social-templates/..." /></label>
         <label><span>Price position</span><select value={design.pricePosition} onChange={event => update("pricePosition", event.target.value as TemplateDesign["pricePosition"])}><option value="top-right">Top right</option><option value="top-left">Top left</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="under-title">Under title</option><option value="top">Top bar</option><option value="middle">Middle bar</option><option value="bottom">Bottom bar</option></select></label>
         <div className="designer-switches">
           <label><input type="checkbox" checked={design.showPrice} onChange={event => update("showPrice", event.target.checked)} />Price</label>
@@ -348,6 +345,8 @@ function TemplateArtwork({ template, bike, design, large = false }: { template: 
   const image = bike?.image || "/bike-placeholder.svg";
   const extraImages = bike?.imageUrls?.filter(item => item && !item.includes("bike-placeholder")).slice(1, 4) ?? [];
   const style = { "--template-accent": activeDesign.accent } as CSSProperties;
+  const staticImageUrl = activeDesign.staticImageUrl || staticTemplateCreative(template.name);
+  if (staticImageUrl) return <div className={`social-template-art static-creative ${large ? "large" : ""}`}><img src={staticImageUrl} alt={activeDesign.headline || title} onError={fallbackImage} /></div>;
   return <div className={`social-template-art ${type} preset-${activeDesign.preset} price-${activeDesign.pricePosition} ${large ? "large" : ""} ${activeDesign.background === "dark" ? "dark" : ""}`} style={style}>
     <div className="template-main-image"><img src={image} alt={title} onError={fallbackImage} /></div>
     {activeDesign.showThumbs === false || type === "single" ? null : <div className="template-side-images">
@@ -375,6 +374,7 @@ function defaultTemplateDesign(template?: SocialTemplate, bike?: PublicStockBike
     subline: typeof visual.subline === "string" && visual.subline ? visual.subline : bike?.variant || bike?.mileage || "Finance - Delivery - Part exchange",
     strapline: typeof visual.strapline === "string" ? visual.strapline : "",
     footer: typeof visual.footer === "string" ? visual.footer : "",
+    staticImageUrl: typeof visual.staticImageUrl === "string" ? visual.staticImageUrl : staticTemplateCreative(template?.name),
     showPrice: visual.showPrice !== false,
     pricePosition: templatePricePosition(visual.pricePosition) ?? "under-title",
     showBrand: visual.showBrand !== false,
@@ -402,6 +402,21 @@ function templateLayout(value: unknown): TemplateDesign["layout"] | null {
 
 function templatePricePosition(value: unknown): TemplateDesign["pricePosition"] | null {
   return value === "top-right" || value === "top-left" || value === "bottom-right" || value === "bottom-left" || value === "under-title" || value === "top" || value === "middle" || value === "bottom" ? value : null;
+}
+
+function staticTemplateCreative(name?: string) {
+  const key = (name ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!key) return "";
+  if (key.includes("finance options")) return "/images/social-templates/finance-options.png";
+  if (key.includes("delivery available")) return "/images/social-templates/delivery-available.png";
+  if (key.includes("part exchange upgrade")) return "/images/social-templates/part-exchange-upgrade.png";
+  if (key.includes("we buy motorbikes")) return "/images/social-templates/we-buy-motorbikes.png";
+  if (key === "awaiting preparation") return "/images/social-templates/awaiting-preparation-layout-a.png";
+  if (key.includes("price top")) return "/images/social-templates/awaiting-preparation-layout-b.png";
+  if (key.includes("price middle")) return "/images/social-templates/awaiting-preparation-layout-c.png";
+  if (key.includes("clean")) return "/images/social-templates/awaiting-preparation-layout-d.png";
+  if (key.includes("stock hero")) return "/images/social-templates/stock-hero-reviews.png";
+  return "";
 }
 
 function templateFilterLabel(value: string) {

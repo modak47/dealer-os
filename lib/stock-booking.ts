@@ -163,7 +163,7 @@ async function queueSocialDrafts(stockBikeId: number, payload: Record<string, un
   const [bikeResult, channelsResult, templatesResult, existingResult] = await Promise.all([
     db.from("stock_bikes").select("id,make,model,variant,year,mileage,price,target_retail_price,registration,image_urls,primary_image_url").eq("id", stockBikeId).single(),
     db.from("social_channels").select("id,platform").in("platform", platforms),
-    db.from("social_post_templates").select("id,platform,caption_template,display_order").eq("active", true).eq("trigger_type", "new_stock").order("display_order"),
+    db.from("social_post_templates").select("id,name,platform,caption_template,display_order,visual_design").eq("active", true).eq("trigger_type", "new_stock").order("display_order"),
     db.from("social_post_queue").select("platform,status").eq("stock_bike_id", stockBikeId).in("platform", platforms).in("status", ["draft", "approved", "scheduled", "posting", "posted", "failed"]),
   ]);
 
@@ -174,7 +174,7 @@ async function queueSocialDrafts(stockBikeId: number, payload: Record<string, un
 
   const queued = new Set((existingResult.data ?? []).map(row => String(row.platform)));
   const channels = new Map((channelsResult.data ?? []).map(row => [String(row.platform), String(row.id)]));
-  const templates = (templatesResult.data ?? []) as { id: string; platform: string | null; caption_template: string; display_order: number }[];
+  const templates = (templatesResult.data ?? []) as { id: string; name?: string | null; platform: string | null; caption_template: string; display_order: number; visual_design?: Record<string, unknown> | null }[];
   const stock = bikeResult.data as Record<string, unknown>;
   const origin = getSocialPublicOrigin();
   const imageUrl = text(stock.primary_image_url, 500) || (Array.isArray(stock.image_urls) ? text(stock.image_urls[0], 500) : "");
@@ -188,7 +188,7 @@ async function queueSocialDrafts(stockBikeId: number, payload: Record<string, un
       platform,
       status: "draft",
       caption: renderBookingSocialCaption(template?.caption_template, stock, payload, origin),
-      image_url: imageUrl || null,
+      image_url: staticTemplateImage(template?.visual_design, template?.name) || imageUrl || null,
       target_url: `${origin}/used-bikes/${stockSlug(stock, payload)}`,
       scheduled_for: null,
       created_by: userId,
@@ -203,6 +203,36 @@ async function queueSocialDrafts(stockBikeId: number, payload: Record<string, un
   if (!rows.length) return;
   const { error } = await db.from("social_post_queue").insert(rows);
   if (error) throw error;
+}
+
+function staticTemplateImage(value: unknown, name?: unknown) {
+  const design = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const image = text(design.staticImageUrl, 300);
+  const cleanImage = cleanStaticImage(image);
+  if (cleanImage) return cleanImage;
+  return staticTemplateCreative(typeof name === "string" ? name : "");
+}
+
+function cleanStaticImage(image: string) {
+  if (!image) return "";
+  if (image.startsWith("/")) return image;
+  if (/^https:\/\//i.test(image)) return image;
+  return "";
+}
+
+function staticTemplateCreative(name: string) {
+  const key = name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!key) return "";
+  if (key.includes("finance options")) return "/images/social-templates/finance-options.png";
+  if (key.includes("delivery available")) return "/images/social-templates/delivery-available.png";
+  if (key.includes("part exchange upgrade")) return "/images/social-templates/part-exchange-upgrade.png";
+  if (key.includes("we buy motorbikes")) return "/images/social-templates/we-buy-motorbikes.png";
+  if (key === "awaiting preparation") return "/images/social-templates/awaiting-preparation-layout-a.png";
+  if (key.includes("price top")) return "/images/social-templates/awaiting-preparation-layout-b.png";
+  if (key.includes("price middle")) return "/images/social-templates/awaiting-preparation-layout-c.png";
+  if (key.includes("clean")) return "/images/social-templates/awaiting-preparation-layout-d.png";
+  if (key.includes("stock hero")) return "/images/social-templates/stock-hero-reviews.png";
+  return "";
 }
 
 function renderBookingSocialCaption(template: string | undefined, stock: Record<string, unknown>, payload: Record<string, unknown>, origin: string) {

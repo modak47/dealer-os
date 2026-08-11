@@ -55,23 +55,23 @@ on conflict (category, name) do update set
 insert into public.social_post_templates(name,trigger_type,platform,caption_template,visual_design,display_order,active)
 values
   ('Finance options','manual',null,'Flexible finance options available on this {{year}} {{make}} {{model}}. To suit every budget. {{url}}',
-    '{"preset":"finance","layout":"single","headline":"Flexible Finance Options","subline":"To Suit Every Budget!","footer":"07984 763470 | www.yesmoto.co.uk","showPrice":false,"showBrand":true}'::jsonb,110,true),
+    '{"preset":"finance","layout":"single","headline":"Flexible Finance Options","subline":"To Suit Every Budget!","footer":"07984 763470 | www.yesmoto.co.uk","staticImageUrl":"/images/social-templates/finance-options.png","showPrice":false,"showBrand":true}'::jsonb,110,true),
   ('Delivery available','manual',null,'From our showroom to your driveway. Delivery available on this {{year}} {{make}} {{model}}. {{url}}',
-    '{"preset":"delivery","layout":"single","headline":"From Our Showroom to Your Driveway","subline":"Delivery Available!","footer":"YES MOTO","showPrice":false,"showBrand":true}'::jsonb,120,true),
+    '{"preset":"delivery","layout":"single","headline":"From Our Showroom to Your Driveway","subline":"Delivery Available!","footer":"YES MOTO","staticImageUrl":"/images/social-templates/delivery-available.png","showPrice":false,"showBrand":true}'::jsonb,120,true),
   ('Part exchange upgrade','manual',null,'Thinking of upgrading? Part exchange your old bike today against this {{year}} {{make}} {{model}}. {{url}}',
-    '{"preset":"part_exchange","layout":"single","headline":"Thinking of Upgrading?","subline":"Part Exchange Your Old Bike Today!","footer":"www.yesmoto.co.uk","showPrice":false,"showBrand":true}'::jsonb,130,true),
+    '{"preset":"part_exchange","layout":"single","headline":"Thinking of Upgrading?","subline":"Part Exchange Your Old Bike Today!","footer":"www.yesmoto.co.uk","staticImageUrl":"/images/social-templates/part-exchange-upgrade.png","showPrice":false,"showBrand":true}'::jsonb,130,true),
   ('We buy motorbikes','manual',null,'We buy motorbikes. What do you have? Contact YesMoto today. {{url}}',
-    '{"preset":"we_buy","layout":"single","headline":"We Buy Motorbikes","subline":"What Do You Have?","footer":"www.yesmoto.co.uk","showPrice":false,"showBrand":true}'::jsonb,140,true),
+    '{"preset":"we_buy","layout":"single","headline":"We Buy Motorbikes","subline":"What Do You Have?","footer":"www.yesmoto.co.uk","staticImageUrl":"/images/social-templates/we-buy-motorbikes.png","showPrice":false,"showBrand":true}'::jsonb,140,true),
   ('Awaiting preparation','new_stock',null,'This {{year}} {{make}} {{model}} is awaiting preparation. Inspection, valet, images and video coming soon. {{url}}',
-    '{"preset":"awaiting_prep","layout":"multi","headline":"Awaiting Preparation","subline":"Inspection | Valet | Images | Video","strapline":"VISIT YESMOTO.CO.UK TO FIND OUT MORE","showPrice":true,"pricePosition":"bottom","showBrand":true,"showThumbs":true}'::jsonb,150,true),
+    '{"preset":"awaiting_prep","layout":"multi","headline":"Awaiting Preparation","subline":"Inspection | Valet | Images | Video","strapline":"VISIT YESMOTO.CO.UK TO FIND OUT MORE","staticImageUrl":"/images/social-templates/awaiting-preparation-layout-a.png","showPrice":true,"pricePosition":"bottom","showBrand":true,"showThumbs":true}'::jsonb,150,true),
   ('Awaiting preparation price top','new_stock',null,'This {{year}} {{make}} {{model}} is awaiting preparation and priced at {{price}}. {{url}}',
-    '{"preset":"awaiting_prep","layout":"multi","headline":"Awaiting Preparation","subline":"Inspection | Valet | Images | Video","strapline":"VISIT YESMOTO.CO.UK TO FIND OUT MORE","showPrice":true,"pricePosition":"top","showBrand":true,"showThumbs":true}'::jsonb,160,true),
+    '{"preset":"awaiting_prep","layout":"multi","headline":"Awaiting Preparation","subline":"Inspection | Valet | Images | Video","strapline":"VISIT YESMOTO.CO.UK TO FIND OUT MORE","staticImageUrl":"/images/social-templates/awaiting-preparation-layout-b.png","showPrice":true,"pricePosition":"top","showBrand":true,"showThumbs":true}'::jsonb,160,true),
   ('Awaiting preparation price middle','new_stock',null,'New arrival: {{year}} {{make}} {{model}}. Awaiting preparation. {{url}}',
-    '{"preset":"awaiting_prep","layout":"multi","headline":"Awaiting Preparation","subline":"Inspection | Valet | Images | Video","strapline":"VISIT YESMOTO.CO.UK TO FIND OUT MORE","showPrice":true,"pricePosition":"middle","showBrand":true,"showThumbs":true}'::jsonb,170,true),
+    '{"preset":"awaiting_prep","layout":"multi","headline":"Awaiting Preparation","subline":"Inspection | Valet | Images | Video","strapline":"VISIT YESMOTO.CO.UK TO FIND OUT MORE","staticImageUrl":"/images/social-templates/awaiting-preparation-layout-c.png","showPrice":true,"pricePosition":"middle","showBrand":true,"showThumbs":true}'::jsonb,170,true),
   ('Awaiting preparation clean','new_stock',null,'{{year}} {{make}} {{model}} now in stock and awaiting preparation. {{url}}',
-    '{"preset":"awaiting_prep","layout":"multi","headline":"Awaiting Preparation","subline":"Inspection | Valet | Images | Video","strapline":"VISIT YESMOTO.CO.UK TO FIND OUT MORE","showPrice":false,"showBrand":true,"showThumbs":true}'::jsonb,180,true),
+    '{"preset":"awaiting_prep","layout":"multi","headline":"Awaiting Preparation","subline":"Inspection | Valet | Images | Video","strapline":"VISIT YESMOTO.CO.UK TO FIND OUT MORE","staticImageUrl":"/images/social-templates/awaiting-preparation-layout-d.png","showPrice":false,"showBrand":true,"showThumbs":true}'::jsonb,180,true),
   ('Stock hero with reviews','manual',null,'{{year}} {{make}} {{model}} now available from YesMoto for {{price}}. Delivery, part exchange and finance available. {{url}}',
-    '{"preset":"stock_hero","layout":"multi","headline":"Delivery - Part Exchange - Finance","subline":"Google Verified Reviews","footer":"YES MOTO","showPrice":true,"pricePosition":"top-right","showBrand":true,"showThumbs":true}'::jsonb,190,true)
+    '{"preset":"stock_hero","layout":"multi","headline":"Delivery - Part Exchange - Finance","subline":"Google Verified Reviews","footer":"YES MOTO","staticImageUrl":"/images/social-templates/stock-hero-reviews.png","showPrice":true,"pricePosition":"top-right","showBrand":true,"showThumbs":true}'::jsonb,190,true)
 on conflict (name) do update set
   trigger_type=excluded.trigger_type,
   platform=excluded.platform,

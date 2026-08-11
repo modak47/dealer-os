@@ -127,15 +127,15 @@ function DeliveryStep({ addons, selected, onSelect, loading }: { addons: Reserva
     <p>Choose how you would like to receive your motorcycle.</p>
     {loading ? <div className="reservation-option-loading">Loading delivery options...</div> : <>
       <div className="delivery-option-cards">{cards.map(addon => <button type="button" key={addon.id} className={`${addon.id === selected ? "selected" : ""}`} onClick={() => onSelect(addon.id)}>
-        <AddonArt addon={addon} />
+        <DeliveryIcon addon={addon} />
         {addon.badge && <em>{addon.badge}</em>}
         <b>{deliveryTitle(addon)}</b>
         <small>{descriptionLead(addon.description)}</small>
-        <AddonBenefits description={addon.description} />
+        <DeliveryBenefits description={addon.description} />
         <strong>{priceLabel(addon)}{Number(addon.price) > 0 ? <span> inc VAT</span> : null}</strong>
       </button>)}</div>
       {quote ? <button type="button" className={`delivery-quote-strip ${quote.id === selected ? "selected" : ""}`} onClick={() => onSelect(quote.id)}>
-        <AddonArt addon={quote} />
+        <DeliveryIcon addon={quote} />
         <div><b>{quote.name}</b><strong>{quote.badge || "Request a Quote"}</strong><small>{descriptionLead(quote.description)}</small></div>
         <span>Request a quote</span>
       </button> : null}
@@ -194,8 +194,8 @@ function CloseIcon() {
   return <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M6 6l12 12M18 6 6 18" /></svg>;
 }
 
-function AddonBenefits({ description }: { description: string | null }) {
-  const lines = (description ?? "").split(/\n+/).map(line => line.trim()).filter(Boolean).slice(1);
+function DeliveryBenefits({ description }: { description: string | null }) {
+  const lines = (description ?? "").split(/\n+/).map(line => line.trim()).filter(Boolean);
   return lines.length ? <ul>{lines.map(line => <li key={line}>{line}</li>)}</ul> : null;
 }
 
@@ -226,6 +226,14 @@ function deliveryTitle(addon: ReservationAddon) {
   return addon.name.replace(/^Free Delivery Within 20 Miles$/i, "Free Delivery\nWithin 20 Miles");
 }
 
+function DeliveryIcon({ addon }: { addon: ReservationAddon }) {
+  const key = `${addon.name} ${addon.icon ?? ""}`.toLowerCase();
+  const kind = key.includes("collect") || key.includes("store") ? "collect" : key.includes("local") || key.includes("20") ? "local" : key.includes("quote") || key.includes("scotland") || key.includes("ireland") ? "quote" : "mainland";
+  if (kind === "collect") return <span className="delivery-svg-icon collect" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M23 47V30h34v17M29 30v-8h22v8M29 50h22M33 41l6 6 11-15" /></svg></span>;
+  if (kind === "quote") return <span className="delivery-svg-icon quote" aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M24 48c9-10 19-17 32-20M24 48l11-2 5 8 10-4 6 6M30 33h7m7-9h7" /></svg></span>;
+  return <span className={`delivery-svg-icon ${kind}`} aria-hidden="true"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" /><path d="M20 45V33h27v12M47 38h9l5 7v8H20v-8M30 57a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm26 0a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM27 27h14" />{kind === "mainland" && <path d="M57 24c-4 3-5 7-2 11 3 3 2 6-2 9" />}</svg></span>;
+}
+
 function warrantyTitle(addon: ReservationAddon) {
   return addon.name.replace(/\s+(12|24|36)\s+months?$/i, "");
 }
@@ -233,15 +241,4 @@ function warrantyTitle(addon: ReservationAddon) {
 function saveAmount(badge: string | null) {
   const match = badge?.match(/save\s*£?(\d+)/i);
   return match ? Number(match[1]) : 0;
-}
-
-function AddonArt({ addon }: { addon: ReservationAddon }) {
-  const key = `${addon.category} ${addon.name} ${addon.icon ?? ""}`.toLowerCase();
-  if (addon.category === "delivery") {
-    if (key.includes("nationwide") || key.includes("mainland") || key.includes("scotland") || key.includes("ireland") || key.includes("map") || key.includes("quote")) return <span className="reservation-card-art delivery-art nationwide"><i /><b /><small /></span>;
-    if (key.includes("local") || key.includes("truck")) return <span className="reservation-card-art delivery-art local"><i /><b /><small /></span>;
-    return <span className="reservation-card-art collection-art"><i /><b /><small /></span>;
-  }
-  const level = key.includes("ultimate") || key.includes("gold") || key.includes("crown") ? "ultimate" : key.includes("plus") || key.includes("silver") || key.includes("star") ? "plus" : key.includes("essential") || key.includes("bronze") ? "essential" : "standard";
-  return <span className={`reservation-card-art warranty-art ${level}`}><i /><b /><small /></span>;
 }

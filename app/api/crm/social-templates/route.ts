@@ -52,9 +52,18 @@ function cleanVisualDesign(input: Record<string, unknown>) {
     subline: cleanText(input.subline, 180),
     strapline: cleanText(input.strapline, 180),
     footer: cleanText(input.footer, 180),
+    staticImageUrl: cleanStaticImageUrl(input.staticImageUrl),
     showPrice: input.showPrice !== false,
     pricePosition: pricePositions.has(pricePosition) ? pricePosition : "under-title",
     showBrand: input.showBrand !== false,
     showThumbs: input.showThumbs !== false,
   };
+}
+
+function cleanStaticImageUrl(value: unknown) {
+  const url = cleanText(value, 300);
+  if (!url) return "";
+  if (url.startsWith("/images/social-templates/") && /\.(png|jpg|jpeg|webp)$/i.test(url)) return url;
+  if (/^https:\/\/[^\s]+$/i.test(url)) return url;
+  return "";
 }
