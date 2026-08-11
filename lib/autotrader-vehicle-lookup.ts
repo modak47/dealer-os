@@ -41,6 +41,7 @@ export type DealerOsVehicle = {
   motExpiry?: string;
   motTests?: unknown;
   history?: unknown;
+  check?: unknown;
   vehicleCheck?: VehicleCheckSummary;
   taxonomyData?: Record<string, unknown>;
 };
@@ -56,7 +57,7 @@ export async function lookupVehicleByVrm(vrmInput: string): Promise<DealerOsVehi
   if (!isValidVrm(vrm)) throw new AutotraderVehicleLookupError("Invalid VRM.", 400, "invalid_vrm");
 
   const config = getAutotraderConfig();
-  const params = new URLSearchParams({ advertiserId: config.advertiserId, registration: vrm, motTests: "true", history: "true" });
+  const params = new URLSearchParams({ advertiserId: config.advertiserId, registration: vrm, motTests: "true", history: "true", fullVehicleCheck: "true" });
   const response = await autotraderFetch(`/vehicles?${params.toString()}`);
   const payload = await readJson<AutotraderVehicleResponse>(response);
 
@@ -117,7 +118,8 @@ export function normaliseAutotraderVehicle(vehicle: Record<string, unknown>, pay
   setText(result, "motExpiry", findMotExpiry(vehicle, payload));
   setRaw(result, "motTests", vehicle.motTests ?? payload.motTests);
   setRaw(result, "history", vehicle.history ?? payload.history);
-  result.vehicleCheck = normaliseVehicleCheck(vehicle.history ?? payload.history ?? payload, {
+  setRaw(result, "check", vehicle.check ?? payload.check);
+  result.vehicleCheck = normaliseVehicleCheck(vehicle.check ?? payload.check ?? vehicle.history ?? payload.history ?? payload, {
     motExpiry: result.motExpiry,
     previousOwners: result.previousOwners,
   });

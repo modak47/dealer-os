@@ -9,6 +9,8 @@ import { normaliseVehicleCheck, vehicleCheckFieldRows, type VehicleCheckSummary 
 type RetailCheck = Record<string, any> & { id?: string | number; Status?: string };
 type LookupVehicle = {
   registration?: string;
+  vin?: string;
+  engineNumber?: string;
   make?: string;
   model?: string;
   derivative?: string;
@@ -19,12 +21,25 @@ type LookupVehicle = {
   fuelType?: string;
   transmission?: string;
   engineSize?: number | string;
+  power?: number | string;
+  powerPs?: number | string;
+  torque?: number | string;
+  co2?: number | string;
+  roadTax?: number | string;
+  topSpeed?: number | string;
+  gears?: number;
+  lengthMm?: number;
+  widthMm?: number;
+  weightKg?: number;
+  euroEmissions?: string;
   bodyType?: string;
   colour?: string;
   previousOwners?: number;
+  firstRegistrationDate?: string;
   motExpiry?: string;
   motTests?: unknown;
   history?: unknown;
+  check?: unknown;
   vehicleCheck?: VehicleCheckSummary;
   taxonomyData?: Record<string, unknown>;
 };
@@ -57,6 +72,24 @@ function elapsedSince(value: unknown) {
   const seconds = Math.max(0, Math.floor((Date.now() - started) / 1000));
   if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function shown(value: unknown) {
+  if (value === null || value === undefined || value === "") return "-";
+  return String(value);
+}
+
+function FieldGrid({ fields }: { fields: Array<{ label: string; value: unknown }> }) {
+  return (
+    <div className="retail-detail-grid">
+      {fields.map(field => (
+        <div key={field.label}>
+          <span>{field.label}</span>
+          <b>{shown(field.value)}</b>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function KPI({
@@ -323,7 +356,7 @@ export default function RetailCheckPage() {
           derivativeId,
           autotraderVehicleId: identifiedVehicle?.vehicleId,
           autotraderTaxonomyData: identifiedVehicle?.taxonomyData,
-          autotraderMotData: identifiedVehicle ? { motTests: identifiedVehicle.motTests ?? null, history: identifiedVehicle.history ?? null } : undefined,
+          autotraderMotData: identifiedVehicle ? { motTests: identifiedVehicle.motTests ?? null, history: identifiedVehicle.history ?? null, check: identifiedVehicle.check ?? null } : undefined,
         }),
       });
 
@@ -376,8 +409,41 @@ export default function RetailCheckPage() {
 
   const storedMotData = displayedValuation?.["Auto Trader MOT Data"];
   const storedMotObject = storedMotData && typeof storedMotData === "object" && !Array.isArray(storedMotData) ? storedMotData as Record<string, unknown> : null;
-  const currentVehicleCheck = identifiedVehicle?.vehicleCheck ?? (storedMotObject && Object.keys(storedMotObject).length ? normaliseVehicleCheck(storedMotObject.history ?? storedMotObject, { motExpiry: identifiedVehicle?.motExpiry, previousOwners: identifiedVehicle?.previousOwners }) : null);
+  const currentVehicleCheck = identifiedVehicle?.vehicleCheck ?? (storedMotObject && Object.keys(storedMotObject).length ? normaliseVehicleCheck(storedMotObject.check ?? storedMotObject.history ?? storedMotObject, { motExpiry: identifiedVehicle?.motExpiry, previousOwners: identifiedVehicle?.previousOwners }) : null);
   const currentVehicleCheckRows = vehicleCheckFieldRows(currentVehicleCheck);
+  const vehicleDetailFields = [
+    { label: "Registration", value: identifiedVehicle?.registration || displayedValuation?.Registration || registration },
+    { label: "VIN", value: identifiedVehicle?.vin },
+    { label: "Engine number", value: identifiedVehicle?.engineNumber },
+    { label: "Make", value: identifiedVehicle?.make || displayedValuation?.Make || selectedMake },
+    { label: "Model", value: identifiedVehicle?.model || displayedValuation?.Model || selectedModel },
+    { label: "Derivative", value: identifiedVehicle?.derivative || derivative || displayedValuation?.Derivative },
+    { label: "Derivative ID", value: identifiedVehicle?.derivativeId || derivativeId || displayedValuation?.["Derivative ID"] },
+    { label: "AutoTrader vehicle ID", value: identifiedVehicle?.vehicleId || displayedValuation?.["Auto Trader Vehicle ID"] },
+    { label: "Year", value: identifiedVehicle?.year || displayedValuation?.Year || year },
+    { label: "Mileage", value: identifiedVehicle?.mileage || displayedValuation?.Mileage || mileage },
+    { label: "First registered", value: identifiedVehicle?.firstRegistrationDate },
+    { label: "Previous owners", value: identifiedVehicle?.previousOwners || currentVehicleCheck?.previousOwners },
+    { label: "Colour", value: identifiedVehicle?.colour },
+    { label: "Body type", value: identifiedVehicle?.bodyType },
+    { label: "Fuel", value: identifiedVehicle?.fuelType },
+    { label: "Transmission", value: identifiedVehicle?.transmission },
+    { label: "Engine", value: identifiedVehicle?.engineSize ? `${identifiedVehicle.engineSize}cc` : "" },
+    { label: "BHP", value: identifiedVehicle?.power },
+    { label: "PS", value: identifiedVehicle?.powerPs },
+    { label: "Torque", value: identifiedVehicle?.torque },
+    { label: "CO2", value: identifiedVehicle?.co2 },
+    { label: "Road tax", value: identifiedVehicle?.roadTax },
+    { label: "Top speed", value: identifiedVehicle?.topSpeed },
+    { label: "Gears", value: identifiedVehicle?.gears },
+    { label: "Length", value: identifiedVehicle?.lengthMm },
+    { label: "Width", value: identifiedVehicle?.widthMm },
+    { label: "Weight", value: identifiedVehicle?.weightKg },
+    { label: "Euro emissions", value: identifiedVehicle?.euroEmissions },
+    { label: "MOT expiry", value: identifiedVehicle?.motExpiry || currentVehicleCheck?.motExpiry },
+    { label: "HPI status", value: currentVehicleCheck?.status },
+    { label: "Write-off category", value: currentVehicleCheck?.category },
+  ];
 
   const progress =
     progressValue(valuation);
@@ -408,6 +474,7 @@ export default function RetailCheckPage() {
       vehicleCheck: currentVehicleCheck ?? undefined,
       taxonomyData: displayedValuation?.["Auto Trader Taxonomy Data"] as Record<string, unknown> | undefined,
       history: storedMotObject?.history,
+      check: storedMotObject?.check,
       motTests: storedMotObject?.motTests,
     };
     sessionStorage.setItem("dealeros.stockBookingPrefill", JSON.stringify({
@@ -419,13 +486,26 @@ export default function RetailCheckPage() {
         variant: String(vehicle.derivative || derivative || ""),
         derivative_id: String(vehicle.derivativeId || derivativeId || ""),
         autotrader_vehicle_id: String(vehicle.vehicleId || displayedValuation?.["Auto Trader Vehicle ID"] || ""),
+        vin: String(vehicle.vin || ""),
+        engine_number: String(vehicle.engineNumber || ""),
         year: vehicle.year ? String(vehicle.year) : year,
         mileage: vehicle.mileage ? String(vehicle.mileage) : mileage,
         engine_cc: vehicle.engineSize ? String(vehicle.engineSize) : "",
+        bhp: vehicle.power ? String(vehicle.power) : "",
+        torque: vehicle.torque ? String(vehicle.torque) : "",
+        co2: vehicle.co2 ? String(vehicle.co2) : "",
+        road_tax: vehicle.roadTax ? String(vehicle.roadTax) : "",
+        top_speed: vehicle.topSpeed ? String(vehicle.topSpeed) : "",
+        number_of_gears: vehicle.gears ? String(vehicle.gears) : "",
+        length_mm: vehicle.lengthMm ? String(vehicle.lengthMm) : "",
+        width_mm: vehicle.widthMm ? String(vehicle.widthMm) : "",
+        weight_kg: vehicle.weightKg ? String(vehicle.weightKg) : "",
+        euro_emissions: vehicle.euroEmissions ? String(vehicle.euroEmissions) : "",
         colour: String(vehicle.colour || ""),
         body_style: String(vehicle.bodyType || ""),
         fuel: String(vehicle.fuelType || ""),
         transmission: String(vehicle.transmission || ""),
+        registration_date: String(vehicle.firstRegistrationDate || ""),
         mot_expiry: String(vehicle.motExpiry || currentVehicleCheck?.motExpiry || ""),
         previous_owners: vehicle.previousOwners == null ? "" : String(vehicle.previousOwners),
         hpi_status: currentVehicleCheck?.status || "",
@@ -464,7 +544,7 @@ export default function RetailCheckPage() {
   );
 
   return (
-    <main className="dealer-module min-h-screen text-white">
+    <main className="dealer-module retail-check-page min-h-screen text-white">
       <div className="mx-auto max-w-[1500px] p-4 md:p-8">
         <div className="mb-6">
           <h1 className="text-4xl font-bold">Retail Checker</h1>
@@ -900,59 +980,41 @@ export default function RetailCheckPage() {
                 )}
 
                 {displayedValuation && activeTab==="vehicle" && (
-                  <div className="rounded-2xl border border-zinc-800 bg-black p-8">
-
-                    <div className="text-5xl font-bold text-green-400 mb-3">
-                      {displayedValuation.Registration}
-                    </div>
-
-                    <div className="text-xl md:text-2xl font-semibold text-white mb-4">
-                      {displayedValuation.Make} {displayedValuation.Model}
-                    </div>
-
-                  
-                    <div className="flex gap-3 mt-4">
-
-                      <div className="px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-700">
-                        {displayedValuation.Year}
+                  <div className="rounded-2xl border border-zinc-800 bg-black p-5">
+                    <div className="retail-tab-header">
+                      <div>
+                        <div className="retail-reg">{displayedValuation.Registration}</div>
+                        <h3>{displayedValuation.Make} {displayedValuation.Model}</h3>
+                        <p>{identifiedVehicle?.derivative || derivative || displayedValuation.Derivative || "Vehicle details"}</p>
                       </div>
-
-                      <div className="px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-700">
-                        {Number(displayedValuation.Mileage).toLocaleString()} miles
-                      </div>
-
-                    </div>   
+                      <button type="button" onClick={bookIntoStock}>Book Into Stock</button>
+                    </div>
+                    <FieldGrid fields={vehicleDetailFields} />
                   </div>
                 )}
                 {activeTab==="vehicle-check" && (
-                  <div className="rounded-2xl border border-zinc-800 bg-black p-8">
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+                  <div className="rounded-2xl border border-zinc-800 bg-black p-5">
+                    <div className="retail-tab-header">
                       <div>
-                        <div className={currentVehicleCheck?.clear === false ? "text-4xl font-bold text-red-300 mb-3" : "text-4xl font-bold text-green-400 mb-3"}>
+                        <div className={currentVehicleCheck?.clear === false ? "retail-check-status danger" : "retail-check-status"}>
                           {currentVehicleCheck?.status || "No vehicle check loaded"}
                         </div>
-                        <div className="text-zinc-400">
+                        <p>
                           {registration || displayedValuation?.Registration || "Search Auto Trader to load HPI and MOT markers."}
-                        </div>
+                        </p>
                       </div>
                       {(identifiedVehicle || displayedValuation) && (
-                        <button type="button" onClick={bookIntoStock} className="bg-[#00E51D] text-black px-5 py-3 rounded-xl font-bold">
+                        <button type="button" onClick={bookIntoStock}>
                           Book Into Stock
                         </button>
                       )}
                     </div>
                     {currentVehicleCheckRows.length > 0 ? (
-                      <div className="grid md:grid-cols-3 gap-4">
-                        {currentVehicleCheckRows.map(field => (
-                          <div key={field.label} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
-                            <div className="text-zinc-500 text-xs uppercase tracking-wide">{field.label}</div>
-                            <div className="text-xl font-bold mt-2">{field.value}</div>
-                          </div>
-                        ))}
-                      </div>
+                      <FieldGrid fields={currentVehicleCheckRows} />
                     ) : (
                       <div className="text-zinc-400">Search Auto Trader first, then the HPI and MOT status will show here.</div>
                     )}
+                    {currentVehicleCheck?.reportUrl && <a className="retail-report-link" href={currentVehicleCheck.reportUrl} target="_blank" rel="noreferrer">Open AutoTrader vehicle check report</a>}
                   </div>
                 )}
                 {displayedValuation && activeTab==="comparables" && (

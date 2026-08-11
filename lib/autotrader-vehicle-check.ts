@@ -3,6 +3,10 @@ export type VehicleCheckSummary = {
   clear: boolean | null;
   category: string;
   outstandingFinance: boolean | null;
+  privateFinance: boolean | null;
+  tradeFinance: boolean | null;
+  mileageDiscrepancy: boolean | null;
+  highRisk: boolean | null;
   stolen: boolean | null;
   scrapped: boolean | null;
   exported: boolean | null;
@@ -13,33 +17,43 @@ export type VehicleCheckSummary = {
   previousOwners: number | null;
   motExpiry: string;
   motStatus: string;
+  reportUrl: string;
   raw: Record<string, unknown>;
 };
 
 export function normaliseVehicleCheck(input: unknown, fallback: Partial<VehicleCheckSummary> = {}): VehicleCheckSummary {
   const raw = objectValue(input) ?? {};
   const flat = flattenScalars(raw);
-  const category = firstText(flat, ["hpiCategory", "writeOffCategory", "insuranceWriteOffCategory", "category", "categoryId"]);
-  const outstandingFinance = firstBoolean(flat, ["outstandingFinance", "financeOutstanding", "hasOutstandingFinance", "finance"]);
+  const category = firstText(flat, ["hpiCategory", "writeOffCategory", "insuranceWriteoffCategory", "insuranceWriteOffCategory", "insuranceWriteOff", "category", "categoryId"]);
+  const privateFinance = firstBoolean(flat, ["privateFinance"]);
+  const tradeFinance = firstBoolean(flat, ["tradeFinance"]);
+  const outstandingFinance = firstBoolean(flat, ["outstandingFinance", "financeOutstanding", "hasOutstandingFinance", "finance"]) ?? financeFromArrays(raw) ?? (privateFinance === true || tradeFinance === true ? true : privateFinance === false && tradeFinance === false ? false : null);
+  const mileageDiscrepancy = firstBoolean(flat, ["mileageDiscrepancy", "mileageDiscrepancyMarker"]);
+  const highRisk = firstBoolean(flat, ["highRisk", "highRiskMarker"]);
   const stolen = firstBoolean(flat, ["stolen", "stolenMarker", "policeStolen", "isStolen"]);
   const scrapped = firstBoolean(flat, ["scrapped", "scrappedMarker", "isScrapped"]);
   const exported = firstBoolean(flat, ["exported", "exportMarker", "isExported"]);
   const imported = firstBoolean(flat, ["imported", "importMarker", "isImported"]);
-  const writtenOff = firstBoolean(flat, ["writtenOff", "writeOff", "insuranceWriteOff", "isWrittenOff"]);
+  const writtenOff = firstBoolean(flat, ["writtenOff", "writeOff", "insuranceWriteOff", "insuranceWriteoff", "isWrittenOff"]) ?? (category ? true : null);
   const colourChanged = firstBoolean(flat, ["colourChanged", "colourChange", "colourChangeMarker"]);
-  const plateChanges = firstNumber(flat, ["plateChanges", "plateChangeCount", "numberOfPlateChanges"]);
+  const plateChanges = firstNumber(flat, ["plateChanges", "plateChangeCount", "numberOfPlateChanges"]) ?? countArray(raw.plateChanges);
   const previousOwners = firstNumber(flat, ["previousOwners", "keepers", "keeperChanges", "owners"]) ?? fallback.previousOwners ?? null;
   const motExpiry = firstDate(flat, ["motExpiry", "motExpiryDate", "motTestExpiryDate", "lastMOTExpiry", "latestMotExpiryDate"]) || fallback.motExpiry || "";
   const motStatus = firstText(flat, ["motStatus", "mot.status"]) || (motExpiry ? "MOT date returned" : "");
+  const reportUrl = firstText(flat, ["report", "reportUrl", "vehicleCheckReport"]);
   const explicitStatus = firstText(flat, ["hpiStatus", "vehicleCheckStatus", "checkStatus", "status", "result"]);
-  const riskFlags = [outstandingFinance, stolen, scrapped, exported, writtenOff];
-  const clear = explicitClear(explicitStatus) ?? (category ? false : riskFlags.some(value => value === true) ? false : riskFlags.some(value => value === false) ? true : null);
+  const riskFlags = [outstandingFinance, stolen, scrapped, exported, writtenOff, mileageDiscrepancy, highRisk];
+  const clear = category ? false : explicitClear(explicitStatus) ?? (riskFlags.some(value => value === true) ? false : riskFlags.some(value => value === false) ? true : null);
 
   return {
-    status: explicitStatus || (clear === true ? "Clear" : clear === false ? "Requires review" : "Vehicle check returned"),
+    status: category ? `Category ${category}` : explicitStatus || (clear === true ? "Clear" : clear === false ? "Requires review" : "Vehicle check returned"),
     clear,
     category,
     outstandingFinance,
+    privateFinance,
+    tradeFinance,
+    mileageDiscrepancy,
+    highRisk,
     stolen,
     scrapped,
     exported,
@@ -50,6 +64,7 @@ export function normaliseVehicleCheck(input: unknown, fallback: Partial<VehicleC
     previousOwners,
     motExpiry,
     motStatus,
+    reportUrl,
     raw,
   };
 }
@@ -61,6 +76,10 @@ export function vehicleCheckFieldRows(check?: VehicleCheckSummary | null) {
     ["Clear", yesNoUnknown(check.clear)],
     ["Write-off category", check.category || "-"],
     ["Outstanding finance", yesNoUnknown(check.outstandingFinance)],
+    ["Private finance", yesNoUnknown(check.privateFinance)],
+    ["Trade finance", yesNoUnknown(check.tradeFinance)],
+    ["Mileage discrepancy", yesNoUnknown(check.mileageDiscrepancy)],
+    ["High risk marker", yesNoUnknown(check.highRisk)],
     ["Stolen marker", yesNoUnknown(check.stolen)],
     ["Scrapped marker", yesNoUnknown(check.scrapped)],
     ["Exported marker", yesNoUnknown(check.exported)],
@@ -71,6 +90,7 @@ export function vehicleCheckFieldRows(check?: VehicleCheckSummary | null) {
     ["Previous owners", check.previousOwners == null ? "-" : String(check.previousOwners)],
     ["MOT status", check.motStatus || "-"],
     ["MOT expiry", check.motExpiry || "-"],
+    ["Report", check.reportUrl ? "Available" : "-"],
   ].map(([label, value]) => ({ label, value }));
 }
 
@@ -82,6 +102,15 @@ function yesNoUnknown(value: boolean | null) {
 
 function objectValue(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function countArray(value: unknown) {
+  return Array.isArray(value) ? value.length : null;
+}
+
+function financeFromArrays(raw: Record<string, unknown>) {
+  if (Array.isArray(raw.financeAgreements)) return raw.financeAgreements.length > 0;
+  return null;
 }
 
 function flattenScalars(value: unknown, prefix = "", output: Record<string, unknown> = {}) {

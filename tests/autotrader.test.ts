@@ -165,6 +165,20 @@ describe("Auto Trader Connect client", () => {
     assert.equal(check.motExpiry, "2027-02-03");
   });
 
+  it("treats an insurance write-off category as review even when another status says clear", () => {
+    const check = normaliseVehicleCheck({
+      hpiStatus: "Clear",
+      insuranceWriteoffCategory: "N",
+      stolen: false,
+      scrapped: false,
+    });
+
+    assert.equal(check.clear, false);
+    assert.equal(check.status, "Category N");
+    assert.equal(check.category, "N");
+    assert.equal(check.writtenOff, true);
+  });
+
   it("looks up a vehicle by VRM using the Auto Trader Vehicles API", async () => {
     process.env.AUTOTRADER_API_KEY = "sandbox-key";
     process.env.AUTOTRADER_API_SECRET = "sandbox-secret";
@@ -177,7 +191,7 @@ describe("Auto Trader Connect client", () => {
       requests.push(url);
       if (url.endsWith("/authenticate")) return jsonResponse({ access_token: "token-123", expires_at: "2099-01-01T00:00:00.000Z" });
       assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer token-123");
-      assert.equal(url, "https://api-sandbox.autotrader.co.uk/vehicles?advertiserId=10014506&registration=AB12CDE&motTests=true&history=true");
+      assert.equal(url, "https://api-sandbox.autotrader.co.uk/vehicles?advertiserId=10014506&registration=AB12CDE&motTests=true&history=true&fullVehicleCheck=true");
       return jsonResponse({
         vehicle: {
           registration: "AB12CDE",

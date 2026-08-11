@@ -37,6 +37,7 @@ type LookupVehicle = {
   motExpiry?: string;
   motTests?: unknown;
   history?: unknown;
+  check?: unknown;
   vehicleCheck?: VehicleCheckSummary;
   taxonomyData?: Record<string, unknown>;
 };
@@ -150,7 +151,7 @@ export function StockBookingForm() {
       const payload = Object.fromEntries(new FormData(event.currentTarget));
       payload.idempotency_key = String(form.idempotency_key);
       if (identifiedVehicle?.taxonomyData) payload.autotrader_taxonomy_data = JSON.stringify(identifiedVehicle.taxonomyData);
-      if (identifiedVehicle?.motTests || identifiedVehicle?.history) payload.autotrader_mot_data = JSON.stringify({ motTests: identifiedVehicle.motTests ?? null, history: identifiedVehicle.history ?? null });
+      if (identifiedVehicle?.motTests || identifiedVehicle?.history || identifiedVehicle?.check) payload.autotrader_mot_data = JSON.stringify({ motTests: identifiedVehicle.motTests ?? null, history: identifiedVehicle.history ?? null, check: identifiedVehicle.check ?? null });
       for (const key of checkboxKeys) payload[key] = String(Boolean(form[key]));
       const response = await fetch("/api/stock/book-into-stock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json() as { booking?: BookingResult; error?: string };
