@@ -108,7 +108,7 @@ export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", l
       <div className="reservation-progress">{steps.map((item, index) => <button type="button" key={item} className={index === step ? "active" : index < step ? "done" : ""} onClick={() => { if (index < step) setStep(index); }} disabled={busy || index > step}><b>{index + 1}</b><span>{item}</span></button>)}</div>
       {step === 0 && <section className="reservation-step reservation-details-step"><h3>Your details</h3><div className="reservation-form-grid"><label><span>First name</span><input value={firstName} onChange={event => setFirstName(event.target.value)} autoComplete="given-name" /></label><label><span>Last name</span><input value={lastName} onChange={event => setLastName(event.target.value)} autoComplete="family-name" /></label><label><span>Email</span><input value={email} onChange={event => setEmail(event.target.value)} type="email" autoComplete="email" /></label><label><span>Phone</span><input value={phone} onChange={event => setPhone(event.target.value)} type="tel" inputMode="tel" autoComplete="tel" /></label></div></section>}
       {step === 1 && <WarrantyStep addons={warranty} selected={selectedWarrantyId} onSelect={setSelectedWarranty} loading={addonsLoading} />}
-      {step === 2 && <AddonStep title="Delivery Options" subtitle="Choose how you would like to receive your motorcycle." addons={delivery} selected={selectedDeliveryId} onSelect={setSelectedDelivery} loading={addonsLoading} />}
+      {step === 2 && <DeliveryStep addons={delivery} selected={selectedDeliveryId} onSelect={setSelectedDelivery} loading={addonsLoading} />}
       {step === 3 && <section className="reservation-step reservation-review-step"><h3>Order summary</h3><div className="reservation-summary"><SummaryRow label={bike} value={money(Number(price || 0))} /><SummaryRow label="Reservation Fee" value={`${money(reservationFee)} Today`} highlight />{selectedAddons.map(addon => <SummaryRow key={addon.id} label={addon.name} value={`+${money(Number(addon.price || 0))}`} />)}<hr /><SummaryRow label="Total Purchase" value={money(purchaseTotal)} strong /><SummaryRow label="Pay Today" value={money(reservationFee)} strong /><SummaryRow label="Remaining Balance" value={money(remaining)} /></div><p className="reservation-payment-note">Only the {money(reservationFee)} reservation fee is charged today. Optional extras will be added to your final motorcycle invoice.</p><label className="reservation-consent"><input checked={acceptedTerms} onChange={event => setAcceptedTerms(event.target.checked)} type="checkbox" /><span>I agree to the <a href="/reserve-online" target="_blank">reservation terms</a>. The {money(reservationFee)} fee is deducted from the final purchase price.</span></label></section>}
       {error && <p className="auth-message reservation-error">{error}</p>}
       <footer className="reservation-builder-actions">{step > 0 ? <button type="button" onClick={() => setStep(current => Math.max(0, current - 1))} disabled={busy}>Back</button> : <button type="button" onClick={closeModal} disabled={busy}>Close</button>}{step < steps.length - 1 ? <button type="button" onClick={next} disabled={busy || addonsLoading}>{addonsLoading ? "Loading options..." : "Continue"}</button> : <button className={busy ? "loading" : ""} disabled={busy}>{busy ? <><i />Redirecting to Stripe...</> : `Pay ${money(reservationFee)} reservation fee`}</button>}</footer>
@@ -119,8 +119,29 @@ export function ReserveButton({ bikeId, slug, bike, price = 0, className = "", l
   return <><button type="button" className={`${className} ${opening ? "loading" : ""}`} onClick={openModal} disabled={opening || busy}>{opening ? "Opening reservation..." : label}</button>{mounted && modal ? createPortal(modal, document.body) : null}</>;
 }
 
-function AddonStep({ title, subtitle, addons, selected, onSelect, loading }: { title: string; subtitle: string; addons: ReservationAddon[]; selected: string; onSelect: (id: string) => void; loading: boolean }) {
-  return <section className="reservation-step"><h3>{title}</h3><p>{subtitle}</p>{loading ? <div className="reservation-option-loading">Loading options...</div> : <div className="reservation-option-grid">{addons.map(addon => <button type="button" key={addon.id} className={`${addon.id === selected ? "selected" : ""} ${addon.category}`} onClick={() => onSelect(addon.id)}><AddonArt addon={addon} />{addon.badge && <em>{addon.badge}</em>}<b>{addon.name}</b><small>{descriptionLead(addon.description)}</small><AddonBenefits description={addon.description} /><strong>{priceLabel(addon)}</strong></button>)}</div>}</section>;
+function DeliveryStep({ addons, selected, onSelect, loading }: { addons: ReservationAddon[]; selected: string; onSelect: (id: string) => void; loading: boolean }) {
+  const quote = addons.find(addon => /scotland|ireland|quote/i.test(`${addon.name} ${addon.badge ?? ""}`));
+  const cards = addons.filter(addon => addon.id !== quote?.id).slice(0, 3);
+  return <section className="reservation-step delivery-options-step">
+    <div className="delivery-step-title"><span /> <h3>Delivery <em>Options</em></h3> <span /></div>
+    <p>Choose how you would like to receive your motorcycle.</p>
+    {loading ? <div className="reservation-option-loading">Loading delivery options...</div> : <>
+      <div className="delivery-option-cards">{cards.map(addon => <button type="button" key={addon.id} className={`${addon.id === selected ? "selected" : ""}`} onClick={() => onSelect(addon.id)}>
+        <AddonArt addon={addon} />
+        {addon.badge && <em>{addon.badge}</em>}
+        <b>{deliveryTitle(addon)}</b>
+        <small>{descriptionLead(addon.description)}</small>
+        <AddonBenefits description={addon.description} />
+        <strong>{priceLabel(addon)}{Number(addon.price) > 0 ? <span> inc VAT</span> : null}</strong>
+      </button>)}</div>
+      {quote ? <button type="button" className={`delivery-quote-strip ${quote.id === selected ? "selected" : ""}`} onClick={() => onSelect(quote.id)}>
+        <AddonArt addon={quote} />
+        <div><b>{quote.name}</b><strong>{quote.badge || "Request a Quote"}</strong><small>{descriptionLead(quote.description)}</small></div>
+        <span>Request a quote</span>
+      </button> : null}
+      <div className="delivery-trust-strip"><span>Fully insured</span><span>Safe & secure</span><span>5-7 day delivery</span><span>Handover included</span></div>
+    </>}
+  </section>;
 }
 
 function WarrantyStep({ addons, selected, onSelect, loading }: { addons: ReservationAddon[]; selected: string; onSelect: (id: string) => void; loading: boolean }) {
@@ -201,6 +222,10 @@ function durationLabel(addon: ReservationAddon) {
   return descriptionLead(addon.description);
 }
 
+function deliveryTitle(addon: ReservationAddon) {
+  return addon.name.replace(/^Free Delivery Within 20 Miles$/i, "Free Delivery\nWithin 20 Miles");
+}
+
 function warrantyTitle(addon: ReservationAddon) {
   return addon.name.replace(/\s+(12|24|36)\s+months?$/i, "");
 }
@@ -213,7 +238,7 @@ function saveAmount(badge: string | null) {
 function AddonArt({ addon }: { addon: ReservationAddon }) {
   const key = `${addon.category} ${addon.name} ${addon.icon ?? ""}`.toLowerCase();
   if (addon.category === "delivery") {
-    if (key.includes("nationwide") || key.includes("map")) return <span className="reservation-card-art delivery-art nationwide"><i /><b /><small /></span>;
+    if (key.includes("nationwide") || key.includes("mainland") || key.includes("scotland") || key.includes("ireland") || key.includes("map") || key.includes("quote")) return <span className="reservation-card-art delivery-art nationwide"><i /><b /><small /></span>;
     if (key.includes("local") || key.includes("truck")) return <span className="reservation-card-art delivery-art local"><i /><b /><small /></span>;
     return <span className="reservation-card-art collection-art"><i /><b /><small /></span>;
   }

@@ -8,14 +8,17 @@ import type { SocialChannel, SocialPublishingBike, SocialPublishingStatus, Socia
 
 type Panel = "stock" | "create" | "status" | "automation" | "templates" | "queue";
 type TemplateDesign = {
+  preset: "finance" | "delivery" | "part_exchange" | "we_buy" | "awaiting_prep" | "stock_hero" | "default";
   layout: "single" | "multi" | "spotlight";
   accent: string;
   background: "light" | "dark";
   badge: string;
   headline: string;
   subline: string;
+  strapline: string;
+  footer: string;
   showPrice: boolean;
-  pricePosition: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "under-title";
+  pricePosition: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "under-title" | "top" | "middle" | "bottom";
   showBrand: boolean;
   showThumbs: boolean;
 };
@@ -48,17 +51,7 @@ export function SocialAutomationClient({ channels, templates, queue, stock, publ
     });
     return rows.sort((a, b) => sortMode === "price_high" ? b.price - a.price : sortMode === "price_low" ? a.price - b.price : sortMode === "oldest" ? Date.parse(a.createdTime || "0") - Date.parse(b.createdTime || "0") : Date.parse(b.createdTime || "0") - Date.parse(a.createdTime || "0")).slice(0, showCount);
   }, [search, showCount, sortMode, statusFilter, stock]);
-  const preview = useMemo(() => {
-    if (!selectedBike || !selectedTemplate) return "";
-    return selectedTemplate.caption_template
-      .replaceAll("{{year}}", String(selectedBike.year || ""))
-      .replaceAll("{{make}}", selectedBike.make)
-      .replaceAll("{{model}}", selectedBike.model)
-      .replaceAll("{{variant}}", selectedBike.variant)
-      .replaceAll("{{price}}", money(selectedBike.price))
-      .replaceAll("{{mileage}}", selectedBike.mileage)
-      .replaceAll("{{url}}", `/used-bikes/${selectedBike.slug}`);
-  }, [selectedBike, selectedTemplate]);
+  const preview = selectedBike && selectedTemplate ? renderTemplateSnippet(selectedTemplate.caption_template, selectedBike) : "";
   const previewTitle = selectedBike ? `${selectedBike.year || ""} ${selectedBike.make} ${selectedBike.model}`.trim() : "";
 
   async function queueBikePost(targetBikeId = String(selectedBike?.id ?? bikeId ?? "")) {
@@ -255,20 +248,25 @@ function AutomationSettings({ channels }: { channels: SocialChannel[] }) {
 
 function TemplateGrid({ templates, bike, selectTemplate }: { templates: SocialTemplate[]; bike?: PublicStockBike; selectTemplate: (id: string) => void }) {
   const [filter, setFilter] = useState("all");
+  const [rows, setRows] = useState<SocialTemplate[]>(templates);
   const [editingTemplate, setEditingTemplate] = useState<SocialTemplate | null>(null);
   const [design, setDesign] = useState<TemplateDesign>(defaultTemplateDesign());
-  const filtered = templates.filter(template => filter === "all" || templateType(template) === filter);
+  const filtered = rows.filter(template => filter === "all" || templateType(template) === filter);
   function edit(template: SocialTemplate) {
     setEditingTemplate(template);
     setDesign(defaultTemplateDesign(template, bike));
+  }
+  function saved(template: SocialTemplate) {
+    setRows(current => current.map(row => row.id === template.id ? template : row));
+    setEditingTemplate(template);
   }
   return <section className="social-workspace-panel">
     <div className="social-template-toolbar">
       <b>Filter Templates:</b>
       {["all", "single", "multi", "spotlight"].map(option => <button type="button" className={filter === option ? "active" : ""} onClick={() => setFilter(option)} key={option}>{templateFilterLabel(option)}</button>)}
-      <button type="button" className="settings" onClick={() => templates[0] && edit(templates[0])}>Create Custom Design</button>
+      <button type="button" className="settings" onClick={() => rows[0] && edit(rows[0])}>Create Custom Design</button>
     </div>
-    {editingTemplate ? <TemplateDesigner template={editingTemplate} bike={bike} design={design} setDesign={setDesign} close={() => setEditingTemplate(null)} useTemplate={() => selectTemplate(editingTemplate.id)} /> : null}
+    {editingTemplate ? <TemplateDesigner key={editingTemplate.id} template={editingTemplate} bike={bike} design={design} setDesign={setDesign} close={() => setEditingTemplate(null)} useTemplate={() => selectTemplate(editingTemplate.id)} onSaved={saved} /> : null}
     <div className="social-template-grid">{filtered.map(template => {
       const type = templateType(template);
       return <article className={`social-template-card ${type}`} key={template.id}>
@@ -285,27 +283,53 @@ function TemplateGrid({ templates, bike, selectTemplate }: { templates: SocialTe
   </section>;
 }
 
-function TemplateDesigner({ template, bike, design, setDesign, close, useTemplate }: { template: SocialTemplate; bike?: PublicStockBike; design: TemplateDesign; setDesign: (next: TemplateDesign) => void; close: () => void; useTemplate: () => void }) {
+function TemplateDesigner({ template, bike, design, setDesign, close, useTemplate, onSaved }: { template: SocialTemplate; bike?: PublicStockBike; design: TemplateDesign; setDesign: (next: TemplateDesign) => void; close: () => void; useTemplate: () => void; onSaved: (template: SocialTemplate) => void }) {
+  const [name, setName] = useState(template.name);
+  const [caption, setCaption] = useState(template.caption_template);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
   const update = <K extends keyof TemplateDesign>(key: K, value: TemplateDesign[K]) => setDesign({ ...design, [key]: value });
+  async function save() {
+    setSaving(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/crm/social-templates", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: template.id, name, caption_template: caption, platform: template.platform, active: template.active, visual_design: design }) });
+      const result = await response.json() as { template?: SocialTemplate; error?: string };
+      if (!response.ok || !result.template) throw new Error(result.error || "Unable to save template.");
+      onSaved(result.template);
+      setMessage("Template saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to save template.");
+    } finally {
+      setSaving(false);
+    }
+  }
   return <div className="social-template-designer">
     <div className="designer-toolbar">
       <div><span>Design editor</span><b>{template.name}</b></div>
       <button type="button" onClick={close}>Close</button>
     </div>
+    {message && <p className={message.endsWith("saved.") ? "stock-save-message success" : "stock-save-message"}>{message}</p>}
     <div className="designer-grid">
       <aside className="designer-controls">
+        <label><span>Template name</span><input value={name} onChange={event => setName(event.target.value)} /></label>
+        <label><span>Caption</span><textarea rows={5} value={caption} onChange={event => setCaption(event.target.value)} /></label>
+        <label><span>Preset</span><select value={design.preset} onChange={event => update("preset", event.target.value as TemplateDesign["preset"])}><option value="default">Default</option><option value="finance">Finance</option><option value="delivery">Delivery</option><option value="part_exchange">Part exchange</option><option value="we_buy">We buy bikes</option><option value="awaiting_prep">Awaiting preparation</option><option value="stock_hero">Stock hero</option></select></label>
         <label><span>Layout</span><select value={design.layout} onChange={event => update("layout", event.target.value as TemplateDesign["layout"])}><option value="single">Single Banner</option><option value="multi">Multiple Image</option><option value="spotlight">Spotlight</option></select></label>
         <label><span>Theme</span><select value={design.background} onChange={event => update("background", event.target.value as TemplateDesign["background"])}><option value="light">Light</option><option value="dark">Dark</option></select></label>
         <label><span>Accent</span><input type="color" value={design.accent} onChange={event => update("accent", event.target.value)} /></label>
         <label><span>Badge text</span><input value={design.badge} onChange={event => update("badge", event.target.value)} /></label>
         <label><span>Headline</span><input value={design.headline} onChange={event => update("headline", event.target.value)} /></label>
         <label><span>Subline</span><input value={design.subline} onChange={event => update("subline", event.target.value)} /></label>
-        <label><span>Price position</span><select value={design.pricePosition} onChange={event => update("pricePosition", event.target.value as TemplateDesign["pricePosition"])}><option value="top-right">Top right</option><option value="top-left">Top left</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="under-title">Under title</option></select></label>
+        <label><span>Strapline</span><input value={design.strapline} onChange={event => update("strapline", event.target.value)} /></label>
+        <label><span>Footer</span><input value={design.footer} onChange={event => update("footer", event.target.value)} /></label>
+        <label><span>Price position</span><select value={design.pricePosition} onChange={event => update("pricePosition", event.target.value as TemplateDesign["pricePosition"])}><option value="top-right">Top right</option><option value="top-left">Top left</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="under-title">Under title</option><option value="top">Top bar</option><option value="middle">Middle bar</option><option value="bottom">Bottom bar</option></select></label>
         <div className="designer-switches">
           <label><input type="checkbox" checked={design.showPrice} onChange={event => update("showPrice", event.target.checked)} />Price</label>
           <label><input type="checkbox" checked={design.showBrand} onChange={event => update("showBrand", event.target.checked)} />Brand</label>
           <label><input type="checkbox" checked={design.showThumbs} onChange={event => update("showThumbs", event.target.checked)} />Thumbnails</label>
         </div>
+        <button type="button" onClick={() => void save()} disabled={saving}>{saving ? "Saving..." : "Save Template"}</button>
         <button type="button" onClick={useTemplate}>Use This Design</button>
       </aside>
       <div className="designer-canvas-wrap">
@@ -316,45 +340,68 @@ function TemplateDesigner({ template, bike, design, setDesign, close, useTemplat
 }
 
 function TemplateArtwork({ template, bike, design, large = false }: { template: SocialTemplate; bike?: PublicStockBike; design?: TemplateDesign; large?: boolean }) {
-  const type = design?.layout ?? templateType(template);
+  const savedDesign = defaultTemplateDesign(template, bike);
+  const activeDesign = design ?? savedDesign;
+  const type = activeDesign.layout ?? templateType(template);
   const title = bike ? `${bike.year || ""} ${bike.make} ${bike.model}`.trim() : "Vehicle Year & Make";
   const price = bike ? money(bike.price) : "Price";
   const image = bike?.image || "/bike-placeholder.svg";
   const extraImages = bike?.imageUrls?.filter(item => item && !item.includes("bike-placeholder")).slice(1, 4) ?? [];
-  const style = design ? ({ "--template-accent": design.accent } as CSSProperties) : undefined;
-  return <div className={`social-template-art ${type} ${large ? "large" : ""} ${design?.background === "dark" ? "dark" : ""}`} style={style}>
+  const style = { "--template-accent": activeDesign.accent } as CSSProperties;
+  return <div className={`social-template-art ${type} preset-${activeDesign.preset} price-${activeDesign.pricePosition} ${large ? "large" : ""} ${activeDesign.background === "dark" ? "dark" : ""}`} style={style}>
     <div className="template-main-image"><img src={image} alt={title} onError={fallbackImage} /></div>
-    {design?.showThumbs === false || type === "single" ? null : <div className="template-side-images">
+    {activeDesign.showThumbs === false || type === "single" ? null : <div className="template-side-images">
       {(extraImages.length ? extraImages : [image, image, image]).slice(0, type === "spotlight" ? 2 : 3).map((item, index) => <img src={item} alt={`${title} template ${index + 1}`} onError={fallbackImage} key={`${item}-${index}`} />)}
     </div>}
-    {design?.showPrice === false ? null : <div className={`template-price price-${design?.pricePosition ?? "under-title"}`}>{price}</div>}
-    {design?.showBrand === false ? null : <div className="template-brand">{design?.badge || "YES MOTO"}</div>}
-    <div className="template-title"><b>{design?.headline || title}</b><span>{design?.subline || bike?.variant || bike?.mileage || "Vehicle Model"}</span></div>
+    {activeDesign.showPrice === false ? null : <div className={`template-price price-${activeDesign.pricePosition}`}>{price}</div>}
+    {activeDesign.showBrand === false ? null : <div className="template-brand">{activeDesign.badge || "YES MOTO"}</div>}
+    {activeDesign.strapline ? <div className="template-strapline">{activeDesign.strapline}</div> : null}
+    <div className="template-title"><b>{activeDesign.headline || title}</b><span>{activeDesign.subline || bike?.variant || bike?.mileage || "Vehicle Model"}</span></div>
+    {activeDesign.footer ? <div className="template-footer">{activeDesign.footer}</div> : null}
   </div>;
 }
 
 function defaultTemplateDesign(template?: SocialTemplate, bike?: PublicStockBike): TemplateDesign {
+  const visual = (template?.visual_design && typeof template.visual_design === "object" && !Array.isArray(template.visual_design) ? template.visual_design : {}) as Record<string, unknown>;
   const title = bike ? `${bike.year || ""} ${bike.make} ${bike.model}`.trim() : "Vehicle Year & Make";
   const layout = template ? templateType(template) as TemplateDesign["layout"] : "single";
   return {
-    layout,
-    accent: "#00e51d",
-    background: "light",
-    badge: "YES MOTO",
-    headline: title,
-    subline: bike?.variant || bike?.mileage || "Finance - Delivery - Part exchange",
-    showPrice: true,
-    pricePosition: "under-title",
-    showBrand: true,
-    showThumbs: true,
+    preset: templatePreset(visual.preset),
+    layout: templateLayout(visual.layout) ?? layout,
+    accent: typeof visual.accent === "string" && /^#[0-9a-f]{6}$/i.test(visual.accent) ? visual.accent : "#00e51d",
+    background: visual.background === "dark" ? "dark" : "light",
+    badge: typeof visual.badge === "string" ? visual.badge : "YES MOTO",
+    headline: typeof visual.headline === "string" && visual.headline ? visual.headline : title,
+    subline: typeof visual.subline === "string" && visual.subline ? visual.subline : bike?.variant || bike?.mileage || "Finance - Delivery - Part exchange",
+    strapline: typeof visual.strapline === "string" ? visual.strapline : "",
+    footer: typeof visual.footer === "string" ? visual.footer : "",
+    showPrice: visual.showPrice !== false,
+    pricePosition: templatePricePosition(visual.pricePosition) ?? "under-title",
+    showBrand: visual.showBrand !== false,
+    showThumbs: visual.showThumbs !== false,
   };
 }
 
 function templateType(template: SocialTemplate) {
+  const visual = template.visual_design && typeof template.visual_design === "object" && !Array.isArray(template.visual_design) ? template.visual_design as Record<string, unknown> : {};
+  const layout = templateLayout(visual.layout);
+  if (layout) return layout;
   const text = `${template.name} ${template.caption_template}`.toLowerCase();
   if (/weekly|still available|multiple|carousel/.test(text)) return "multi";
   if (/low mileage|spotlight|feature/.test(text)) return "spotlight";
   return "single";
+}
+
+function templatePreset(value: unknown): TemplateDesign["preset"] {
+  return value === "finance" || value === "delivery" || value === "part_exchange" || value === "we_buy" || value === "awaiting_prep" || value === "stock_hero" ? value : "default";
+}
+
+function templateLayout(value: unknown): TemplateDesign["layout"] | null {
+  return value === "single" || value === "multi" || value === "spotlight" ? value : null;
+}
+
+function templatePricePosition(value: unknown): TemplateDesign["pricePosition"] | null {
+  return value === "top-right" || value === "top-left" || value === "bottom-right" || value === "bottom-left" || value === "under-title" || value === "top" || value === "middle" || value === "bottom" ? value : null;
 }
 
 function templateFilterLabel(value: string) {

@@ -18,6 +18,7 @@ export type SocialTemplate = {
   trigger_type: string;
   platform: string | null;
   caption_template: string;
+  visual_design?: Record<string, unknown> | null;
   active: boolean;
   display_order: number;
 };
@@ -88,7 +89,7 @@ export async function getSocialAutomationData(): Promise<SocialAutomationData> {
   const queueColumns = "id,stock_bike_id,platform,status,caption,image_url,target_url,scheduled_for,posted_at,external_url,error,created_at";
   const [channels, templates, queue, queueHistory, stockSettings, stock] = await Promise.all([
     db.from("social_channels").select("id,platform,display_name,status,posting_enabled,last_error").order("platform"),
-    db.from("social_post_templates").select("id,name,trigger_type,platform,caption_template,active,display_order").order("display_order"),
+    db.from("social_post_templates").select("id,name,trigger_type,platform,caption_template,visual_design,active,display_order").order("display_order"),
     db.from("social_post_queue").select(`${queueColumns},bike:stock_bikes(make,model,year,registration)`).order("created_at", { ascending: false }).limit(20),
     db.from("social_post_queue").select(queueColumns).order("created_at", { ascending: false }).limit(500),
     db.from("social_stock_settings").select("id,stock_bike_id,include_in_rotation,priority,preferred_platform,preferred_template_id,preferred_post_time,max_posts_per_bike,last_queued_at,notes,updated_at"),
