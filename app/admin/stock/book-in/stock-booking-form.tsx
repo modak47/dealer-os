@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { vehicleCheckFieldRows, type VehicleCheckSummary } from "@/lib/autotrader-vehicle-check";
 
 type BookingResult = { stock_bike_id: number; stock_number: string; purchase_id?: string; existing?: boolean };
 type LookupVehicle = {
@@ -36,17 +37,20 @@ type LookupVehicle = {
   motExpiry?: string;
   motTests?: unknown;
   history?: unknown;
+  vehicleCheck?: VehicleCheckSummary;
   taxonomyData?: Record<string, unknown>;
 };
+type BookingPrefill = { form?: Record<string, string | boolean>; vehicle?: LookupVehicle; message?: string };
 
 const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value || 0);
 
 export function StockBookingForm() {
   const router = useRouter();
-  const [lookupReg, setLookupReg] = useState("");
-  const [lookupMessage, setLookupMessage] = useState("");
+  const [bookingPrefill] = useState<BookingPrefill | null>(() => readBookingPrefill());
+  const [lookupReg, setLookupReg] = useState(typeof bookingPrefill?.form?.registration === "string" ? bookingPrefill.form.registration : "");
+  const [lookupMessage, setLookupMessage] = useState(bookingPrefill?.message ?? "");
   const [lookupLoading, setLookupLoading] = useState(false);
-  const [identifiedVehicle, setIdentifiedVehicle] = useState<LookupVehicle | null>(null);
+  const [identifiedVehicle, setIdentifiedVehicle] = useState<LookupVehicle | null>(bookingPrefill?.vehicle ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<BookingResult | null>(null);
@@ -63,6 +67,7 @@ export function StockBookingForm() {
     hpi_check_required: true,
     documents_required: true,
     purchase_date: new Date().toISOString().slice(0, 10),
+    ...(bookingPrefill?.form ?? {}),
   }));
 
   const purchase = numberValue(form.purchase_price);
@@ -72,6 +77,7 @@ export function StockBookingForm() {
   const retail = numberValue(form.target_retail_price);
   const totalCost = purchase + prep + transport + fees;
   const estimatedProfit = retail - totalCost;
+  const vehicleCheckRows = vehicleCheckFieldRows(identifiedVehicle?.vehicleCheck);
 
   const canSubmit = useMemo(() => !submitting && !result, [submitting, result]);
 
@@ -122,6 +128,11 @@ export function StockBookingForm() {
       updateIfBlank("registration_date", vehicle.firstRegistrationDate);
       updateIfBlank("mot_expiry", vehicle.motExpiry);
       updateIfBlank("mileage", vehicle.mileage);
+      if (vehicle.vehicleCheck) {
+        updateIfBlank("hpi_status", vehicle.vehicleCheck.status);
+        updateIfBlank("hpi_category", vehicle.vehicleCheck.category);
+        if (vehicle.vehicleCheck.clear === true) update("hpi_check_required", false);
+      }
       setLookupMessage(vehicle.derivativeId ? "Auto Trader lookup completed and derivative matched. Check and correct the details before booking." : "Auto Trader found the vehicle but did not return a derivative ID. You can continue manually.");
     } catch (caught) {
       setIdentifiedVehicle(null);
@@ -191,7 +202,11 @@ export function StockBookingForm() {
         <span>{identifiedVehicle.registration || lookupReg}</span>
         <small>{[identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "", identifiedVehicle.transmission, identifiedVehicle.fuelType].filter(Boolean).join(" / ")}</small>
         {identifiedVehicle.motExpiry && <small>MOT expires {identifiedVehicle.motExpiry}</small>}
+        {identifiedVehicle.vehicleCheck && <small>Vehicle check: {identifiedVehicle.vehicleCheck.status}{identifiedVehicle.vehicleCheck.category ? ` / ${identifiedVehicle.vehicleCheck.category}` : ""}</small>}
         {identifiedVehicle.derivativeId && <em>Auto Trader derivative matched</em>}
+      </div>}
+      {vehicleCheckRows.length > 0 && <div className="stock-vehicle-check-grid">
+        {vehicleCheckRows.slice(0, 10).map(field => <div key={field.label}><span>{field.label}</span><b>{field.value}</b></div>)}
       </div>}
       {lookupMessage && <p className="stock-booking-message">{lookupMessage}</p>}
     </section>
@@ -284,6 +299,20 @@ function Field({ name, label, form, update, type = "text", required = false }: {
 
 function Select({ name, label, form, update, options }: { name: string; label: string; form: Record<string, string | boolean>; update: (key: string, value: string) => void; options: string[] }) {
   return <label><span>{label}</span><select name={name} value={String(form[name] ?? "")} onChange={event => update(name, event.target.value)}>{options.map(option => <option value={option} key={option}>{option.replaceAll("_", " ")}</option>)}</select></label>;
+}
+
+function readBookingPrefill(): BookingPrefill | null {
+  if (typeof window === "undefined") return null;
+  if (!new URLSearchParams(window.location.search).has("fromRetailCheck")) return null;
+  const raw = sessionStorage.getItem("dealeros.stockBookingPrefill");
+  if (!raw) return null;
+  sessionStorage.removeItem("dealeros.stockBookingPrefill");
+  try {
+    const prefill = JSON.parse(raw) as BookingPrefill;
+    return { ...prefill, message: "Retail check details loaded. Confirm seller and purchase details before booking." };
+  } catch {
+    return { message: "Could not load the retail check prefill. You can still search by VRM." };
+  }
 }
 
 function numberValue(value: unknown) {

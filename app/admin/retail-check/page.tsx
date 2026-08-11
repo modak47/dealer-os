@@ -2,8 +2,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { normaliseVehicleCheck, vehicleCheckFieldRows, type VehicleCheckSummary } from "@/lib/autotrader-vehicle-check";
 
 type RetailCheck = Record<string, any> & { id?: string | number; Status?: string };
 type LookupVehicle = {
@@ -20,9 +21,11 @@ type LookupVehicle = {
   engineSize?: number | string;
   bodyType?: string;
   colour?: string;
+  previousOwners?: number;
   motExpiry?: string;
   motTests?: unknown;
   history?: unknown;
+  vehicleCheck?: VehicleCheckSummary;
   taxonomyData?: Record<string, unknown>;
 };
 
@@ -78,6 +81,7 @@ function KPI({
 }
 
 export default function RetailCheckPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [makes, setMakes] = useState<any[]>([]);
   const [models, setModels] = useState<any[]>([]);
@@ -275,6 +279,7 @@ export default function RetailCheckPage() {
       if (vehicle.mileage && !mileage) setMileage(String(vehicle.mileage));
       setDerivative(vehicle.derivative || "");
       setDerivativeId(vehicle.derivativeId || "");
+      if (vehicle.vehicleCheck) setActiveTab("vehicle-check");
       setLookupMessage(vehicle.derivativeId ? "Auto Trader derivative matched." : "Vehicle found. No derivative ID returned; you can continue manually.");
     } catch (caught) {
       setIdentifiedVehicle(null);
@@ -369,6 +374,11 @@ export default function RetailCheckPage() {
   const displayedValuation =
   selectedHistoryRecord || valuation;
 
+  const storedMotData = displayedValuation?.["Auto Trader MOT Data"];
+  const storedMotObject = storedMotData && typeof storedMotData === "object" && !Array.isArray(storedMotData) ? storedMotData as Record<string, unknown> : null;
+  const currentVehicleCheck = identifiedVehicle?.vehicleCheck ?? (storedMotObject && Object.keys(storedMotObject).length ? normaliseVehicleCheck(storedMotObject.history ?? storedMotObject, { motExpiry: identifiedVehicle?.motExpiry, previousOwners: identifiedVehicle?.previousOwners }) : null);
+  const currentVehicleCheckRows = vehicleCheckFieldRows(currentVehicleCheck);
+
   const progress =
     progressValue(valuation);
 
@@ -383,6 +393,52 @@ export default function RetailCheckPage() {
 
   const runButtonDisabled =
     loading || activeCheckRunning;
+
+  function bookIntoStock() {
+    const purchase = offerPrice || String(displayedValuation?.["Suggested Offer"] || "");
+    const retail = String(displayedValuation?.["Market Retail"] || askingPrice || "");
+    const vehicle = identifiedVehicle ?? {
+      registration,
+      make: selectedMake,
+      model: selectedModel,
+      derivative,
+      derivativeId,
+      year: year ? Number(year) : undefined,
+      mileage: mileage ? Number(mileage) : undefined,
+      vehicleCheck: currentVehicleCheck ?? undefined,
+      taxonomyData: displayedValuation?.["Auto Trader Taxonomy Data"] as Record<string, unknown> | undefined,
+      history: storedMotObject?.history,
+      motTests: storedMotObject?.motTests,
+    };
+    sessionStorage.setItem("dealeros.stockBookingPrefill", JSON.stringify({
+      vehicle,
+      form: {
+        registration: String(vehicle.registration || registration).toUpperCase().replace(/\s+/g, ""),
+        make: String(vehicle.make || selectedMake || ""),
+        model: String(vehicle.model || selectedModel || ""),
+        variant: String(vehicle.derivative || derivative || ""),
+        derivative_id: String(vehicle.derivativeId || derivativeId || ""),
+        autotrader_vehicle_id: String(vehicle.vehicleId || displayedValuation?.["Auto Trader Vehicle ID"] || ""),
+        year: vehicle.year ? String(vehicle.year) : year,
+        mileage: vehicle.mileage ? String(vehicle.mileage) : mileage,
+        engine_cc: vehicle.engineSize ? String(vehicle.engineSize) : "",
+        colour: String(vehicle.colour || ""),
+        body_style: String(vehicle.bodyType || ""),
+        fuel: String(vehicle.fuelType || ""),
+        transmission: String(vehicle.transmission || ""),
+        mot_expiry: String(vehicle.motExpiry || currentVehicleCheck?.motExpiry || ""),
+        previous_owners: vehicle.previousOwners == null ? "" : String(vehicle.previousOwners),
+        hpi_status: currentVehicleCheck?.status || "",
+        hpi_category: currentVehicleCheck?.category || "",
+        target_retail_price: retail,
+        purchase_price: purchase,
+        purchase_source: websiteLeadId ? "website_lead" : "buying_opportunity",
+        website_lead_id: websiteLeadId,
+        hpi_check_required: currentVehicleCheck?.clear === true ? false : true,
+      },
+    }));
+    router.push(`/admin/stock/book-in?fromRetailCheck=${encodeURIComponent(String(recordId || requestId || registration || "lookup"))}`);
+  }
 
   const marketRetail =
   Number(displayedValuation?.["Market Retail"]) || 0;
@@ -452,7 +508,7 @@ export default function RetailCheckPage() {
 
             </div>
 
-            {identifiedVehicle && (
+                {identifiedVehicle && (
               <div className="bg-black border border-zinc-800 rounded-xl p-4 mb-4">
                 <div className="font-bold text-white">
                   {[identifiedVehicle.year, identifiedVehicle.make, identifiedVehicle.model, identifiedVehicle.derivative].filter(Boolean).join(" ")}
@@ -464,7 +520,11 @@ export default function RetailCheckPage() {
                   {[identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "", identifiedVehicle.transmission, identifiedVehicle.fuelType].filter(Boolean).join(" / ")}
                 </div>
                 {identifiedVehicle.motExpiry && <div className="text-zinc-500 text-xs mt-1">MOT expires {identifiedVehicle.motExpiry}</div>}
+                {identifiedVehicle.vehicleCheck && <div className={identifiedVehicle.vehicleCheck.clear === false ? "text-red-300 text-xs font-bold uppercase tracking-wide mt-3" : "text-[#00E51D] text-xs font-bold uppercase tracking-wide mt-3"}>Vehicle check: {identifiedVehicle.vehicleCheck.status}</div>}
                 {identifiedVehicle.derivativeId && <div className="text-[#00E51D] text-xs font-bold uppercase tracking-wide mt-3">Derivative matched</div>}
+                <button type="button" onClick={bookIntoStock} className="mt-4 w-full bg-zinc-900 border border-[#00E51D] text-[#00E51D] font-bold py-3 rounded-xl">
+                  Book Into Stock
+                </button>
               </div>
             )}
 
@@ -637,13 +697,13 @@ export default function RetailCheckPage() {
 
             <div className="bg-[#151515] border border-zinc-800 rounded-3xl overflow-hidden">
               <div className="flex border-b border-zinc-800">
-                {["vehicle","valuation","comparables","history"].map(tab=>(
+                {["vehicle","vehicle-check","valuation","comparables","history"].map(tab=>(
                   <button
                     key={tab}
                     onClick={()=>setActiveTab(tab)}
                     className={`px-6 py-4 capitalize font-semibold ${activeTab===tab ? "text-[#00E51D] border-b-2 border-[#00E51D]" : "text-zinc-400"}`}
                   >
-                    {tab}
+                    {tab.replace("-", " ")}
                   </button>
                 ))}
               </div>
@@ -758,9 +818,14 @@ export default function RetailCheckPage() {
                     </div>
 
                     <div className="bg-black border border-zinc-800 rounded-2xl p-5">
-                      <h3 className="text-xl font-bold mb-4">
-                        Buying Metrics
-                      </h3>
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                        <h3 className="text-xl font-bold">
+                          Buying Metrics
+                        </h3>
+                        <button type="button" onClick={bookIntoStock} className="bg-[#00E51D] text-black px-4 py-3 rounded-xl font-bold">
+                          Book Into Stock
+                        </button>
+                      </div>
 
                       <div className="mb-4">
                         <input
@@ -857,6 +922,37 @@ export default function RetailCheckPage() {
                       </div>
 
                     </div>   
+                  </div>
+                )}
+                {activeTab==="vehicle-check" && (
+                  <div className="rounded-2xl border border-zinc-800 bg-black p-8">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+                      <div>
+                        <div className={currentVehicleCheck?.clear === false ? "text-4xl font-bold text-red-300 mb-3" : "text-4xl font-bold text-green-400 mb-3"}>
+                          {currentVehicleCheck?.status || "No vehicle check loaded"}
+                        </div>
+                        <div className="text-zinc-400">
+                          {registration || displayedValuation?.Registration || "Search Auto Trader to load HPI and MOT markers."}
+                        </div>
+                      </div>
+                      {(identifiedVehicle || displayedValuation) && (
+                        <button type="button" onClick={bookIntoStock} className="bg-[#00E51D] text-black px-5 py-3 rounded-xl font-bold">
+                          Book Into Stock
+                        </button>
+                      )}
+                    </div>
+                    {currentVehicleCheckRows.length > 0 ? (
+                      <div className="grid md:grid-cols-3 gap-4">
+                        {currentVehicleCheckRows.map(field => (
+                          <div key={field.label} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+                            <div className="text-zinc-500 text-xs uppercase tracking-wide">{field.label}</div>
+                            <div className="text-xl font-bold mt-2">{field.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-zinc-400">Search Auto Trader first, then the HPI and MOT status will show here.</div>
+                    )}
                   </div>
                 )}
                 {displayedValuation && activeTab==="comparables" && (

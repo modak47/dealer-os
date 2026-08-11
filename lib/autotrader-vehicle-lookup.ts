@@ -1,4 +1,5 @@
 import { autotraderFetch, getAutotraderConfig } from "@/lib/autotrader";
+import { normaliseVehicleCheck, type VehicleCheckSummary } from "@/lib/autotrader-vehicle-check";
 import { normaliseRegistration } from "@/lib/vrm-lookup";
 
 export type DealerOsVehicle = {
@@ -40,6 +41,7 @@ export type DealerOsVehicle = {
   motExpiry?: string;
   motTests?: unknown;
   history?: unknown;
+  vehicleCheck?: VehicleCheckSummary;
   taxonomyData?: Record<string, unknown>;
 };
 
@@ -115,6 +117,10 @@ export function normaliseAutotraderVehicle(vehicle: Record<string, unknown>, pay
   setText(result, "motExpiry", findMotExpiry(vehicle, payload));
   setRaw(result, "motTests", vehicle.motTests ?? payload.motTests);
   setRaw(result, "history", vehicle.history ?? payload.history);
+  result.vehicleCheck = normaliseVehicleCheck(vehicle.history ?? payload.history ?? payload, {
+    motExpiry: result.motExpiry,
+    previousOwners: result.previousOwners,
+  });
   result.taxonomyData = payload;
   return result;
 }

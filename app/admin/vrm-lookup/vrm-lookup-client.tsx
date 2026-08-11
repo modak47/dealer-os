@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { vehicleCheckFieldRows, type VehicleCheckSummary } from "@/lib/autotrader-vehicle-check";
 
 type LookupResult = { vehicle?: LookupVehicle; error?: string; [key: string]: unknown };
 type LookupVehicle = Record<string, unknown> & {
@@ -26,6 +27,7 @@ type LookupVehicle = Record<string, unknown> & {
   motExpiry?: string;
   motTests?: unknown;
   history?: unknown;
+  vehicleCheck?: VehicleCheckSummary;
   power?: number | string;
   powerPs?: number | string;
   torque?: number | string;
@@ -125,6 +127,8 @@ export function VrmLookupClient() {
   const vin = shown(vehicle.vin);
   const engineNumber = shown(vehicle.engineNumber);
   const motExpiry = shown(vehicle.motExpiry);
+  const vehicleCheck = vehicle.vehicleCheck;
+  const vehicleCheckRows = vehicleCheckFieldRows(vehicleCheck);
   const headline = [year, make, model, derivative].filter(value => value !== "-").join(" ") || registration;
   const subline = [colour, fuel, engine].filter(value => value !== "-").join(" / ");
 
@@ -173,10 +177,10 @@ export function VrmLookupClient() {
   return <div className="vrm-tool"><section className="vrm-search-card"><div><span className="vrm-icon">AT</span><div><h2>LOOK UP A VEHICLE</h2><p>Enter a registration to retrieve Auto Trader vehicle and taxonomy data.</p></div></div><form onSubmit={submit}><label htmlFor="vrm">Registration number</label><div><input id="vrm" value={vrm} onChange={event => setVrm(event.target.value.toUpperCase())} placeholder="YM21 NZK" autoComplete="off" maxLength={10} disabled={loading} /><button type="submit" disabled={loading}>{loading ? <><i />Searching Auto Trader...</> : "Lookup vehicle"}</button></div></form></section>
     {error && <div className="vrm-error" role="alert"><b>Lookup unsuccessful</b><p>{error}</p></div>}
     {result && <section className="vehicle-summary"><header><div className="vehicle-title"><span className="summary-icon">OK</span><div><p>AUTO TRADER VEHICLE SUMMARY</p><h2>{headline}</h2><small>{subline || "Vehicle data returned successfully"}</small></div></div><strong className="registration-plate">{registration}</strong></header>
-      <div className="vehicle-badges">{vehicle.derivativeId ? <span className="good">Derivative matched</span> : <span className="exempt">No derivative ID</span>}{motExpiry !== "-" && <span className="good">MOT expires {motExpiry}</span>}{vehicle.vehicleId && <span className="good">Vehicle ID returned</span>}</div>
+      <div className="vehicle-badges">{vehicleCheck && <span className={vehicleCheck.clear === false ? "bad" : vehicleCheck.clear === true ? "good" : "neutral"}>{vehicleCheck.status}</span>}{vehicle.derivativeId ? <span className="good">Derivative matched</span> : <span className="neutral">No derivative ID</span>}{motExpiry !== "-" && <span className="good">MOT expires {motExpiry}</span>}{vehicle.vehicleId && <span className="good">Vehicle ID returned</span>}</div>
       <div className="summary-highlights">{[{ label: "Registration", value: registration }, { label: "Year", value: year }, { label: "Colour", value: colour }, { label: "Fuel", value: fuel }, { label: "Transmission", value: transmission }, { label: "Engine", value: engine }].map(field => <div key={field.label}><span>{field.label}</span><strong>{field.value}</strong></div>)}</div>
       <div className="vehicle-actions"><button onClick={() => copy(registration, "Registration")}>Copy {copied === "Registration" ? "Copied" : "Registration"}</button><button onClick={() => copy(vin, "VIN")}>{copied === "VIN" ? "Copied" : "Copy VIN"}</button><button onClick={() => copy(JSON.stringify(result, null, 2), "JSON")}>{copied === "JSON" ? "Copied" : "Copy JSON"}</button><button className="primary" onClick={reset}>New Lookup</button></div>
-      <div className="vehicle-sections"><details open><summary><span>+</span> Vehicle Details <i>+</i></summary><DataGrid fields={vehicleFields} /></details><details><summary><span>+</span> MOT &amp; Mileage <i>+</i></summary><DataGrid fields={motFields} /></details><details><summary><span>+</span> Keeper / Identity <i>+</i></summary><DataGrid fields={keeperFields} /></details><details><summary><span>+</span> Technical Data <i>+</i></summary><DataGrid fields={technicalFields} /></details><details className="raw-json"><summary><span>+</span> Raw Auto Trader JSON <i>+</i></summary><pre>{JSON.stringify(result, null, 2)}</pre></details></div>
+      <div className="vehicle-sections"><details open><summary><span>+</span> Vehicle Check <i>+</i></summary><DataGrid fields={vehicleCheckRows} /></details><details><summary><span>+</span> Vehicle Details <i>+</i></summary><DataGrid fields={vehicleFields} /></details><details><summary><span>+</span> MOT &amp; Mileage <i>+</i></summary><DataGrid fields={motFields} /></details><details><summary><span>+</span> Keeper / Identity <i>+</i></summary><DataGrid fields={keeperFields} /></details><details><summary><span>+</span> Technical Data <i>+</i></summary><DataGrid fields={technicalFields} /></details><details className="raw-json"><summary><span>+</span> Raw Auto Trader JSON <i>+</i></summary><pre>{JSON.stringify(result, null, 2)}</pre></details></div>
     </section>}
   </div>;
 }

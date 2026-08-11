@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { clearAutotraderTokenCache, testAutotraderConnection } from "../lib/autotrader";
+import { normaliseVehicleCheck } from "../lib/autotrader-vehicle-check";
 import { lookupVehicleByVrm, normaliseAutotraderVehicle } from "../lib/autotrader-vehicle-lookup";
 
 const originalEnv = { ...process.env };
@@ -143,6 +144,25 @@ describe("Auto Trader Connect client", () => {
       motTests: [{ completedDate: "2026-01-01", expiryDate: "2027-01-01" }],
       history: { previousOwners: 1 },
     });
+  });
+
+  it("summarises Auto Trader vehicle check markers", () => {
+    const check = normaliseVehicleCheck({
+      hpiStatus: "Clear",
+      outstandingFinance: false,
+      stolen: false,
+      scrapped: false,
+      writeOffCategory: "",
+      plateChanges: 2,
+    }, { motExpiry: "2027-02-03", previousOwners: 1 });
+
+    assert.equal(check.clear, true);
+    assert.equal(check.status, "Clear");
+    assert.equal(check.outstandingFinance, false);
+    assert.equal(check.stolen, false);
+    assert.equal(check.plateChanges, 2);
+    assert.equal(check.previousOwners, 1);
+    assert.equal(check.motExpiry, "2027-02-03");
   });
 
   it("looks up a vehicle by VRM using the Auto Trader Vehicles API", async () => {
