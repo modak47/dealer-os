@@ -156,7 +156,7 @@ function WarrantyCard({ addon, selected, onSelect }: { addon: ReservationAddon; 
   const save = saveAmount(addon.badge);
   const was = save && Number(addon.price) > 0 ? Number(addon.price) + save : null;
   const monthly = Number(addon.price) > 0 ? Number(addon.price) / 10 : 0;
-  return <button type="button" className={`warranty-upgrade-card ${selected ? "selected" : ""} ${isIncluded ? "selected included" : ""}`} onClick={onSelect}>
+  return <button type="button" className={`warranty-upgrade-card ${selected ? "selected" : ""} ${isIncluded ? "selected included" : ""} ${addon.badge && !isIncluded ? "badged" : ""}`} onClick={onSelect}>
     {addon.badge && !isIncluded && <em>{addon.badge}</em>}
     <WarrantyIcon addon={addon} />
     {isIncluded && <span className="warranty-included-label">Included</span>}
