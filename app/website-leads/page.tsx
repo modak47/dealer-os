@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { directionsUrl, formatDriveMinutes, formatMiles, googleMapsUrl, leadLocationStatus, leadLocationTitle } from "@/lib/location-ui";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusBadgeClass, statusLabel } from "@/lib/website-leads";
 import type { DealerContact, ReferralShareOptions } from "@/types/referral";
@@ -10,10 +10,16 @@ import { WEBSITE_LEAD_SOURCES, WEBSITE_LEAD_STATUSES, type WebsiteLead } from "@
 
 type SortKey = "newest" | "oldest" | "margin" | "offer";
 
+const viewedLeadIdsKey = "dealer-os.website-leads.viewed-ids";
+const oldBatchMaxIdKey = "dealer-os.website-leads.old-batch-max-id";
+
 export default function WebsiteLeadsPage() {
+  const router = useRouter();
   const [leads, setLeads] = useState<WebsiteLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [viewedLeadIds, setViewedLeadIds] = useState<Set<number>>(() => new Set());
+  const [oldBatchMaxId, setOldBatchMaxId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [website, setWebsite] = useState("");
   const [status, setStatus] = useState("");
@@ -31,7 +37,11 @@ export default function WebsiteLeadsPage() {
     fetch("/api/website-leads").then(async response => {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Unable to load website leads.");
-      if (active) setLeads(payload.leads);
+      if (active) {
+        const loadedLeads = (payload.leads ?? []) as WebsiteLead[];
+        setLeads(loadedLeads);
+        initialiseViewedState(loadedLeads, setViewedLeadIds, setOldBatchMaxId);
+      }
     }).catch((fetchError: Error) => active && setError(fetchError.message)).finally(() => active && setLoading(false));
     return () => { active = false; };
   }, []);
@@ -66,6 +76,11 @@ export default function WebsiteLeadsPage() {
     setStatus("");
     setValuationStatus("");
     setSort("newest");
+  }
+
+  function openLead(lead: WebsiteLead) {
+    markLeadViewed(lead.id, setViewedLeadIds);
+    router.push(`/website-leads/${lead.id}`);
   }
 
   async function runValuation(lead: WebsiteLead) {
@@ -119,14 +134,13 @@ export default function WebsiteLeadsPage() {
     {error && <div className="website-state error">{error}</div>}
     {loading && <div className="website-card-grid">{Array.from({ length: 6 }).map((_, index) => <article className="website-lead-card skeleton" key={index}><i /><div><span /><span /><span /></div></article>)}</div>}
     {!loading && !error && !filtered.length && <div className="website-state">No website leads match these filters.</div>}
-    {!loading && !error && <section className="website-card-grid">{filtered.map(lead => <LeadCard lead={lead} running={runningId === lead.id} locating={locatingId === lead.id} error={cardErrors[lead.id]} onRun={() => void runValuation(lead)} onRefreshLocation={() => void refreshLocation(lead)} onRefer={() => setReferralLead(lead)} onBook={() => { setBookingLead(lead); setBookingResult(null); }} key={lead.id} />)}</section>}
+    {!loading && !error && <section className="website-card-grid">{filtered.map(lead => <LeadCard lead={lead} muted={viewedLeadIds.has(lead.id) || (oldBatchMaxId !== null && lead.id <= oldBatchMaxId)} running={runningId === lead.id} locating={locatingId === lead.id} error={cardErrors[lead.id]} onOpen={() => openLead(lead)} onRun={() => void runValuation(lead)} onRefreshLocation={() => void refreshLocation(lead)} onRefer={() => setReferralLead(lead)} onBook={() => { setBookingLead(lead); setBookingResult(null); }} key={lead.id} />)}</section>}
     {bookingLead && <BookIntoStockModal lead={bookingLead} result={bookingResult} onBooked={(stockId, stockNumber) => { setBookingResult({ stockId, stockNumber }); setLeads(current => current.map(item => item.id === bookingLead.id ? { ...item, status: "purchase_agreed", stock_bike_id: stockId, purchase_agreed_at: new Date().toISOString() } : item)); }} onClose={() => setBookingLead(null)} />}
     {referralLead && <ReferralModal lead={referralLead} onClose={() => setReferralLead(null)} onReferred={lead => { setLeads(current => current.map(item => item.id === lead.id ? lead : item)); setReferralLead(null); }} />}
   </main>;
 }
 
-function LeadCard({ lead, running, locating, error, onRun, onRefreshLocation, onRefer, onBook }: { lead: WebsiteLead; running: boolean; locating: boolean; error?: string; onRun: () => void; onRefreshLocation: () => void; onRefer: () => void; onBook: () => void }) {
-  const router = useRouter();
+function LeadCard({ lead, muted, running, locating, error, onOpen, onRun, onRefreshLocation, onRefer, onBook }: { lead: WebsiteLead; muted: boolean; running: boolean; locating: boolean; error?: string; onOpen: () => void; onRun: () => void; onRefreshLocation: () => void; onRefer: () => void; onBook: () => void }) {
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const [imageIndex, setImageIndex] = useState(0);
   const margin = safeNumber(lead.estimated_margin);
@@ -136,8 +150,7 @@ function LeadCard({ lead, running, locating, error, onRun, onRefreshLocation, on
   const locationAvailable = Boolean(lead.postcode || lead.normalised_postcode || lead.location_display_name || lead.latitude != null);
   const locationResolved = lead.latitude != null && lead.longitude != null;
   const primaryImage = imageIndex >= 0 ? images[imageIndex] : null;
-  useEffect(() => setImageIndex(0), [lead.id, images[0]]);
-  return <article className={`website-lead-card ${primaryImage ? "" : "no-photo"}`} onClick={() => router.push(`/website-leads/${lead.id}`)}>
+  return <article className={`website-lead-card ${primaryImage ? "" : "no-photo"} ${muted ? "viewed" : ""}`} onClick={onOpen}>
     {primaryImage && <div className="website-lead-photo"><img src={primaryImage} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} onError={() => setImageIndex(current => current + 1 < images.length ? current + 1 : -1)} />{images.length > 1 && <b>{images.length} photos</b>}</div>}
     <div className="website-lead-card-body">
       <div className="website-lead-title"><span>{lead.reg || "No reg"}</span><h2>{[lead.make, lead.model].filter(Boolean).join(" ") || "Bike details pending"}</h2><p>{lead.year || "Year unknown"} · {formatMileage(lead.mileage)} · {lead.engine || "Engine n/a"}</p></div>
@@ -159,10 +172,43 @@ function LeadCard({ lead, running, locating, error, onRun, onRefreshLocation, on
         {lead.stock_bike_id ? <Link href={`/admin/stock/${lead.stock_bike_id}`}>View Pending Stock</Link> : <button onClick={onBook}>Book Into Stock</button>}
         {hasReg ? <button disabled={running || processing} onClick={onRun}>{runLabel}</button> : <span>Registration required</span>}
         {lead.retail_check_id && <Link href={`/admin/retail-check?recordId=${encodeURIComponent(lead.retail_check_id)}&leadId=${lead.id}`}>View Valuation</Link>}
-        <Link href={`/website-leads/${lead.id}`}>View Lead</Link>
+        <Link href={`/website-leads/${lead.id}`} onClick={onOpen}>View Lead</Link>
       </div>
     </div>
   </article>;
+}
+
+function initialiseViewedState(leads: WebsiteLead[], setViewedLeadIds: (ids: Set<number>) => void, setOldBatchMaxId: (id: number | null) => void) {
+  const viewed = readViewedLeadIds();
+  setViewedLeadIds(viewed);
+  const storedMaxId = Number(window.localStorage.getItem(oldBatchMaxIdKey));
+  if (Number.isFinite(storedMaxId) && storedMaxId > 0) {
+    setOldBatchMaxId(storedMaxId);
+    return;
+  }
+  const maxId = leads.reduce((max, lead) => Math.max(max, lead.id), 0);
+  if (maxId > 0) {
+    window.localStorage.setItem(oldBatchMaxIdKey, String(maxId));
+    setOldBatchMaxId(maxId);
+  }
+}
+
+function markLeadViewed(id: number, setViewedLeadIds: Dispatch<SetStateAction<Set<number>>>) {
+  setViewedLeadIds(current => {
+    const next = new Set(current);
+    next.add(id);
+    window.localStorage.setItem(viewedLeadIdsKey, JSON.stringify(Array.from(next)));
+    return next;
+  });
+}
+
+function readViewedLeadIds() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(viewedLeadIdsKey) ?? "[]");
+    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is number => Number.isInteger(value)) : []);
+  } catch {
+    return new Set<number>();
+  }
 }
 
 function BookIntoStockModal({ lead, result, onBooked, onClose }: { lead: WebsiteLead; result: { stockId: string; stockNumber?: string } | null; onBooked: (stockId: string, stockNumber?: string) => void; onClose: () => void }) {

@@ -9,6 +9,7 @@ import { WEBSITE_LEAD_STATUSES, type WebsiteLead } from "@/types/website-lead";
 import type { LeadReferral } from "@/types/referral";
 
 const valuationFields = ["valuation_status", "retail_estimate", "suggested_offer", "estimated_margin", "similar_bikes", "auto_trader_search", "valuation_notes", "Motorway output", "internal_notes", "status", "assigned_to"] as const;
+const viewedLeadIdsKey = "dealer-os.website-leads.viewed-ids";
 
 type FormState = Record<typeof valuationFields[number], string>;
 
@@ -37,6 +38,10 @@ export default function WebsiteLeadDetailPage() {
       }
     }).catch((fetchError: Error) => active && setError(fetchError.message)).finally(() => active && setLoading(false));
     return () => { active = false; };
+  }, [params.id]);
+
+  useEffect(() => {
+    markLeadViewed(Number(params.id));
   }, [params.id]);
 
   useEffect(() => {
@@ -237,4 +242,16 @@ function copyText(value: string | null | undefined) {
 
 function isUrl(value: string) {
   try { const url = new URL(value); return url.protocol === "http:" || url.protocol === "https:"; } catch { return false; }
+}
+
+function markLeadViewed(id: number) {
+  if (!Number.isInteger(id)) return;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(viewedLeadIdsKey) ?? "[]");
+    const ids = new Set(Array.isArray(parsed) ? parsed.filter((value): value is number => Number.isInteger(value)) : []);
+    ids.add(id);
+    window.localStorage.setItem(viewedLeadIdsKey, JSON.stringify(Array.from(ids)));
+  } catch {
+    window.localStorage.setItem(viewedLeadIdsKey, JSON.stringify([id]));
+  }
 }
