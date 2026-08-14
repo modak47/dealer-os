@@ -14,12 +14,17 @@ type AutomationJob = {
 };
 
 const labels: Record<string, string> = {
+  autotrader_recent_scraper: "AutoTrader Recent Scraper",
+  autotrader_scraper_1: "AutoTrader Scraper 1",
+  autotrader_scraper_2: "AutoTrader Scraper 2",
+  autotrader_scraper_3: "AutoTrader Scraper 3",
+  autotrader_scraper_4: "AutoTrader Scraper 4",
+  autotrader_scraper_5: "AutoTrader Scraper 5",
   opportunity_scanner: "Opportunity Scanner",
   dealer5_sync: "Dealer5 Sync",
-  scrapers: "Scrapers",
-  recent_scraper: "Recent Scraper",
-  retail_scanner: "Retail Scanner",
 };
+
+const legacyJobNames = new Set(["scrapers", "recent_scraper", "retail_scanner"]);
 
 export default async function AutomationsPage() {
   const { data, error } = await getSupabaseAdmin()
@@ -27,7 +32,7 @@ export default async function AutomationsPage() {
     .select("*")
     .order("job_name", { ascending: true });
 
-  const jobs = (data ?? []) as AutomationJob[];
+  const jobs = ((data ?? []) as AutomationJob[]).filter((job) => !legacyJobNames.has(job.job_name));
 
   return (
     <AdminPage

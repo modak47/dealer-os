@@ -13,10 +13,7 @@ create table if not exists public.automation_jobs (
 insert into public.automation_jobs (job_name, status)
 values
   ('opportunity_scanner', 'unknown'),
-  ('dealer5_sync', 'unknown'),
-  ('scrapers', 'unknown'),
-  ('recent_scraper', 'unknown'),
-  ('retail_scanner', 'unknown')
+  ('dealer5_sync', 'unknown')
 on conflict (job_name) do nothing;
 
 insert into public.automation_jobs (
