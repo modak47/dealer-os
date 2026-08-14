@@ -358,7 +358,7 @@ function ReferralModal({ lead, onClose, onReferred }: { lead: WebsiteLead; onClo
       setSaving(false);
       return;
     }
-    const url = payload.urls?.[method === "email" ? "mailto" : method];
+    const url = method === "email" ? null : payload.urls?.[method];
     if (url) window.open(url, "_blank", "noopener,noreferrer");
     const refreshed = await fetch(`/api/website-leads/${lead.id}`);
     const refreshedPayload = await refreshed.json();
@@ -377,7 +377,7 @@ function ReferralModal({ lead, onClose, onReferred }: { lead: WebsiteLead; onClo
         <section className="full"><h3>4. Consent Confirmation</h3>{includesPersonal ? <div className="referral-consent"><p>You are about to share customer details with {selected?.dealer_name || "the selected dealer"}.</p><select value={consent} onChange={event => setConsent(event.target.value)}><option>Consent not confirmed</option><option>Customer consent confirmed by telephone</option><option>Customer consent confirmed by email</option><option>Consent recorded on website form</option></select><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I confirm YesMoto has permission to share the selected customer details.</label></div> : <p>Motorcycle details only. No direct customer contact details selected.</p>}</section>
         <section className="full"><h3>5. Review Message</h3><input value={subject} onChange={event => setSubject(event.target.value)} /><textarea rows={13} value={message} onChange={event => setMessage(event.target.value)} /></section>
       </div>
-      <footer><button type="button" onClick={onClose}>Cancel</button><button className="primary" disabled={saving}>{saving ? "Recording..." : method === "email" ? "Prepare Email" : method === "whatsapp" ? "Open WhatsApp" : "Open SMS"}</button></footer>
+      <footer><button type="button" onClick={onClose}>Cancel</button><button className="primary" disabled={saving}>{saving ? (method === "email" ? "Sending..." : "Recording...") : method === "email" ? "Send Email" : method === "whatsapp" ? "Open WhatsApp" : "Open SMS"}</button></footer>
     </form>
   </div>;
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
+import { getDealerSettings } from "@/lib/dealer-settings";
 import { buildReferralDraft, cleanReferralText, defaultReferralShareOptions, isValidEmail, methodStatus, normaliseUkPhone, requiresCustomerConsent } from "@/lib/referrals";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { combineLeadImages } from "@/lib/website-leads";
@@ -22,6 +23,8 @@ function shareOptions(value: unknown): ReferralShareOptions {
   const body = value && typeof value === "object" ? value as Partial<ReferralShareOptions> : {};
   return { ...defaultReferralShareOptions, ...body };
 }
+
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] || char));
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!await requireStaffUser()) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
@@ -70,6 +73,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const userId = await getCurrentUserId();
     const now = new Date().toISOString();
     const referralStatus = methodStatus(communicationMethod);
+    const resendKey = process.env.RESEND_API_KEY;
+    if (communicationMethod === "email" && !resendKey) {
+      return NextResponse.json({ error: "Email provider not configured. Add RESEND_API_KEY in Vercel before sending dealer referrals.", code: "not_configured" }, { status: 503 });
+    }
     const payload = {
       website_lead_id: id,
       dealer_contact_id: dealer.id,
@@ -89,21 +96,59 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       dealer_outcome: "Awaiting response",
       sent_at: null,
       opened_externally_at: communicationMethod === "email" ? null : now,
-      provider: communicationMethod === "email" ? "mailto" : communicationMethod,
-      provider_response: { stage: "prepared_external_app" },
+      provider: communicationMethod === "email" ? "resend" : communicationMethod,
+      provider_response: { stage: communicationMethod === "email" ? "queued_for_resend" : "prepared_external_app" },
       created_by: userId,
       updated_by: userId,
     };
     const { data: referral, error: insertError } = await db.from("lead_referrals").insert(payload).select("*,dealer:dealer_contacts(dealer_name,contact_name,email,mobile_number,whatsapp_number,town)").single();
     if (insertError) return NextResponse.json({ error: `Unable to record referral: ${insertError.message}` }, { status: 500 });
+    let savedReferral = referral;
+    if (communicationMethod === "email") {
+      const settings = await getDealerSettings();
+      const fromAddress = process.env.RESEND_FROM_EMAIL || settings.email_from_address || settings.email;
+      const from = fromAddress.includes("<") ? fromAddress : `${settings.email_from_name || settings.business_name || "YesMoto"} <${fromAddress}>`;
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from,
+          to: [dealer.email],
+          reply_to: settings.email_reply_to || settings.email || undefined,
+          subject,
+          html: `<div style="font-family:Arial,sans-serif;color:#18211d;white-space:pre-line">${escapeHtml(message)}</div>`,
+        }),
+      });
+      const provider = await response.json().catch(() => ({ message: "Invalid provider response" }));
+      if (!response.ok) {
+        await db.from("lead_referrals").update({
+          referral_status: "Failed",
+          failed_at: new Date().toISOString(),
+          failure_reason: `Resend failed: ${String((provider as { message?: string }).message ?? response.statusText)}`,
+          provider_response: provider,
+          updated_by: userId,
+        }).eq("id", referral.id);
+        return NextResponse.json({ error: `Dealer referral email failed: ${String((provider as { message?: string }).message ?? response.statusText)}` }, { status: 502 });
+      }
+      const sentAt = new Date().toISOString();
+      const { data: updatedReferral, error: updateError } = await db.from("lead_referrals").update({
+        referral_status: "Sent",
+        sent_at: sentAt,
+        provider_message_id: String((provider as { id?: string }).id ?? ""),
+        provider_response: provider,
+        updated_by: userId,
+      }).eq("id", referral.id).select("*,dealer:dealer_contacts(dealer_name,contact_name,email,mobile_number,whatsapp_number,town)").single();
+      if (updateError) return NextResponse.json({ error: `Referral email sent, but Dealer OS could not update the referral record: ${updateError.message}` }, { status: 500 });
+      savedReferral = updatedReferral;
+    }
     await Promise.all([
-      db.from("website_leads").update({ status: "referred_to_dealer", latest_referral_id: referral.id, latest_referred_dealer_id: dealer.id, latest_referred_dealer_name: dealer.dealer_name, latest_referred_at: now, referral_count: (Number(lead.referral_count) || 0) + 1, updated_at: now }).eq("id", id),
+      db.from("website_leads").update({ status: "referred_to_dealer", latest_referral_id: savedReferral.id, latest_referred_dealer_id: dealer.id, latest_referred_dealer_name: dealer.dealer_name, latest_referred_at: now, referral_count: (Number(lead.referral_count) || 0) + 1, updated_at: now }).eq("id", id),
       db.from("dealer_contacts").update({ last_referral_date: now, total_referrals: (Number(dealer.total_referrals) || 0) + 1, updated_by: userId }).eq("id", dealer.id),
     ]);
     return NextResponse.json({
-      referral,
+      referral: savedReferral,
       urls: {
-        mailto: communicationMethod === "email" ? `mailto:${encodeURIComponent(dealer.email || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}` : null,
+        mailto: null,
         whatsapp: communicationMethod === "whatsapp" ? `https://wa.me/${payload.recipient_phone?.replace("+", "")}?text=${encodeURIComponent(message)}` : null,
         sms: communicationMethod === "sms" ? `sms:${encodeURIComponent(payload.recipient_phone || "")}?&body=${encodeURIComponent(message)}` : null,
       },
