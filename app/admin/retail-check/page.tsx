@@ -312,10 +312,12 @@ export default function RetailCheckPage() {
       if (vehicle.mileage && !mileage) setMileage(String(vehicle.mileage));
       setDerivative(vehicle.derivative || "");
       setDerivativeId(vehicle.derivativeId || "");
+      setShowManualSearch(false);
       if (vehicle.vehicleCheck) setActiveTab("vehicle-check");
       setLookupMessage(vehicle.derivativeId ? "Auto Trader derivative matched." : "Vehicle found. No derivative ID returned; you can continue manually.");
     } catch (caught) {
       setIdentifiedVehicle(null);
+      setShowManualSearch(true);
       setLookupMessage(caught instanceof Error ? caught.message : "Auto Trader lookup unavailable. Continue manually.");
     } finally {
       setLookupLoading(false);
@@ -555,20 +557,33 @@ export default function RetailCheckPage() {
           <aside className="col-span-12 lg:col-span-3 bg-[#151515] border border-zinc-800 rounded-3xl p-6 h-fit lg:sticky lg:top-6">
             <h2 className="font-bold text-xl mb-5">Bike Details</h2>
 
-            <div className="space-y-4 mb-4">
+            <div className="retail-search-panel mb-4">
+              <label className="retail-input-field">
+                <span>Registration</span>
+                <input
+                  type="text"
+                  placeholder="AB12 CDE"
+                  value={registration}
+                  onChange={(e) =>
+                    setRegistration(
+                      e.target.value.toUpperCase()
+                    )
+                  }
+                  className="flex-1 p-4 rounded-xl bg-black border border-zinc-700"
+                />
+              </label>
 
+              <label className="retail-input-field">
+                <span>Mileage</span>
+                <input
+                  type="number"
+                  placeholder="Mileage"
+                  value={mileage}
+                  onChange={(e)=>setMileage(e.target.value)}
+                  className="w-full p-4 rounded-xl bg-black border border-zinc-700"
+                />
+              </label>
 
-              <input
-                type="text"
-                placeholder="Registration"
-                value={registration}
-                onChange={(e) =>
-                  setRegistration(
-                    e.target.value.toUpperCase()
-                  )
-                }
-                className="flex-1 p-4 rounded-xl bg-black border border-zinc-700"
-              />
               <button
                 type="button"
                 onClick={() => void lookupRegistration()}
@@ -577,30 +592,24 @@ export default function RetailCheckPage() {
               >
                 {lookupLoading ? "Searching Auto Trader..." : "Search Auto Trader"}
               </button>
-
-              <input
-                type="number"
-                placeholder="Mileage"
-                value={mileage}
-                onChange={(e)=>setMileage(e.target.value)}
-                className="w-full p-4 rounded-xl bg-black border border-zinc-700"
-              />
-
             </div>
 
-                {identifiedVehicle && (
-              <div className="bg-black border border-zinc-800 rounded-xl p-4 mb-4">
-                <div className="font-bold text-white">
-                  {[identifiedVehicle.year, identifiedVehicle.make, identifiedVehicle.model, identifiedVehicle.derivative].filter(Boolean).join(" ")}
+            {identifiedVehicle && (
+              <div className="retail-identified-card bg-black border border-zinc-800 rounded-xl p-4 mb-4">
+                <div className="retail-identified-head">
+                  <div>
+                    <span>{identifiedVehicle.registration || registration}</span>
+                    <b>{[identifiedVehicle.year, identifiedVehicle.make, identifiedVehicle.model].filter(Boolean).join(" ") || "Vehicle found"}</b>
+                    <small>{identifiedVehicle.derivative || "Derivative details not supplied"}</small>
+                  </div>
+                  {identifiedVehicle.vehicleCheck && <em className={identifiedVehicle.vehicleCheck.clear === false ? "danger" : ""}>{identifiedVehicle.vehicleCheck.status}</em>}
                 </div>
-                <div className="text-zinc-400 text-sm mt-1">
-                  {identifiedVehicle.registration || registration}
+                <div className="retail-identified-facts">
+                  <div><span>Engine</span><b>{identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "-"}</b></div>
+                  <div><span>Transmission</span><b>{identifiedVehicle.transmission || "-"}</b></div>
+                  <div><span>Fuel</span><b>{identifiedVehicle.fuelType || "-"}</b></div>
+                  <div><span>MOT</span><b>{identifiedVehicle.motExpiry || "-"}</b></div>
                 </div>
-                <div className="text-zinc-500 text-xs mt-2">
-                  {[identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "", identifiedVehicle.transmission, identifiedVehicle.fuelType].filter(Boolean).join(" / ")}
-                </div>
-                {identifiedVehicle.motExpiry && <div className="text-zinc-500 text-xs mt-1">MOT expires {identifiedVehicle.motExpiry}</div>}
-                {identifiedVehicle.vehicleCheck && <div className={identifiedVehicle.vehicleCheck.clear === false ? "text-red-300 text-xs font-bold uppercase tracking-wide mt-3" : "text-[#00E51D] text-xs font-bold uppercase tracking-wide mt-3"}>Vehicle check: {identifiedVehicle.vehicleCheck.status}</div>}
                 {identifiedVehicle.derivativeId && <div className="text-[#00E51D] text-xs font-bold uppercase tracking-wide mt-3">Derivative matched</div>}
                 <button type="button" onClick={bookIntoStock} className="mt-4 w-full bg-zinc-900 border border-[#00E51D] text-[#00E51D] font-bold py-3 rounded-xl">
                   Book Into Stock
@@ -631,9 +640,11 @@ export default function RetailCheckPage() {
             </button>
 
             
-            <div className="space-y-4">
+            <div className={showManualSearch ? "space-y-4 mb-4" : "hidden"}>
               <div className="grid grid-cols-2 gap-3">
 
+                <label className="retail-input-field">
+                  <span>Make</span>
                 <select
                   value={selectedMake}
                   onChange={(e)=>{
@@ -642,7 +653,7 @@ export default function RetailCheckPage() {
                   }}
                   className="w-full p-4 rounded-xl bg-black border border-zinc-700"
                 >
-                  <option>Select Make</option>
+                  <option value="">Select Make</option>
 
                   {makes
                     .filter((m:any)=>m?.make)
@@ -655,13 +666,16 @@ export default function RetailCheckPage() {
                       </option>
                     ))}
                 </select>
+                </label>
 
+                <label className="retail-input-field">
+                  <span>Model</span>
                 <select
                   value={selectedModel}
                   onChange={(e)=>setSelectedModel(e.target.value)}
                   className="w-full p-4 rounded-xl bg-black border border-zinc-700"
                 >
-                  <option>Select Model</option>
+                  <option value="">Select Model</option>
 
                   {filteredModels.map((m:any)=>(
                     <option
@@ -672,11 +686,14 @@ export default function RetailCheckPage() {
                     </option>
                   ))}
                 </select>
+                </label>
 
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
 
+                <label className="retail-input-field">
+                  <span>Year</span>
                 <input
                   type="number"
                   placeholder="Year"
@@ -684,18 +701,13 @@ export default function RetailCheckPage() {
                   onChange={(e)=>setYear(e.target.value)}
                   className="w-full p-4 rounded-xl bg-black border border-zinc-700"
                 />
-
-                <input
-                  type="number"
-                  placeholder="Mileage"
-                  value={mileage}
-                  onChange={(e)=>setMileage(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-black border border-zinc-700"
-                />
+                </label>
 
               </div>
               
+            </div>
 
+            <div className="space-y-4">
               <button onClick={checkMarket} disabled={runButtonDisabled} className="w-full bg-[#00E51D] text-black font-bold py-4 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed">
                 {loading ? "Starting Check..." : activeCheckRunning ? "Valuation Running..." : "Run Retail Check"}
               </button>
