@@ -68,9 +68,17 @@ function Filter({ label, value, onChange, options = [], custom = [] }: { label: 
 function StockImage({ bike }: { bike: PublicStockBike }) {
   const images = bike.imageUrls.length ? bike.imageUrls : [bike.image];
   const [index, setIndex] = useState(0);
+  const image = images[index] || "/bike-placeholder.svg";
+  const failed = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    if (index + 1 < images.length) setIndex((current) => current + 1);
+    else {
+      event.currentTarget.onerror = null;
+      event.currentTarget.src = "/bike-placeholder.svg";
+    }
+  };
   return (
     <>
-      <img src={images[index]} alt={`${bike.make} ${bike.model}${bike.variant ? ` ${bike.variant}` : ""}`} onError={() => setIndex((current) => Math.min(current + 1, images.length - 1))} />
+      <img src={image} alt={`${bike.make} ${bike.model}${bike.variant ? ` ${bike.variant}` : ""}`} onError={failed} />
       {!bike.photoReady && <small className="photo-pending">Photos coming soon</small>}
     </>
   );

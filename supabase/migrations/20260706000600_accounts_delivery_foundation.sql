@@ -90,6 +90,7 @@ def is_durable_dealer_image(value):
     return bool(url) and (
         "cd5.uk/" in url
         or "cardealer5.co.uk/" in url
+        or "/storage/v1/object/public/stock-images/" in url
     ) and "airtableusercontent.com" not in url
 
 

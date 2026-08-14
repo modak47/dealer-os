@@ -2,6 +2,7 @@ from playwright.sync_api import sync_playwright
 import requests
 import os
 import re
+import time
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from dotenv import load_dotenv
@@ -16,9 +17,6 @@ load_dotenv(os.path.expanduser("~/dealerbot/.env"))
 
 USERNAME = os.environ.get("DEALER5_USERNAME")
 PASSWORD = os.environ.get("DEALER5_PASSWORD")
-
-if not USERNAME or not PASSWORD:
-    raise RuntimeError("DEALER5_USERNAME and DEALER5_PASSWORD must be configured")
 
 # =========================================
 # SUPABASE
@@ -39,6 +37,53 @@ SUPABASE_HEADERS = {
     "Prefer": "resolution=merge-duplicates"
 }
 
+AUTOMATION_JOB_NAME = "dealer5_sync"
+SYNC_STARTED_AT = datetime.now(timezone.utc).isoformat()
+SYNC_STARTED_MONOTONIC = time.monotonic()
+sync_completed = False
+
+
+def update_automation_job(status, last_error=None):
+    try:
+        payload = {
+            "job_name": AUTOMATION_JOB_NAME,
+            "status": status,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if status == "running":
+            payload.update({
+                "last_started": SYNC_STARTED_AT,
+                "last_error": None,
+                "duration_ms": None,
+            })
+        else:
+            payload.update({
+                "last_finished": datetime.now(timezone.utc).isoformat(),
+                "duration_ms": int((time.monotonic() - SYNC_STARTED_MONOTONIC) * 1000),
+                "last_error": last_error,
+            })
+
+        response = requests.post(
+            f"{SUPABASE_URL}/rest/v1/automation_jobs?on_conflict=job_name",
+            headers=SUPABASE_HEADERS,
+            json=payload,
+            timeout=20
+        )
+        if response.status_code not in (200, 201, 204):
+            print(
+                f"WARNING: Could not update automation status "
+                f"({response.status_code}): {response.text}"
+            )
+    except Exception as status_error:
+        print(f"WARNING: Could not update automation status: {status_error}")
+
+
+if not USERNAME or not PASSWORD:
+    credential_error = "DEALER5_USERNAME and DEALER5_PASSWORD must be configured"
+    update_automation_job("failed", credential_error)
+    raise RuntimeError(credential_error)
+
 
 # =========================================
 # TRACK DEALER5 REGS
@@ -49,6 +94,7 @@ reserved_regs = set()
 dealer5_visible_regs = set()
 FORCE_REFRESH_IMAGES = os.environ.get("FORCE_REFRESH_IMAGES", "").strip().lower() in {"1", "true", "yes"}
 MINIMUM_COMPLETE_GALLERY_IMAGES = int(os.environ.get("MINIMUM_COMPLETE_GALLERY_IMAGES", "50"))
+PUBLIC_STOCK_BASE_URL = os.environ.get("PUBLIC_STOCK_BASE_URL", "https://yesmoto.co.uk").rstrip("/")
 
 
 def utc_timestamp():
@@ -94,7 +140,9 @@ def dedupe_images(values, canonical_output=False):
 def is_permanent_dealer_image(value):
     url = canonical_image_url(value).lower()
     return bool(url) and "airtableusercontent.com" not in url and (
-        "cd5.uk/" in url or "cardealer5.co.uk/" in url
+        "cd5.uk/" in url
+        or "cardealer5.co.uk/" in url
+        or "/storage/v1/object/public/stock-images/" in url
     )
 
 
@@ -181,6 +229,121 @@ def extract_dealer5_gallery_images(page):
         seen.add(src)
         images.append({"url": src})
     return images
+
+
+def stock_id_from_url(value):
+    match = re.search(r"(?:[?&]id=|/)(\d{6,})(?:[/?#&]|$)", str(value or ""))
+    return match.group(1) if match else ""
+
+
+def public_stock_listing_html():
+    for path in ("/used/cars/brighton/?stock=reset", "/used/cars/brighton/"):
+        try:
+            response = requests.get(
+                f"{PUBLIC_STOCK_BASE_URL}{path}",
+                headers={"User-Agent": "Mozilla/5.0 DealerOS image sync"},
+                timeout=30
+            )
+            if response.status_code == 200:
+                return response.text
+        except Exception as error:
+            log(f"Public stock listing lookup failed for {path}: {error}")
+    return ""
+
+
+def find_public_stock_url(stock_id):
+    if not stock_id:
+        return ""
+    html = public_stock_listing_html()
+    if not html:
+        return ""
+    candidates = re.findall(r"""(?:href|data-href)=["']([^"']+)["']""", html, re.I)
+    for candidate in candidates:
+        if stock_id not in candidate:
+            continue
+        try:
+            return urljoin(PUBLIC_STOCK_BASE_URL, candidate)
+        except Exception:
+            return candidate
+    return ""
+
+
+def extract_public_dealer5_gallery_images(stock_id):
+    public_url = find_public_stock_url(stock_id)
+    if not public_url:
+        log(f"{stock_id or 'UNKNOWN'} public Dealer5 advert URL not found")
+        return []
+
+    try:
+        response = requests.get(
+            public_url,
+            headers={"User-Agent": "Mozilla/5.0 DealerOS image sync"},
+            timeout=30
+        )
+        if response.status_code != 200:
+            log(f"{stock_id} public Dealer5 advert returned {response.status_code}")
+            return []
+    except Exception as error:
+        log(f"{stock_id} public Dealer5 advert fetch failed: {error}")
+        return []
+
+    values = []
+    html = response.text
+    values.extend(re.findall(r"""(?:src|href|data-src|data-original|data-large|data-full)=["']([^"']+)["']""", html, re.I))
+    values.extend(re.findall(r"""url\(["']?([^"')]+)["']?\)""", html, re.I))
+
+    images = []
+    seen = set()
+    marker = f"/stockimages/{stock_id}/"
+    for raw in values:
+        if not raw:
+            continue
+        src = urljoin(public_url, raw.replace("&amp;", "&"))
+        if marker not in src or "/w640/" in src:
+            continue
+        src = canonical_image_url(src)
+        if not src or src in seen or is_probably_promo_image(src):
+            continue
+        seen.add(src)
+        images.append({"url": src})
+
+    log(f"{stock_id} public Dealer5 advert image count: {len(images)}")
+    return images
+
+
+def image_url_loads(value):
+    url = image_url(value)
+    if not url:
+        return False
+    try:
+        response = requests.head(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 DealerOS image sync"},
+            allow_redirects=True,
+            timeout=12
+        )
+        content_type = response.headers.get("content-type", "")
+        if response.status_code == 200 and content_type.startswith("image/"):
+            return True
+        if response.status_code in (403, 405, 501):
+            response = requests.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 DealerOS image sync", "Range": "bytes=0-1024"},
+                timeout=12
+            )
+            content_type = response.headers.get("content-type", "")
+            return response.status_code in (200, 206) and content_type.startswith("image/")
+    except Exception:
+        return False
+    return False
+
+
+def gallery_sample_looks_live(values, sample_size=3):
+    urls = [image_url(item) for item in values or [] if image_url(item)]
+    if not urls:
+        return False
+    sample = urls[:sample_size]
+    return all(image_url_loads(url) for url in sample)
 
 # =========================================
 # LOGGING
@@ -961,6 +1124,29 @@ def scrape_current_page(page, context, forced_status=None, registration_set=None
                     )
 
             fetched_unique_images = real_dealer_images(fetched_images)
+            fetched_gallery_live = gallery_sample_looks_live(fetched_unique_images) if fetched_unique_images else False
+            if fetched_unique_images and not fetched_gallery_live:
+                log(f"{reg_key or 'UNKNOWN'} admin Dealer5 image sample failed live check")
+
+            should_use_public_fallback = should_scrape_images and (
+                not fetched_unique_images
+                or not fetched_gallery_live
+                or len(fetched_unique_images) < MINIMUM_COMPLETE_GALLERY_IMAGES
+            )
+            if should_use_public_fallback:
+                public_images = real_dealer_images(
+                    extract_public_dealer5_gallery_images(stock_id_from_url(source_url))
+                )
+                public_gallery_live = gallery_sample_looks_live(public_images) if public_images else False
+                if public_images and public_gallery_live and (
+                    not fetched_gallery_live or len(public_images) >= len(fetched_unique_images)
+                ):
+                    fetched_unique_images = public_images
+                    fetched_images_successfully = True
+                    log(f"{reg_key or 'UNKNOWN'} using public Dealer5 advert gallery ({len(public_images)} images)")
+                elif public_images:
+                    log(f"{reg_key or 'UNKNOWN'} public Dealer5 gallery found but did not pass selection ({len(public_images)} images, live={public_gallery_live})")
+
             image_urls = (
                 fetched_unique_images
                 if fetched_images_successfully and fetched_unique_images
@@ -1085,6 +1271,8 @@ def scrape_current_page(page, context, forced_status=None, registration_set=None
 # =========================================
 # MAIN
 # =========================================
+
+update_automation_job("running")
 
 try:
 
@@ -1227,6 +1415,23 @@ try:
 
         browser.close()
 
+        failed_sections = []
+        if not unsold_result["ok"]:
+            failed_sections.append(
+                f"unsold scrape failed or had {unsold_result['row_errors']} row errors"
+            )
+        if not reserved_result["ok"]:
+            failed_sections.append(
+                f"reserved scrape failed or had {reserved_result['row_errors']} row errors"
+            )
+
+        if failed_sections:
+            update_automation_job("failed", "; ".join(failed_sections))
+        else:
+            update_automation_job("success")
+        sync_completed = True
+
 except Exception as e:
 
     log(f"SCRIPT CRASHED: {e}")
+    update_automation_job("failed", str(e))

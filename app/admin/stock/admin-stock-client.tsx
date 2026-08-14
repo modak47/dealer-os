@@ -59,7 +59,10 @@ function StockCardImage({ images, alt }: { images: string[]; alt: string }) {
   if (!image) return <div><b>YM</b><span>Image required</span></div>;
   function failed(event: SyntheticEvent<HTMLImageElement>) {
     if (index + 1 < images.length) setIndex(index + 1);
-    else event.currentTarget.src = "/bike-placeholder.svg";
+    else {
+      event.currentTarget.onerror = null;
+      event.currentTarget.src = "/bike-placeholder.svg";
+    }
   }
   return <img src={image} alt={alt} onError={failed} />;
 }
