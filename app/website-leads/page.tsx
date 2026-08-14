@@ -62,13 +62,13 @@ export default function WebsiteLeadsPage() {
   }, [leads, query, website, status, valuationStatus, sort]);
 
   const kpis = useMemo(() => [
-    ["New Leads", leads.filter(lead => (lead.status || "new") === "new").length],
+    ["New Leads", leads.filter(lead => (lead.status || "new") === "new" && !isLeadMuted(lead, viewedLeadIds, oldBatchMaxId)).length],
     ["Pending Valuations", leads.filter(lead => (lead.valuation_status || "pending") === "pending").length],
     ["Contacted", leads.filter(lead => lead.status === "contacted").length],
     ["Offers Made", leads.filter(lead => lead.status === "offer_made").length],
     ["Purchased", leads.filter(lead => lead.status === "purchased").length],
     ["Total Leads", leads.length],
-  ], [leads]);
+  ], [leads, oldBatchMaxId, viewedLeadIds]);
 
   function clearFilters() {
     setQuery("");
@@ -134,7 +134,7 @@ export default function WebsiteLeadsPage() {
     {error && <div className="website-state error">{error}</div>}
     {loading && <div className="website-card-grid">{Array.from({ length: 6 }).map((_, index) => <article className="website-lead-card skeleton" key={index}><i /><div><span /><span /><span /></div></article>)}</div>}
     {!loading && !error && !filtered.length && <div className="website-state">No website leads match these filters.</div>}
-    {!loading && !error && <section className="website-card-grid">{filtered.map(lead => <LeadCard lead={lead} muted={viewedLeadIds.has(lead.id) || (oldBatchMaxId !== null && lead.id <= oldBatchMaxId)} running={runningId === lead.id} locating={locatingId === lead.id} error={cardErrors[lead.id]} onOpen={() => openLead(lead)} onRun={() => void runValuation(lead)} onRefreshLocation={() => void refreshLocation(lead)} onRefer={() => setReferralLead(lead)} onBook={() => { setBookingLead(lead); setBookingResult(null); }} key={lead.id} />)}</section>}
+    {!loading && !error && <section className="website-card-grid">{filtered.map(lead => <LeadCard lead={lead} muted={isLeadMuted(lead, viewedLeadIds, oldBatchMaxId)} running={runningId === lead.id} locating={locatingId === lead.id} error={cardErrors[lead.id]} onOpen={() => openLead(lead)} onRun={() => void runValuation(lead)} onRefreshLocation={() => void refreshLocation(lead)} onRefer={() => setReferralLead(lead)} onBook={() => { setBookingLead(lead); setBookingResult(null); }} key={lead.id} />)}</section>}
     {bookingLead && <BookIntoStockModal lead={bookingLead} result={bookingResult} onBooked={(stockId, stockNumber) => { setBookingResult({ stockId, stockNumber }); setLeads(current => current.map(item => item.id === bookingLead.id ? { ...item, status: "purchase_agreed", stock_bike_id: stockId, purchase_agreed_at: new Date().toISOString() } : item)); }} onClose={() => setBookingLead(null)} />}
     {referralLead && <ReferralModal lead={referralLead} onClose={() => setReferralLead(null)} onReferred={lead => { setLeads(current => current.map(item => item.id === lead.id ? lead : item)); setReferralLead(null); }} />}
   </main>;
@@ -209,6 +209,10 @@ function readViewedLeadIds() {
   } catch {
     return new Set<number>();
   }
+}
+
+function isLeadMuted(lead: WebsiteLead, viewedLeadIds: Set<number>, oldBatchMaxId: number | null) {
+  return viewedLeadIds.has(lead.id) || oldBatchMaxId === null || lead.id <= oldBatchMaxId;
 }
 
 function BookIntoStockModal({ lead, result, onBooked, onClose }: { lead: WebsiteLead; result: { stockId: string; stockNumber?: string } | null; onBooked: (stockId: string, stockNumber?: string) => void; onClose: () => void }) {
@@ -305,15 +309,15 @@ function BookIntoStockModal({ lead, result, onBooked, onClose }: { lead: Website
   </div>;
 }
 
-const defaultShare: ReferralShareOptions = { registration: true, makeModel: true, year: true, mileage: true, askingPrice: true, condition: true, serviceHistory: true, mot: true, town: true, partialPostcode: true, fullPostcode: false, photos: true, customerNotes: true, customerName: false, customerPhone: false, customerEmail: false, fullAddress: false };
+const defaultShare: ReferralShareOptions = { registration: true, makeModel: true, year: true, mileage: true, askingPrice: true, condition: true, serviceHistory: true, mot: true, town: true, partialPostcode: true, fullPostcode: true, photos: true, customerNotes: true, customerName: true, customerPhone: true, customerEmail: true, fullAddress: true };
 
 function ReferralModal({ lead, onClose, onReferred }: { lead: WebsiteLead; onClose: () => void; onReferred: (lead: WebsiteLead) => void }) {
   const [dealers, setDealers] = useState<DealerContact[]>([]);
   const [dealerId, setDealerId] = useState("");
   const [method, setMethod] = useState<"email" | "whatsapp" | "sms">("email");
   const [share, setShare] = useState<ReferralShareOptions>(defaultShare);
-  const [consent, setConsent] = useState("Share motorcycle details only");
-  const [confirmed, setConfirmed] = useState(false);
+  const [consent, setConsent] = useState("Consent recorded on website form");
+  const [confirmed, setConfirmed] = useState(true);
   const [subject, setSubject] = useState(() => referralSubject(lead));
   const [message, setMessage] = useState(() => referralMessage(lead, null, defaultShare));
   const [saving, setSaving] = useState(false);
@@ -372,7 +376,7 @@ function ReferralModal({ lead, onClose, onReferred }: { lead: WebsiteLead; onClo
       {error && <div className="website-card-error">{error}</div>}
       <div className="referral-grid">
         <section><h3>1. Select Dealer</h3><select value={dealerId} onChange={event => setDealerId(event.target.value)} required><option value="">Choose dealer</option>{dealers.map(dealer => <option value={dealer.id} key={dealer.id}>{dealer.dealer_name} {dealer.town ? `- ${dealer.town}` : ""}</option>)}</select>{selected && <p>{selected.contact_name || "No named contact"} · {selected.email || selected.mobile_number || selected.whatsapp_number || "No preferred contact shown"}</p>}<a href="/dealer-contacts" target="_blank" rel="noreferrer">Manage dealer contacts</a></section>
-        <section><h3>2. Communication</h3><div className="referral-methods">{(["email", "whatsapp", "sms"] as const).map(item => <label key={item}><input type="radio" checked={method === item} onChange={() => setMethod(item)} />{item.toUpperCase()}</label>)}</div><p>{method === "email" ? "Opens your email app with a prepared message." : method === "whatsapp" ? "Opens WhatsApp. This records that WhatsApp was opened, not delivered." : "Opens the SMS app where supported. Desktop support varies."}</p></section>
+        <section><h3>2. Communication</h3><div className="referral-methods">{(["email", "whatsapp", "sms"] as const).map(item => <label key={item}><input type="radio" checked={method === item} onChange={() => setMethod(item)} />{item.toUpperCase()}</label>)}</div><p>{method === "email" ? "Sends directly from YesMoto and records the referral as sent." : method === "whatsapp" ? "Opens WhatsApp. This records that WhatsApp was opened, not delivered." : "Opens the SMS app where supported. Desktop support varies."}</p></section>
         <section className="full"><h3>3. Information to Share</h3><div className="referral-checks">{Object.entries(share).map(([key, value]) => <label key={key}><input type="checkbox" checked={value} onChange={() => toggle(key as keyof ReferralShareOptions)} />{shareLabel(key)}</label>)}</div></section>
         <section className="full"><h3>4. Consent Confirmation</h3>{includesPersonal ? <div className="referral-consent"><p>You are about to share customer details with {selected?.dealer_name || "the selected dealer"}.</p><select value={consent} onChange={event => setConsent(event.target.value)}><option>Consent not confirmed</option><option>Customer consent confirmed by telephone</option><option>Customer consent confirmed by email</option><option>Consent recorded on website form</option></select><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I confirm YesMoto has permission to share the selected customer details.</label></div> : <p>Motorcycle details only. No direct customer contact details selected.</p>}</section>
         <section className="full"><h3>5. Review Message</h3><input value={subject} onChange={event => setSubject(event.target.value)} /><textarea rows={13} value={message} onChange={event => setMessage(event.target.value)} /></section>
