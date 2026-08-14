@@ -46,6 +46,30 @@ describe("website lead webhook payload mapping", () => {
     assert.equal(lead.make, "Honda");
   });
 
+  it("recognises spaced and capitalised legacy form field names", () => {
+    const lead = parseWebsiteLeadWebhookPayload({
+      Website: "Bike Buyer UK",
+      "Application Id": "legacy-50",
+      "Application Reg": "AB12 CDE",
+      "Application Make": "Yamaha",
+      "Application Model": "MT-07",
+      "First Name": "Leo",
+      "Last Name": "Byrne",
+      "Customer Email": " LEO@EXAMPLE.COM ",
+      "Customer Phone": "07700 900123",
+      Postcode: "m11ae",
+    });
+
+    assert.equal(lead.external_submission_id, "legacy-50");
+    assert.equal(lead.lead_source, "bike_buyer_uk");
+    assert.equal(lead.reg, "AB12CDE");
+    assert.equal(lead.make, "Yamaha");
+    assert.equal(lead.model, "MT-07");
+    assert.equal(lead.fname, "Leo");
+    assert.equal(lead.email, "leo@example.com");
+    assert.equal(lead.postcode, "M1 1AE");
+  });
+
   it("rejects payloads without a recognised source", () => {
     assert.throws(() => parseWebsiteLeadWebhookPayload({ source: "unknown", reg: "AB12CDE" }), /Payload source/);
   });

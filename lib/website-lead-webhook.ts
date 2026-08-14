@@ -59,7 +59,7 @@ export type CanonicalWebsiteLead = {
 const loosePayloadSchema = z.record(z.string(), z.unknown());
 
 const envelopeSchema = loosePayloadSchema.transform(input => {
-  const source = normaliseSource(input.source ?? input.website ?? input.lead_source);
+  const source = normaliseSource(first(input, ["source", "website", "lead_source"]));
   if (!source) throw new Error("Payload source must be bike_buyer_uk or sell_your_motorbike.");
   return { source, input };
 });
@@ -161,8 +161,29 @@ export function stableSubmissionId(source: string, submittedAt: string, payload:
 }
 
 function first(payload: Record<string, unknown>, keys: string[]) {
-  for (const key of keys) if (payload[key] !== undefined && payload[key] !== null && payload[key] !== "") return payload[key];
+  for (const key of keys) {
+    const exactValue = payload[key];
+    if (exactValue !== undefined && exactValue !== null && exactValue !== "") return exactValue;
+  }
+
+  const normalised = new Map<string, unknown>();
+  for (const [payloadKey, value] of Object.entries(payload)) {
+    normalised.set(normalisePayloadKey(payloadKey), value);
+  }
+
+  for (const key of keys) {
+    const value = normalised.get(normalisePayloadKey(key));
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
   return null;
+}
+
+function normalisePayloadKey(key: string) {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 function collectImages(payload: Record<string, unknown>) {
