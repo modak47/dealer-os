@@ -18,6 +18,7 @@ export type AutotraderConnectionTest = {
   advertiserId: string;
   tokenExpiresAt: string;
   advertiser: AutotraderAdvertiser | null;
+  advertAllowances: unknown;
   totalResults: number | null;
 };
 
@@ -117,7 +118,7 @@ export async function autotraderFetch(path: string, init: RequestInit = {}, retr
 export async function testAutotraderConnection(): Promise<AutotraderConnectionTest> {
   const config = getAutotraderConfig();
   const token = await getAutotraderAccessToken();
-  const params = new URLSearchParams({ advertiserId: config.advertiserId });
+  const params = new URLSearchParams({ advertiserId: config.advertiserId, autotraderAdvertAllowances: "true" });
   const response = await autotraderFetch(`/advertisers?${params.toString()}`);
   const payload = await readJson<{ results?: AutotraderAdvertiser[]; totalResults?: number; message?: string }>(response);
 
@@ -132,6 +133,7 @@ export async function testAutotraderConnection(): Promise<AutotraderConnectionTe
     advertiserId: config.advertiserId,
     tokenExpiresAt: token.expiresAt,
     advertiser: results[0] ?? null,
+    advertAllowances: results[0]?.autotraderAdvertAllowances ?? null,
     totalResults: typeof payload.totalResults === "number" ? payload.totalResults : null,
   };
 }

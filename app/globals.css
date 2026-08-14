@@ -222,6 +222,8 @@ body:has(.admin-login)>.topbar,body:has(.admin-login)>header,body:has(.admin-log
 .website-lead-card.no-photo .website-lead-card-body{min-height:250px}
 .website-lead-card.viewed{opacity:.52;filter:grayscale(.75);border-color:#242b30;background:#0c1115;transition:opacity .18s ease,filter .18s ease,transform .18s ease,border-color .18s ease,box-shadow .18s ease}
 .website-lead-card.viewed:hover{opacity:.78;filter:grayscale(.35)}
+.channel-grid article>a{display:inline-block;background:#192127;border:1px solid #364048;color:#b9c0c4;padding:8px;font-size:10px;text-decoration:none}
+.channel-grid article>a:hover{border-color:var(--green);color:white}
 .pdi-signature-grid canvas{background:#fff!important}
 
 .social-publishing-panel{display:grid;gap:14px;padding:18px;border:1px solid #29363c;border-radius:8px;background:linear-gradient(145deg,#11191e,#090e11);box-shadow:0 12px 30px #0005}

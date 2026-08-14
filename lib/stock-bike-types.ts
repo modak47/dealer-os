@@ -44,6 +44,12 @@ export interface SupabaseStockBike {
   autotrader_vehicle_id?:string|null;
   autotrader_taxonomy_data?:Record<string,unknown>;
   autotrader_mot_data?:Record<string,unknown>;
+  autotrader_stock_id?:string|null;
+  autotrader_publish_status?:string|null;
+  autotrader_last_payload?:Record<string,unknown>|null;
+  autotrader_last_response?:Record<string,unknown>|null;
+  autotrader_last_synced_at?:string|null;
+  autotrader_publish_error?:string|null;
   attention_grabber?:string|null;
   plate:string|null;
   engine_number:string|null;
