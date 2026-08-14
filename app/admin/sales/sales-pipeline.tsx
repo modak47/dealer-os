@@ -24,8 +24,9 @@ export function SalesPipeline({ deals, reservations }: { deals: SalesDeal[]; res
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     return deals.filter(deal => {
-      const haystack = [deal.invoice_number, deal.status, customerName(deal), bikeName(deal), deal.bike?.registration, deal.payment_status, deal.finance_status].join(" ").toLowerCase();
-      return (!term || haystack.includes(term)) && (stage === "all" || deal.status === stage);
+      const status = effectiveStatus(deal);
+      const haystack = [deal.invoice_number, status, customerName(deal), bikeName(deal), deal.bike?.registration, deal.payment_status, deal.finance_status].join(" ").toLowerCase();
+      return (!term || haystack.includes(term)) && (stage === "all" || status === stage);
     });
   }, [deals, query, stage]);
 
@@ -54,6 +55,25 @@ export function SalesPipeline({ deals, reservations }: { deals: SalesDeal[]; res
     router.push(`/admin/sales/${result.saleId}`);
   }
 
+  async function cancelDeal(deal: SalesDeal) {
+    const reason = window.prompt(`Cancel sale for ${bikeName(deal)}? Add a reason:`);
+    if (!reason?.trim()) return;
+    setBusy(deal.id);
+    setMessage("");
+    const response = await fetch(`/api/crm/sales/${deal.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel", reason }),
+    });
+    const result = await response.json().catch(() => ({})) as { error?: string };
+    setBusy("");
+    if (!response.ok) {
+      setMessage(result.error || "Unable to cancel sale.");
+      return;
+    }
+    router.refresh();
+  }
+
   return <section className="sales-pipeline">
     <div className="sales-pipeline-toolbar">
       <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search customer, bike, reg, invoice..." />
@@ -74,7 +94,7 @@ export function SalesPipeline({ deals, reservations }: { deals: SalesDeal[]; res
     <div className="sales-pipeline-board">
       {columns.map(column => {
         const columnReservations = column.key === "Reservation" ? filteredReservations : [];
-        const columnDeals = filtered.filter(deal => column.statuses.includes(deal.status));
+        const columnDeals = filtered.filter(deal => column.statuses.includes(effectiveStatus(deal)));
         return <section className="sales-pipeline-column" key={column.key}>
           <header><h2>{column.title}</h2><span>{columnReservations.length + columnDeals.length}</span></header>
           <div>
@@ -90,7 +110,7 @@ export function SalesPipeline({ deals, reservations }: { deals: SalesDeal[]; res
                 <Link href={`/admin/customers/${reservation.customer?.id}`}>Customer</Link>
               </footer>
             </article>)}
-            {columnDeals.map(deal => <DealCard deal={deal} key={deal.id} />)}
+            {columnDeals.map(deal => <DealCard deal={deal} busy={busy === deal.id} onCancel={cancelDeal} key={deal.id} />)}
             {!columnReservations.length && !columnDeals.length && <p className="sales-pipeline-empty">Nothing here.</p>}
           </div>
         </section>;
@@ -99,10 +119,11 @@ export function SalesPipeline({ deals, reservations }: { deals: SalesDeal[]; res
   </section>;
 }
 
-function DealCard({ deal }: { deal: SalesDeal }) {
+function DealCard({ deal, busy, onCancel }: { deal: SalesDeal; busy: boolean; onCancel: (deal: SalesDeal) => void }) {
   const invoice = Array.isArray(deal.invoice) ? deal.invoice[0] : null;
   const delivery = Array.isArray(deal.delivery) ? deal.delivery[0] : null;
   const checklist = delivery ? [delivery.identity_checked, delivery.licence_verified, delivery.v5_prepared, delivery.handover_completed, delivery.keys_given, delivery.documents_signed, delivery.hpi_complete].filter(Boolean).length : 0;
+  const status = effectiveStatus(deal);
   return <article className="sales-deal-card">
     <DealCardHead image={deal.bike?.primary_image_url} title={bikeName(deal)} sub={deal.bike?.registration || deal.invoice_number || "Deal"} />
     <div className="sales-deal-meta">
@@ -115,6 +136,7 @@ function DealCard({ deal }: { deal: SalesDeal }) {
       <Link href={`/admin/sales/${deal.id}`}>View Deal</Link>
       {invoice && <Link href={`/admin/accounts/invoices/${invoice.id}/document`} target="_blank">Invoice</Link>}
       {deal.bike?.id && <Link href={`/admin/stock/${deal.bike.id}`}>Vehicle</Link>}
+      {!["Cancelled", "Completed", "Sale Completed"].includes(status) && <button type="button" className="danger" onClick={() => onCancel(deal)} disabled={busy}>{busy ? "Cancelling..." : "Cancel"}</button>}
     </footer>
   </article>;
 }
@@ -132,6 +154,10 @@ function bikeName(deal: SalesDeal | PipelineReservation) {
 
 function customerName(deal: SalesDeal | PipelineReservation) {
   return [deal.customer?.first_name, deal.customer?.last_name].filter(Boolean).join(" ") || "Customer";
+}
+
+function effectiveStatus(deal: SalesDeal) {
+  return deal.cancelled_at ? "Cancelled" : deal.status;
 }
 
 function money(value: unknown) {

@@ -38,4 +38,4 @@ export async function getInvoiceableReservations(){
   return (data??[]).filter(r=>!usedIds.has(r.id));
 }
 
-export function invoiceStats(rows:InvoiceRow[]){return rows.reduce((s,i)=>({invoiced:s.invoiced+Number(i.total||0),paid:s.paid+Number(i.paid||0),outstanding:s.outstanding+(i.status==="cancelled"?0:Number(i.balance||0)),overdue:s.overdue+(i.status==="overdue"?Number(i.balance||0):0)}),{invoiced:0,paid:0,outstanding:0,overdue:0})}
+export function invoiceStats(rows:InvoiceRow[]){return rows.reduce((s,i)=>{const closed=i.status==="cancelled"||i.status==="credited";return {invoiced:s.invoiced+(closed?0:Number(i.total||0)),paid:s.paid+(closed?0:Number(i.paid||0)),outstanding:s.outstanding+(closed?0:Number(i.balance||0)),overdue:s.overdue+(i.status==="overdue"?Number(i.balance||0):0)}},{invoiced:0,paid:0,outstanding:0,overdue:0})}

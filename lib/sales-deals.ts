@@ -19,6 +19,8 @@ export type SalesDeal = {
   handover_status?: string | null;
   created_at: string;
   completed_at: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
   customer?: { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null } | null;
   bike?: { id: number; stock_number?: string | null; make: string | null; model: string | null; variant: string | null; year?: number | null; registration: string | null; price: number | null; status: string | null; primary_image_url: string | null; purchase_price?: number | null; total_stock_cost?: number | null } | null;
   invoice?: { id: string; invoice_number: string; status: string; total: number; paid: number; balance: number }[] | null;
@@ -85,8 +87,8 @@ export async function getSalesPipeline(): Promise<SalesPipelineResult> {
   const now = new Date();
   const month = now.getMonth();
   const year = now.getFullYear();
-  const openDeals = deals.filter(deal => !["Completed", "Sale Completed", "Cancelled"].includes(deal.status));
-  const completedThisMonth = deals.filter(deal => ["Completed", "Sale Completed"].includes(deal.status) && deal.completed_at && sameMonth(deal.completed_at, month, year)).length;
+  const openDeals = deals.filter(deal => !["Completed", "Sale Completed", "Cancelled"].includes(effectiveStatus(deal)));
+  const completedThisMonth = deals.filter(deal => ["Completed", "Sale Completed"].includes(effectiveStatus(deal)) && deal.completed_at && sameMonth(deal.completed_at, month, year)).length;
 
   return {
     migrationReady: true,
@@ -94,10 +96,10 @@ export async function getSalesPipeline(): Promise<SalesPipelineResult> {
     reservations,
     kpis: {
       openDeals: openDeals.length,
-      reserved: reservations.length + openDeals.filter(deal => deal.status === "Reserved").length,
-      awaitingPayment: openDeals.filter(deal => ["Sale Pending", "Awaiting Payment", "Sale Agreed"].includes(deal.status)).length,
-      finance: openDeals.filter(deal => deal.status === "Finance").length,
-      delivery: openDeals.filter(deal => ["Sold", "Delivery"].includes(deal.status)).length,
+      reserved: reservations.length + openDeals.filter(deal => effectiveStatus(deal) === "Reserved").length,
+      awaitingPayment: openDeals.filter(deal => ["Sale Pending", "Awaiting Payment", "Sale Agreed"].includes(effectiveStatus(deal))).length,
+      finance: openDeals.filter(deal => effectiveStatus(deal) === "Finance").length,
+      delivery: openDeals.filter(deal => ["Sold", "Delivery"].includes(effectiveStatus(deal))).length,
       completedThisMonth,
       openValue: openDeals.reduce((sum, deal) => sum + Number(deal.sale_price ?? deal.bike?.price ?? 0), 0),
       outstandingBalance: openDeals.reduce((sum, deal) => sum + Number(deal.balance_due ?? invoiceBalance(deal) ?? 0), 0),
@@ -130,4 +132,8 @@ function emptyPipeline(migrationReady: boolean): SalesPipelineResult {
 function sameMonth(value: string, month: number, year: number) {
   const date = new Date(value);
   return date.getMonth() === month && date.getFullYear() === year;
+}
+
+function effectiveStatus(deal: SalesDeal) {
+  return deal.cancelled_at ? "Cancelled" : deal.status;
 }

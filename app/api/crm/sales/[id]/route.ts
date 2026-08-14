@@ -19,9 +19,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const db = getSupabaseAdmin();
     const action = cleanText(body.action, 40);
     if (action === "cancel") {
-      const { error } = await db.rpc("crm_undo_sale", { p_sale_id: saleId, p_reason: cleanText(body.reason) || "Sale cancelled by staff", p_user_id: await getCurrentUserId() });
+      const reason = cleanText(body.reason) || "Sale cancelled by staff";
+      const { error } = await db.rpc("crm_cancel_sale", { p_sale_id: saleId, p_reason: reason, p_user_id: await getCurrentUserId() });
       if (error) throw error;
-      await db.from("crm_sales").update({ cancellation_reason: cleanText(body.reason) || "Sale cancelled by staff", cancelled_at: new Date().toISOString() }).eq("id", saleId);
+      await cleanupCancelledSaleFinancials(saleId, reason);
       return NextResponse.json({ ok: true });
     }
     if (action === "complete") {
@@ -50,10 +51,36 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const { id } = await params, saleId = uuid(id); if (!saleId) throw new Error("Invalid sale.");
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-    const { error } = await getSupabaseAdmin().rpc("crm_undo_sale", { p_sale_id: saleId, p_reason: cleanText(body.reason) || "Sale reversed by staff", p_user_id: await getCurrentUserId() });
+    const reason = cleanText(body.reason) || "Sale reversed by staff";
+    const { error } = await getSupabaseAdmin().rpc("crm_cancel_sale", { p_sale_id: saleId, p_reason: reason, p_user_id: await getCurrentUserId() });
     if (error) throw error;
+    await cleanupCancelledSaleFinancials(saleId, reason);
     return NextResponse.json({ ok: true });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to undo sale." }, { status: 400 }); }
+}
+
+async function cleanupCancelledSaleFinancials(saleId: string, reason: string) {
+  const db = getSupabaseAdmin();
+  await db.from("crm_invoices")
+    .update({ status: "cancelled", paid: 0, balance: 0, cancelled_at: new Date().toISOString() })
+    .eq("sale_id", saleId)
+    .is("deleted_at", null);
+
+  await db.from("crm_payments")
+    .update({ status: "Refund Required", notes: `Sale cancelled: ${reason}` })
+    .eq("sale_id", saleId)
+    .eq("status", "Completed");
+
+  const [invoices, payments] = await Promise.all([
+    db.from("crm_invoices").select("id").eq("sale_id", saleId),
+    db.from("crm_payments").select("id").eq("sale_id", saleId),
+  ]);
+
+  await db.from("financial_ledger_transactions").update({ status: "void", notes: `Voided after sale cancellation: ${reason}` }).eq("deal_id", saleId).eq("status", "posted");
+  const invoiceIds = (invoices.data ?? []).map(row => row.id).filter(Boolean);
+  if (invoiceIds.length) await db.from("financial_ledger_transactions").update({ status: "void", notes: `Voided after sale cancellation: ${reason}` }).in("invoice_id", invoiceIds).eq("status", "posted");
+  const paymentIds = (payments.data ?? []).map(row => row.id).filter(Boolean);
+  if (paymentIds.length) await db.from("financial_ledger_transactions").update({ status: "void", notes: `Voided after sale cancellation: ${reason}` }).in("payment_id", paymentIds).eq("status", "posted");
 }
 
 function asBoolean(value: unknown) {

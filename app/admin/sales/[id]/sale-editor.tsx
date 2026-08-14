@@ -21,7 +21,7 @@ const handoverChecks = [
   ["hpi_complete", "HPI complete"],
 ];
 
-const statuses = ["Negotiation", "Reserved", "Finance", "Awaiting Payment", "Sale Agreed", "Delivery", "Completed", "Cancelled"];
+const statuses = ["Negotiation", "Reserved", "Sale Pending", "Finance", "Awaiting Payment", "Sale Agreed", "Delivery", "Sold", "Completed", "Cancelled"];
 
 export function SaleEditor({ sale }: { sale: Record<string, unknown> }) {
   const router = useRouter();
@@ -35,11 +35,12 @@ export function SaleEditor({ sale }: { sale: Record<string, unknown> }) {
   const [cancelOpen, setCancelOpen] = useState(false);
 
   const totals = useMemo(() => {
+    const cancelled = sale.status === "Cancelled" || Boolean(sale.cancelled_at);
     const salePrice = number(sale.sale_price ?? bike?.price);
     const investment = number(bike?.total_stock_cost ?? bike?.purchase_price);
-    const paid = payments.filter(payment => payment.status === "Completed").reduce((sum, payment) => sum + number(payment.amount), 0);
-    return { salePrice, investment, expectedProfit: salePrice - investment, paid, balance: number(sale.balance_due ?? invoice?.balance) };
-  }, [bike?.price, bike?.purchase_price, bike?.total_stock_cost, invoice?.balance, payments, sale.balance_due, sale.sale_price]);
+    const paid = cancelled ? 0 : payments.filter(payment => payment.status === "Completed").reduce((sum, payment) => sum + number(payment.amount), 0);
+    return { salePrice, investment, expectedProfit: cancelled ? 0 : salePrice - investment, paid, balance: cancelled ? 0 : number(sale.balance_due ?? invoice?.balance) };
+  }, [bike?.price, bike?.purchase_price, bike?.total_stock_cost, invoice?.balance, payments, sale.balance_due, sale.cancelled_at, sale.sale_price, sale.status]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
