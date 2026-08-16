@@ -39,6 +39,7 @@ export default function DealerPortalAdminPage() {
   const [method, setMethod] = useState<"matching_pool" | "direct" | "dealer_group">("matching_pool");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -148,12 +149,29 @@ export default function DealerPortalAdminPage() {
     setSaving(false);
   }
 
+  async function backfillVehicleChecks() {
+    setBackfilling(true);
+    setError("");
+    setNotice("");
+    const response = await fetch("/api/dealer-portal/admin/backfill-vehicle-checks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limit: 25 }),
+    });
+    const payload = await response.json();
+    if (response.ok) {
+      setNotice(`Vehicle check backfill processed ${payload.processed ?? 0} lead(s): ${payload.created ?? 0} created, ${payload.failed ?? 0} failed, ${payload.skipped ?? 0} skipped.`);
+      await load();
+    } else setError(payload.error || "Unable to backfill vehicle checks.");
+    setBackfilling(false);
+  }
+
   function toggleDealer(id: string) {
     setSelectedDealers(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
   }
 
   return <main className="admin-page dealer-portal-admin-page">
-    <div className="admin-heading"><div><h1>Dealer Portal</h1><p>Manage dealer buying accounts and release website leads for claim-based access.</p></div><div className="quick-actions"><Link href="/dealer-login" target="_blank">Dealer Login</Link><button className="admin-primary" onClick={() => startEditing(emptyAccount)}>Add Portal Dealer</button></div></div>
+    <div className="admin-heading"><div><h1>Dealer Portal</h1><p>Manage dealer buying accounts and release website leads for claim-based access.</p></div><div className="quick-actions"><Link href="/dealer-login" target="_blank">Dealer Login</Link><button onClick={() => void backfillVehicleChecks()} disabled={backfilling}>{backfilling ? "Checking..." : "Backfill Vehicle Checks"}</button><button className="admin-primary" onClick={() => startEditing(emptyAccount)}>Add Portal Dealer</button></div></div>
     <section className="website-kpis">{kpis.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</section>
     {error && <div className="website-state error compact">{error}</div>}{notice && <div className="website-state success compact">{notice}</div>}
     <section className="website-detail-grid dealer-portal-grid">
