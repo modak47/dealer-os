@@ -29,12 +29,12 @@ export function normaliseVehicleCheck(input: unknown, fallback: Partial<VehicleC
   const tradeFinance = firstBoolean(flat, ["tradeFinance"]);
   const outstandingFinance = firstBoolean(flat, ["outstandingFinance", "financeOutstanding", "hasOutstandingFinance", "finance"]) ?? financeFromArrays(raw) ?? (privateFinance === true || tradeFinance === true ? true : privateFinance === false && tradeFinance === false ? false : null);
   const mileageDiscrepancy = firstBoolean(flat, ["mileageDiscrepancy", "mileageDiscrepancyMarker"]);
-  const highRisk = firstBoolean(flat, ["highRisk", "highRiskMarker"]);
+  const highRisk = firstBoolean(flat, ["highRisk", "highRiskMarker"]) ?? markerArray(raw.highRiskMarkers);
   const stolen = firstBoolean(flat, ["stolen", "stolenMarker", "policeStolen", "isStolen"]);
   const scrapped = firstBoolean(flat, ["scrapped", "scrappedMarker", "isScrapped"]);
   const exported = firstBoolean(flat, ["exported", "exportMarker", "isExported"]);
   const imported = firstBoolean(flat, ["imported", "importMarker", "isImported"]);
-  const writtenOff = firstBoolean(flat, ["writtenOff", "writeOff", "insuranceWriteOff", "insuranceWriteoff", "isWrittenOff"]) ?? (category ? true : null);
+  const writtenOff = firstBoolean(flat, ["writtenOff", "writeOff", "insuranceWriteOff", "insuranceWriteoff", "isWrittenOff"]) ?? markerArray(raw.insuranceHistory) ?? (category ? true : null);
   const colourChanged = firstBoolean(flat, ["colourChanged", "colourChange", "colourChangeMarker"]);
   const plateChanges = firstNumber(flat, ["plateChanges", "plateChangeCount", "numberOfPlateChanges"]) ?? countArray(raw.plateChanges);
   const previousOwners = firstNumber(flat, ["previousOwners", "keepers", "keeperChanges", "owners"]) ?? fallback.previousOwners ?? null;
@@ -115,6 +115,11 @@ function countArray(value: unknown) {
 
 function financeFromArrays(raw: Record<string, unknown>) {
   if (Array.isArray(raw.financeAgreements)) return raw.financeAgreements.length > 0;
+  return null;
+}
+
+function markerArray(value: unknown) {
+  if (Array.isArray(value)) return value.length > 0;
   return null;
 }
 

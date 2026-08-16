@@ -103,6 +103,7 @@ function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null
     ["Derivative", textValue(vehicle.derivative, vehicle.derivativeId, vehicle.derivative_id)],
     ["First registered", textValue(vehicle.firstRegistrationDate)],
   ].filter((row): row is [string, string] => Boolean(row[1]));
+  const identityReturned = details.some(([label]) => ["Registration", "VIN", "Engine number", "Auto Trader vehicle ID"].includes(label));
   return {
     status: check.status || "Vehicle check available",
     clear: check.clear,
@@ -111,7 +112,7 @@ function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null
     report_available: Boolean(check.reportUrl),
     details: details.map(([label, value]) => ({ label, value })),
     flags: [
-      flag("identity", "Identity check", check.clear === null ? null : false, "Vehicle identity data returned", "Identity needs review"),
+      flag("identity", "Identity check", identityReturned ? false : null, "Vehicle identity data returned", "Identity needs review"),
       flag("stolen", "Stolen", check.stolen, "Not recorded stolen", "Vehicle recorded stolen"),
       flag("finance", "Finance", check.outstandingFinance, "No finance recorded", "Outstanding finance recorded"),
       flag("write_off", "Insurance write-off", check.writtenOff, "No insurance total loss recorded", check.category ? `Insurance loss recorded: ${check.category}` : "Insurance loss recorded"),
