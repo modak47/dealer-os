@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentDealerPortalAccount, redactLeadForDealer } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { combineLeadImages } from "@/lib/website-leads";
-import type { DealerLeadClaim, DealerVisibleLead } from "@/types/dealer-portal";
+import type { DealerLeadClaim, DealerLeadNote, DealerVisibleLead } from "@/types/dealer-portal";
 import type { WebsiteLead } from "@/types/website-lead";
 
 export const dynamic = "force-dynamic";
@@ -28,20 +28,29 @@ export async function GET() {
   ]);
   if (allocationsResult.error) return NextResponse.json({ error: "Unable to load available leads." }, { status: 500 });
   if (claimsResult.error) return NextResponse.json({ error: "Unable to load claimed leads." }, { status: 500 });
+  const claimRows = (claimsResult.data ?? []) as DealerLeadClaim[];
+  const claimIds = claimRows.map(claim => claim.id);
+  const notesResult = claimIds.length ? await db.from("dealer_lead_notes").select("*").in("claim_id", claimIds).order("created_at", { ascending: false }).limit(200) : { data: [], error: null };
+  if (notesResult.error) return NextResponse.json({ error: "Unable to load lead notes." }, { status: 500 });
+  const notesByClaim = new Map<string, DealerLeadNote[]>();
+  for (const note of (notesResult.data ?? []) as DealerLeadNote[]) {
+    if (!note.claim_id) continue;
+    notesByClaim.set(note.claim_id, [...(notesByClaim.get(note.claim_id) ?? []), note]);
+  }
   const activeClaimByLead = new Map<number, DealerLeadClaim>();
-  for (const claim of (claimsResult.data ?? []) as DealerLeadClaim[]) activeClaimByLead.set(Number(claim.website_lead_id), claim);
+  for (const claim of claimRows) activeClaimByLead.set(Number(claim.website_lead_id), claim);
   const available = (allocationsResult.data ?? []).flatMap(row => {
     const lead = relatedLead(row.lead);
     if (!lead || activeClaimByLead.has(Number(row.website_lead_id))) return [];
     const redacted = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, false) as DealerVisibleLead;
     return [{ ...redacted, portal_allocation_id: String(row.id), customer_unlocked: false }];
   });
-  const claimed = ((claimsResult.data ?? []) as DealerLeadClaim[]).flatMap(claim => {
+  const claimed = claimRows.flatMap(claim => {
     const lead = relatedLead(claim.lead);
     if (!lead) return [];
     const unlocked = Boolean(claim.customer_details_unlocked_at);
     const visible = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, unlocked) as DealerVisibleLead;
-    return [{ ...visible, portal_claim_id: claim.id, portal_claim_status: claim.status, customer_unlocked: unlocked }];
+    return [{ ...visible, portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked }];
   });
   return NextResponse.json({ dealer: session.dealer, available, claimed });
 }

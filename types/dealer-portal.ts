@@ -65,9 +65,23 @@ export type DealerLeadClaim = {
   lead?: WebsiteLead | null;
 };
 
+export type DealerLeadNote = {
+  id: string;
+  website_lead_id: number;
+  claim_id: string | null;
+  dealer_account_id: string;
+  dealer_user_id: string | null;
+  note_type: "note" | "call" | "email" | "sms" | "whatsapp" | "offer" | "status";
+  body: string;
+  created_at: string;
+};
+
 export type DealerVisibleLead = WebsiteLead & {
   portal_allocation_id?: string | null;
   portal_claim_id?: string | null;
   portal_claim_status?: DealerLeadClaimStatus | null;
+  portal_lost_reason?: string | null;
+  portal_attribution_expires_at?: string | null;
+  portal_notes?: DealerLeadNote[];
   customer_unlocked?: boolean;
 };

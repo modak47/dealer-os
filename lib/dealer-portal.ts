@@ -3,7 +3,7 @@ import "server-only";
 import { getCurrentUserId } from "@/lib/current-user";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText, safeNumber } from "@/lib/website-leads";
-import type { DealerPortalAccount } from "@/types/dealer-portal";
+import type { DealerLeadClaim, DealerPortalAccount } from "@/types/dealer-portal";
 
 export async function getCurrentDealerPortalAccount() {
   const userId = await getCurrentUserId();
@@ -68,4 +68,17 @@ export function redactLeadForDealer<T extends Record<string, unknown>>(lead: T, 
     auto_trader_search: null,
     estimated_margin: null,
   };
+}
+
+export async function getDealerClaimForSession(claimId: string) {
+  const session = await getCurrentDealerPortalAccount();
+  if (!session) return { session: null, claim: null };
+  const { data, error } = await getSupabaseAdminClient()
+    .from("dealer_lead_claims")
+    .select("*")
+    .eq("id", claimId)
+    .eq("dealer_account_id", session.dealer.id)
+    .maybeSingle();
+  if (error || !data) return { session, claim: null };
+  return { session, claim: data as DealerLeadClaim };
 }
