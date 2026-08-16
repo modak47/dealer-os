@@ -14,6 +14,7 @@ type PortalData = {
 };
 
 type PortalTab = "available" | "active" | "purchased" | "lost";
+type LeadCardTab = "overview" | "location" | "check" | "customer";
 
 const terminalStatuses = new Set(["purchased", "purchased_later", "lost", "returned_to_pool"]);
 const lostReasons = ["Couldn't agree price", "Customer stopped responding", "Customer sold elsewhere", "Condition not as described", "Mileage", "Vehicle history", "Outstanding finance", "Too far away", "Specification unsuitable", "Customer decided not to sell", "Other"];
@@ -111,6 +112,7 @@ function emptyCopy(tab: PortalTab) {
 }
 
 function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
+  const [cardTab, setCardTab] = useState<LeadCardTab>("overview");
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const image = images[0];
   const unlocked = Boolean(lead.customer_unlocked);
@@ -118,6 +120,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   const active = unlocked && claimId && !terminalStatuses.has(String(lead.portal_claim_status));
   const notes = lead.portal_notes ?? [];
   const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
+  const tabs: [LeadCardTab, string][] = [["overview", "Overview"], ["location", "Location"], ["check", "Vehicle check"], ...(unlocked ? [["customer", "Customer"] as [LeadCardTab, string]] : [])];
   return <article className="dealer-lead-card">
     <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <b>{images.length} photos</b>}</div>
     <div className="dealer-lead-body">
@@ -127,33 +130,41 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
         <div><span>Distance</span><b>{lead.portal_distance_label || "Distance not calculated"}</b></div>
         <div><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
       </div>
-      <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />
-      <VehicleCheckPanel lead={lead} />
-      <section className="dealer-preview-panel">
-        <h3>Motorcycle Preview</h3>
-        <dl>
-          <Detail label="Make" value={lead.make} />
-          <Detail label="Model" value={lead.model} />
-          <Detail label="Year" value={lead.year} />
-          <Detail label="Variant / Engine" value={lead.engine} />
-          <Detail label="Colour" value={lead.colour} />
-          <Detail label="Owners" value={lead.owners} />
-          <Detail label="Service history" value={lead.service || lead.history} />
-          <Detail label="MOT" value={lead.mot} />
-          <Detail label="Finance" value={lead.finance_information} />
-          <Detail label="Condition" value={lead.bike_condition || lead.damage} />
-        </dl>
-        {(lead.customer_message || lead.extras) && <p>{lead.customer_message || lead.extras}</p>}
-      </section>
-      <section className={`dealer-customer-panel ${unlocked ? "unlocked" : ""}`}>
-        <h3>{unlocked ? "Customer Details" : "Customer Details Locked"}</h3>
-        {unlocked ? <dl><div><dt>Name</dt><dd>{customerName(lead)}</dd></div><div><dt>Phone</dt><dd>{lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : "Not supplied"}</dd></div><div><dt>Email</dt><dd>{lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : "Not supplied"}</dd></div><div><dt>Postcode</dt><dd>{lead.postcode || "Not supplied"}</dd></div></dl> : <p>Claim this lead to unlock customer contact details. Only one dealer can claim each lead.</p>}
-      </section>
+      <nav className="dealer-card-tabs" aria-label={`${title} lead details`}>{tabs.map(([tab, label]) => <button className={cardTab === tab ? "active" : ""} onClick={() => setCardTab(tab)} type="button" key={tab}>{label}</button>)}</nav>
+      {cardTab === "overview" && <><VehicleCheckPanel lead={lead} compact /><MotorcyclePreviewPanel lead={lead} /></>}
+      {cardTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
+      {cardTab === "check" && <VehicleCheckPanel lead={lead} />}
+      {cardTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
+      {!unlocked && <CustomerPanel lead={lead} unlocked={false} />}
       {!unlocked && <button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button>}
-      {active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}
-      {unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}
     </div>
   </article>;
+}
+
+function MotorcyclePreviewPanel({ lead }: { lead: DealerVisibleLead }) {
+  const rows = [
+    ["Make", lead.make],
+    ["Model", lead.model],
+    ["Year", lead.year],
+    ["Engine", lead.engine],
+    ["Colour", lead.colour],
+    ["Owners", lead.owners],
+    ["Service history", lead.service || lead.history],
+    ["MOT", lead.mot],
+    ["Condition", lead.bike_condition || lead.damage],
+  ] as const;
+  return <section className="dealer-preview-panel">
+    <h3>Motorcycle Preview</h3>
+    <dl>{rows.map(([label, value]) => <Detail label={label} value={value} key={label} />)}</dl>
+    {(lead.customer_message || lead.extras) && <p>{lead.customer_message || lead.extras}</p>}
+  </section>;
+}
+
+function CustomerPanel({ lead, unlocked }: { lead: DealerVisibleLead; unlocked: boolean }) {
+  return <section className={`dealer-customer-panel ${unlocked ? "unlocked" : ""}`}>
+    <h3>{unlocked ? "Customer Details" : "Customer Details Locked"}</h3>
+    {unlocked ? <dl><div><dt>Name</dt><dd>{customerName(lead)}</dd></div><div><dt>Phone</dt><dd>{lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : "Not supplied"}</dd></div><div><dt>Email</dt><dd>{lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : "Not supplied"}</dd></div><div><dt>Postcode</dt><dd>{lead.postcode || "Not supplied"}</dd></div></dl> : <p>Claim this lead to unlock customer contact details. Only one dealer can claim each lead.</p>}
+  </section>;
 }
 
 function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; unlocked: boolean }) {
@@ -185,11 +196,13 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
   </section>;
 }
 
-function VehicleCheckPanel({ lead }: { lead: DealerVisibleLead }) {
+function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead; compact?: boolean }) {
   const check = lead.portal_vehicle_check;
-  return <section className={`dealer-vehicle-check ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
+  const priorityFlags = check?.flags.filter(item => ["stolen", "finance", "mileage", "write_off", "mot"].includes(item.key)) ?? [];
+  const flags = compact ? priorityFlags : check?.flags ?? [];
+  return <section className={`dealer-vehicle-check ${compact ? "compact" : ""} ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
     <header><div><span>Vehicle Check</span><h3>{check?.status || "Vehicle check not available yet"}</h3></div>{check?.mot_expiry && <b>MOT {check.mot_expiry}</b>}</header>
-    {!check ? <p>YesMoto has not linked a vehicle check to this opportunity yet.</p> : <><div className="dealer-check-grid">{check.flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "-"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>{check.details.length > 0 && <dl className="dealer-check-details">{check.details.map(item => <Detail label={item.label} value={item.value} key={item.label} />)}</dl>}</>}
+    {!check ? <p>YesMoto has not linked a vehicle check to this opportunity yet.</p> : <><div className="dealer-check-grid">{flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "-"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>{check.details.length > 0 && !compact && <details className="dealer-check-details"><summary>Technical identity details</summary><dl>{check.details.map(item => <Detail label={item.label} value={item.value} key={item.label} />)}</dl></details>}</>}
   </section>;
 }
 
