@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, statusLabel } from "@/lib/website-leads";
 import type { DealerPortalAccount, DealerVisibleLead } from "@/types/dealer-portal";
@@ -58,7 +59,7 @@ export function DealerPortalClient() {
   return <main className="dealer-portal">
     <section className="dealer-portal-head"><div><p>DEALER BUYING PORTAL</p><h1>{data?.dealer.trading_name || "Motorcycle opportunities"}</h1><span>Claiming and contacting are free. A successful purchase fee is only due when you buy the motorcycle.</span></div></section>
     {error && <div className="portal-message error">{error}</div>}{notice && <div className="portal-message">{notice}</div>}
-    {loading ? <div className="portal-empty"><h2>Loading portal...</h2></div> : !data ? <div className="portal-empty"><h2>Dealer access unavailable</h2><p>Your signed-in user is not linked to an active dealer portal account yet.</p></div> : <section className="dealer-portal-dashboard">
+    {loading ? <div className="portal-empty"><h2>Loading portal...</h2></div> : !data ? <div className="portal-empty"><h2>Dealer access unavailable</h2><p>Sign in with a linked dealer login, or ask YesMoto to set up your dealer account.</p><Link className="dealer-claim-button" href="/dealer-login">Go to Dealer Login</Link></div> : <section className="dealer-portal-dashboard">
       <div className="portal-kpis">{kpis.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
       <nav className="portal-tabs" aria-label="Dealer lead sections"><button className={activeTab === "available" ? "active" : ""} onClick={() => setActiveTab("available")}>Available Leads</button><button className={activeTab === "claimed" ? "active" : ""} onClick={() => setActiveTab("claimed")}>Active Leads</button></nav>
       {!leads.length ? <div className="portal-empty"><h2>{activeTab === "available" ? "No available motorcycles right now" : "No claimed motorcycles yet"}</h2><p>{activeTab === "available" ? "New suitable opportunities will appear here when YesMoto releases them." : "Claim a lead to unlock customer details and work the opportunity."}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} key={`${activeTab}-${lead.id}`} />)}</section>}
