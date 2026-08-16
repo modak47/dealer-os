@@ -199,7 +199,7 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
 function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead; compact?: boolean }) {
   const check = lead.portal_vehicle_check;
   const priorityFlags = check?.flags.filter(item => ["stolen", "finance", "mileage", "write_off", "mot"].includes(item.key)) ?? [];
-  const flags = compact ? priorityFlags : check?.flags ?? [];
+  const flags = (compact ? priorityFlags : check?.flags ?? []).filter(item => !(item.key === "mot" && check?.mot_expiry));
   const reportHref = check?.report_url ? `/api/autotrader/vehicle-check-report?url=${encodeURIComponent(check.report_url)}` : "";
   return <section className={`dealer-vehicle-check ${compact ? "compact" : ""} ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
     <header><div><span>Vehicle Check</span><h3>{check?.status || "Vehicle check not available yet"}</h3></div><nav>{check?.mot_expiry && <b>MOT {check.mot_expiry}</b>}{reportHref && <a href={reportHref} target="_blank" rel="noreferrer">View report</a>}</nav></header>
