@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { normaliseRegistration, parseWebsiteLeadWebhookPayload } from "../lib/website-lead-webhook";
+import { normaliseRegistration, parseWebsiteLeadWebhookPayload, websiteLeadInsertPayload } from "../lib/website-lead-webhook";
 
 describe("website lead webhook payload mapping", () => {
   it("maps a Bike Buyer UK payload into canonical lead fields", () => {
@@ -70,8 +70,75 @@ describe("website lead webhook payload mapping", () => {
     assert.equal(lead.postcode, "M1 1AE");
   });
 
-  it("rejects payloads without a recognised source", () => {
-    assert.throws(() => parseWebsiteLeadWebhookPayload({ source: "unknown", reg: "AB12CDE" }), /Payload source/);
+  it("treats YesMoto website values as Sell Your Motorbike leads", () => {
+    const lead = parseWebsiteLeadWebhookPayload({
+      website: "yesmoto.co.uk",
+      id: "722",
+      reg: "MT07 ABC",
+      make: "Yamaha",
+      model: "MT-07",
+      fname: "Dan",
+      phone: "07700900123",
+    });
+
+    assert.equal(lead.external_submission_id, "722");
+    assert.equal(lead.lead_source, "sell_your_motorbike");
+    assert.equal(lead.website, "sellyourmotorbike");
+  });
+
+  it("accepts webhook payloads that only provide a website field", () => {
+    const lead = parseWebsiteLeadWebhookPayload({
+      website: "YesMoto website",
+      id: "724",
+      reg: "AB12 CDE",
+      fname: "Dan",
+      phone: "07700900123",
+    });
+
+    assert.equal(lead.external_submission_id, "724");
+    assert.equal(lead.lead_source, "sell_your_motorbike");
+  });
+
+  it("saves leads without images using an empty image array", () => {
+    const lead = parseWebsiteLeadWebhookPayload({
+      source: "sell_your_motorbike",
+      id: "723",
+      reg: "AB12 CDE",
+      fname: "Dan",
+      phone: "07700900123",
+    });
+
+    assert.equal(lead.images, null);
+    assert.deepEqual(websiteLeadInsertPayload(lead).images, []);
+  });
+
+  it("accepts sparse source rows when they include an id", () => {
+    const lead = parseWebsiteLeadWebhookPayload({
+      id: "720",
+      website: "sellyourmotorbike",
+      reg: "",
+      make: "",
+      model: "",
+      mot: "",
+      image1: "",
+    });
+
+    assert.equal(lead.external_submission_id, "720");
+    assert.equal(lead.lead_source, "sell_your_motorbike");
+    assert.equal(lead.reg, null);
+    assert.equal(lead.mot, null);
+    assert.equal(lead.images, null);
+  });
+
+  it("defaults authenticated webhook payloads without a recognised source", () => {
+    const lead = parseWebsiteLeadWebhookPayload({
+      source: "unknown",
+      reg: "AB12 CDE",
+      fname: "Dan",
+      phone: "07700900123",
+    });
+
+    assert.equal(lead.lead_source, "sell_your_motorbike");
   });
 
   it("normalises registrations safely", () => {

@@ -59,8 +59,7 @@ export type CanonicalWebsiteLead = {
 const loosePayloadSchema = z.record(z.string(), z.unknown());
 
 const envelopeSchema = loosePayloadSchema.transform(input => {
-  const source = normaliseSource(first(input, ["source", "website", "lead_source"]));
-  if (!source) throw new Error("Payload source must be bike_buyer_uk or sell_your_motorbike.");
+  const source = normaliseSource(first(input, ["source", "lead_source"])) ?? normaliseWebsiteSource(first(input, ["website"])) ?? "sell_your_motorbike";
   return { source, input };
 });
 
@@ -68,8 +67,8 @@ export function parseWebsiteLeadWebhookPayload(body: unknown): CanonicalWebsiteL
   const parsed = envelopeSchema.parse(body);
   const payload = parsed.input;
   const submittedAt = normaliseTimestamp(first(payload, ["submitted_at", "submittedAt", "date", "created_at"])) ?? new Date().toISOString();
-  const externalId = cleanText(first(payload, ["external_submission_id", "externalSubmissionId", "application_id", "applicationId", "field_id", "id"]), 160)
-    ?? stableSubmissionId(parsed.source, submittedAt, payload);
+  const suppliedExternalId = cleanText(first(payload, ["external_submission_id", "externalSubmissionId", "application_id", "applicationId", "field_id", "id"]), 160);
+  const externalId = suppliedExternalId ?? stableSubmissionId(parsed.source, submittedAt, payload);
   const images = collectImages(payload);
   const email = normaliseEmail(first(payload, ["email", "customer_email"]));
   const phone = normaliseUkPhone(first(payload, ["phone", "telephone", "mobile", "customer_phone"]));
@@ -78,7 +77,7 @@ export function parseWebsiteLeadWebhookPayload(body: unknown): CanonicalWebsiteL
   const firstName = cleanText(first(payload, ["fname", "first_name", "firstname", "firstName", "customer_first_name"]), 100);
   const lastName = cleanText(first(payload, ["lname", "last_name", "lastname", "lastName", "customer_last_name"]), 100);
   const meaningfulDetails = [reg, first(payload, ["make"]), first(payload, ["model"]), email, phone, postcode, firstName, lastName].filter(Boolean).length;
-  if (!reg && meaningfulDetails < 2) throw new Error("Lead must include a registration or meaningful bike/customer details.");
+  if (!suppliedExternalId && !reg && meaningfulDetails < 2) throw new Error("Lead must include a row id, registration, or meaningful bike/customer details.");
 
   return {
     external_submission_id: externalId,
@@ -134,6 +133,7 @@ export function parseWebsiteLeadWebhookPayload(body: unknown): CanonicalWebsiteL
 export function websiteLeadInsertPayload(lead: CanonicalWebsiteLead) {
   return {
     ...lead,
+    images: lead.images ?? [],
     retail_estimate: null,
     suggested_offer: safeNumber(lead.price),
     estimated_margin: null,
@@ -143,10 +143,18 @@ export function websiteLeadInsertPayload(lead: CanonicalWebsiteLead) {
 }
 
 export function normaliseSource(value: unknown): WebhookLeadSource | null {
-  const text = cleanText(value, 80)?.toLowerCase().replace(/[\s-]+/g, "_");
+  const text = cleanText(value, 80)?.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   if (text === "bikebuyeruk" || text === "bike_buyer_uk") return "bike_buyer_uk";
   if (text === "sellyourmotorbike" || text === "sell_your_motorbike") return "sell_your_motorbike";
+  if (text === "yesmoto" || text === "yes_moto" || text === "yesmoto_co_uk") return "sell_your_motorbike";
   return null;
+}
+
+function normaliseWebsiteSource(value: unknown): WebhookLeadSource | null {
+  const text = cleanText(value, 120)?.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!text) return null;
+  if (text.includes("bikebuyer") || text.includes("bike_buyer")) return "bike_buyer_uk";
+  return normaliseSource(text) ?? "sell_your_motorbike";
 }
 
 export function stableSubmissionId(source: string, submittedAt: string, payload: Record<string, unknown>) {

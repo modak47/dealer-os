@@ -10,8 +10,23 @@ export function formatGbp(value: number | string | null | undefined): string {
 
 export function formatLeadDate(value: string | null | undefined): string {
   if (!value) return "Not recorded";
-  const date = new Date(value);
+  const date = parseLeadDate(value);
   return Number.isNaN(date.getTime()) ? "Not recorded" : dateFormatter.format(date);
+}
+
+function parseLeadDate(value: string) {
+  const trimmed = value.trim();
+  const ukDate = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if (ukDate) {
+    const day = Number(ukDate[1]);
+    const month = Number(ukDate[2]);
+    const rawYear = Number(ukDate[3]);
+    const year = rawYear < 100 ? 2000 + rawYear : rawYear;
+    const hour = Number(ukDate[4] ?? 0);
+    const minute = Number(ukDate[5] ?? 0);
+    return new Date(year, month - 1, day, hour, minute);
+  }
+  return new Date(trimmed);
 }
 
 export function formatMileage(value: string | number | null | undefined): string {
@@ -71,6 +86,25 @@ export function resolveLegacyImagePath(value: string, baseUrl = process.env.LEGA
   return new URL(image.replace(/^\/+/, ""), base).toString();
 }
 
+function imageExtension(value: string) {
+  const pathname = (() => {
+    try {
+      return new URL(value).pathname;
+    } catch {
+      return value.split("?")[0];
+    }
+  })();
+  return pathname.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? null;
+}
+
+function displayableLeadImageUrl(value: string) {
+  const extension = imageExtension(value);
+  if (!extension) return value;
+  if (["jpg", "jpeg", "png", "webp", "gif", "avif", "svg"].includes(extension)) return value;
+  if (["heic", "heif"].includes(extension)) return `/api/website-leads/image?url=${encodeURIComponent(value)}`;
+  return null;
+}
+
 export function combineLeadImages(lead: Pick<WebsiteLead, "images" | "Images" | "image1" | "image2" | "image3" | "image4" | "image5" | "image6" | "image7" | "image8" | "image9" | "image10">, legacyBaseUrl?: string): string[] {
   const jsonImages = Array.isArray(lead.images) ? lead.images : [];
   const numbered = [lead.image1, lead.image2, lead.image3, lead.image4, lead.image5, lead.image6, lead.image7, lead.image8, lead.image9, lead.image10];
@@ -80,8 +114,10 @@ export function combineLeadImages(lead: Pick<WebsiteLead, "images" | "Images" | 
     if (typeof value !== "string") return [];
     const resolved = resolveLegacyImagePath(value, legacyBaseUrl);
     if (!resolved || seen.has(resolved)) return [];
+    const displayUrl = displayableLeadImageUrl(resolved);
+    if (!displayUrl) return [];
     seen.add(resolved);
-    return [resolved];
+    return [displayUrl];
   });
 }
 

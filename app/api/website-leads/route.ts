@@ -112,7 +112,7 @@ async function websiteLeadSummary(searchParams: URLSearchParams) {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const latestLimit = Math.min(Math.max(Number(searchParams.get("limit") ?? 5) || 5, 1), 20);
   const supabase = getSupabaseAdminClient();
-  const latestQuery = applyLeadFilters(leadQuery(supabase.from("website_leads").select(listSelect)), searchParams).order("date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false, nullsFirst: false }).limit(latestLimit);
+  const latestQuery = applyLeadFilters(leadQuery(supabase.from("website_leads").select(listSelect)), searchParams).order("id", { ascending: false }).limit(latestLimit);
   const [total, newCount, pendingValuations, receivedToday, receivedThisWeek, purchasedThisMonth, bikeBuyerUk, sellYourMotorbike, motorcycleBuyer, latestResult] = await Promise.all([
     countLeads(searchParams),
     countLeads(searchParams, query => query.eq("status", "new")),
@@ -143,10 +143,10 @@ export async function GET(request: Request) {
   const limit = Number(searchParams.get("limit") ?? 0);
   const sort = searchParams.get("sort") ?? "newest";
   let query = applyLeadFilters(leadQuery(getSupabaseAdminClient().from("website_leads").select(defaultSelect)), searchParams);
-  if (sort === "oldest") query = query.order("date", { ascending: true, nullsFirst: false }).order("created_at", { ascending: true, nullsFirst: false });
+  if (sort === "oldest") query = query.order("id", { ascending: true });
   else if (sort === "highest_margin") query = query.order("estimated_margin", { ascending: false, nullsFirst: false });
   else if (sort === "highest_offer") query = query.order("suggested_offer", { ascending: false, nullsFirst: false });
-  else query = query.order("date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false, nullsFirst: false });
+  else query = query.order("id", { ascending: false });
   if (Number.isFinite(limit) && limit > 0) query = query.limit(Math.min(limit, 500));
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Unable to load website leads." }, { status: 500 });

@@ -1,4 +1,4 @@
-export const WEBSITE_LEAD_STATUSES = ["new", "reviewing", "contacted", "offer_made", "accepted", "declined", "purchased", "closed", "purchase_agreed", "purchase_cancelled", "referred_to_dealer"] as const;
+export const WEBSITE_LEAD_STATUSES = ["new", "reviewing", "contacted", "offer_made", "accepted", "declined", "purchased", "closed", "purchase_agreed", "purchase_cancelled", "referred_to_dealer", "dealer_pool_available", "dealer_allocated", "dealer_claimed", "dealer_purchased", "dealer_lost", "dealer_returned"] as const;
 export const WEBSITE_VALUATION_STATUSES = ["pending", "in_progress", "valued", "offer_ready", "needs_review", "complete"] as const;
 export const WEBSITE_LEAD_SOURCES = ["bikebuyeruk", "sellyourmotorbike", "motorcyclebuyer", "bike_buyer_uk", "sell_your_motorbike"] as const;
 

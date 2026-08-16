@@ -34,7 +34,7 @@ export default function WebsiteLeadsPage() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/website-leads").then(async response => {
+    fetch("/api/website-leads", { cache: "no-store" }).then(async response => {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Unable to load website leads.");
       if (active) {
@@ -54,10 +54,10 @@ export default function WebsiteLeadsPage() {
       const searchable = [lead.reg, lead.make, lead.model, lead.fname, lead.lname, lead.email, lead.phone, lead.postcode].join(" ").toLowerCase();
       return (!search || searchable.includes(search)) && (!website || lead.website === website) && (!status || lead.status === status) && (!valuationStatus || lead.valuation_status === valuationStatus);
     }).sort((a, b) => {
-      if (sort === "oldest") return new Date(a.date || a.created_at || 0).getTime() - new Date(b.date || b.created_at || 0).getTime();
+      if (sort === "oldest") return legacyAwareLeadOrder(b, a);
       if (sort === "margin") return (b.estimated_margin ?? -Infinity) - (a.estimated_margin ?? -Infinity);
       if (sort === "offer") return (b.suggested_offer ?? -Infinity) - (a.suggested_offer ?? -Infinity);
-      return new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime();
+      return legacyAwareLeadOrder(a, b);
     });
   }, [leads, query, website, status, valuationStatus, sort]);
 
@@ -213,6 +213,17 @@ function readViewedLeadIds() {
 
 function isLeadMuted(lead: WebsiteLead, viewedLeadIds: Set<number>, oldBatchMaxId: number | null) {
   return viewedLeadIds.has(lead.id) || oldBatchMaxId === null || lead.id <= oldBatchMaxId;
+}
+
+function legacyAwareLeadOrder(a: WebsiteLead, b: WebsiteLead) {
+  const aLegacy = isLegacyImportedLead(a);
+  const bLegacy = isLegacyImportedLead(b);
+  if (aLegacy !== bLegacy) return aLegacy ? 1 : -1;
+  return aLegacy ? a.id - b.id : b.id - a.id;
+}
+
+function isLegacyImportedLead(lead: WebsiteLead) {
+  return lead.external_submission_id?.startsWith("legacy-airtable-") ?? false;
 }
 
 function BookIntoStockModal({ lead, result, onBooked, onClose }: { lead: WebsiteLead; result: { stockId: string; stockNumber?: string } | null; onBooked: (stockId: string, stockNumber?: string) => void; onClose: () => void }) {
