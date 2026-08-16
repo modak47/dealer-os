@@ -121,7 +121,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   return <article className="dealer-lead-card">
     <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <b>{images.length} photos</b>}</div>
     <div className="dealer-lead-body">
-      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><h2>{title}</h2><p>{lead.reg || "Registration not shown"} - {formatMileage(lead.mileage)} - {lead.engine || "Engine n/a"}</p></div><strong>{lead.price || "Price not supplied"}</strong></header>
+      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><h2>{title}</h2><p>{lead.reg || "Registration not shown"} - {formatMileage(lead.mileage)} - {lead.engine || "Engine n/a"}</p></div><strong><span>Customer asking price</span>{lead.price || "Not supplied"}</strong></header>
       <div className="dealer-opportunity-strip">
         <div><span>Approx location</span><b>{lead.portal_location_label || "Location pending"}</b></div>
         <div><span>Distance</span><b>{lead.portal_distance_label || "Distance not calculated"}</b></div>
