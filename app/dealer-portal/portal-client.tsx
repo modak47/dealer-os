@@ -128,6 +128,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
         <div><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
       </div>
       <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />
+      <VehicleCheckPanel lead={lead} />
       <section className="dealer-preview-panel">
         <h3>Motorcycle Preview</h3>
         <dl>
@@ -181,6 +182,14 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
       </dl>
       {hasLocation && <nav><a href={googleMapsUrl(publicLocation)} target="_blank" rel="noreferrer">View Map</a><a href={directionsUrl(dealerOrigin, publicLocation)} target="_blank" rel="noreferrer">Directions</a></nav>}
     </div>
+  </section>;
+}
+
+function VehicleCheckPanel({ lead }: { lead: DealerVisibleLead }) {
+  const check = lead.portal_vehicle_check;
+  return <section className={`dealer-vehicle-check ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
+    <header><div><span>Vehicle Check</span><h3>{check?.status || "Vehicle check not available yet"}</h3></div>{check?.mot_expiry && <b>MOT {check.mot_expiry}</b>}</header>
+    {!check ? <p>YesMoto has not linked a vehicle check to this opportunity yet.</p> : <div className="dealer-check-grid">{check.flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "-"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>}
   </section>;
 }
 

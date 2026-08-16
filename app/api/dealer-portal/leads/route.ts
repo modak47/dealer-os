@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentDealerPortalAccount, redactLeadForDealer } from "@/lib/dealer-portal";
+import { normaliseVehicleCheck } from "@/lib/autotrader-vehicle-check";
 import { isFullUKPostcode, normaliseUKPostcode } from "@/lib/location";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { combineLeadImages } from "@/lib/website-leads";
-import type { DealerLeadClaim, DealerLeadNote, DealerVisibleLead } from "@/types/dealer-portal";
+import type { DealerLeadClaim, DealerLeadNote, DealerVehicleCheckFlag, DealerVehicleCheckSummary, DealerVisibleLead } from "@/types/dealer-portal";
 import type { WebsiteLead } from "@/types/website-lead";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,8 @@ export const dynamic = "force-dynamic";
 function relatedLead(value: unknown) {
   return (Array.isArray(value) ? value[0] : value) as WebsiteLead | null;
 }
+
+type RetailCheckRow = Record<string, unknown> & { id: number | string };
 
 function distanceMiles(fromLat: number | null | undefined, fromLon: number | null | undefined, toLat: number | null | undefined, toLon: number | null | undefined) {
   if (![fromLat, fromLon, toLat, toLon].every(value => typeof value === "number" && Number.isFinite(value))) return null;
@@ -64,6 +67,40 @@ async function dealerLeadMeta(lead: WebsiteLead, dealer: { postcode?: string | n
   };
 }
 
+function flag(key: string, label: string, value: boolean | null, clearDetail: string, warningDetail: string): DealerVehicleCheckFlag {
+  return {
+    key,
+    label,
+    state: value === true ? "warning" : value === false ? "clear" : "unknown",
+    detail: value === true ? warningDetail : value === false ? clearDetail : "Not returned by vehicle check",
+  };
+}
+
+function dealerVehicleCheck(record: RetailCheckRow | undefined): DealerVehicleCheckSummary | null {
+  if (!record) return null;
+  const motData = record["Auto Trader MOT Data"];
+  const motObject = motData && typeof motData === "object" && !Array.isArray(motData) ? motData as Record<string, unknown> : {};
+  const check = normaliseVehicleCheck(motObject.check ?? motObject.history ?? motObject, { motExpiry: String(record["MOT Expiry"] || "") });
+  return {
+    status: check.status || String(record.Status || "Vehicle check available"),
+    clear: check.clear,
+    checked_at: typeof record["Last Checked"] === "string" ? record["Last Checked"] : typeof record.updated_at === "string" ? record.updated_at : null,
+    mot_expiry: check.motExpiry || null,
+    report_available: Boolean(check.reportUrl),
+    flags: [
+      flag("identity", "Identity check", check.clear === null ? null : false, "Vehicle identity data returned", "Identity needs review"),
+      flag("stolen", "Stolen", check.stolen, "Not recorded stolen", "Vehicle recorded stolen"),
+      flag("finance", "Finance", check.outstandingFinance, "No finance recorded", "Outstanding finance recorded"),
+      flag("write_off", "Insurance write-off", check.writtenOff, "No insurance total loss recorded", check.category ? `Insurance loss recorded: ${check.category}` : "Insurance loss recorded"),
+      flag("scrapped", "Scrapped", check.scrapped, "Not recorded scrapped", "Vehicle recorded scrapped"),
+      flag("mileage", "Mileage", check.mileageDiscrepancy, "Mileage consistent", "Mileage discrepancy recorded"),
+      flag("imported", "Imported", check.imported, "Not recorded imported", "Imported marker recorded"),
+      flag("exported", "Exported", check.exported, "Not recorded exported", "Export marker recorded"),
+      flag("mot", "MOT history", check.motExpiry || check.motStatus ? false : null, check.motExpiry ? `MOT expiry ${check.motExpiry}` : check.motStatus || "MOT data returned", "MOT needs review"),
+    ],
+  };
+}
+
 export async function GET() {
   const session = await getCurrentDealerPortalAccount();
   if (!session) return NextResponse.json({ error: "Dealer portal access is not available for this user." }, { status: 401 });
@@ -90,6 +127,17 @@ export async function GET() {
     if (!note.claim_id) continue;
     notesByClaim.set(note.claim_id, [...(notesByClaim.get(note.claim_id) ?? []), note]);
   }
+  const leadRows = [
+    ...(allocationsResult.data ?? []).map(row => relatedLead(row.lead)),
+    ...claimRows.map(claim => relatedLead(claim.lead)),
+  ].filter((lead): lead is WebsiteLead => Boolean(lead));
+  const retailCheckIds = Array.from(new Set(leadRows.map(lead => lead.retail_check_id).filter((id): id is string => Boolean(id))));
+  const retailChecksResult = retailCheckIds.length
+    ? await db.from("retail_checks").select("id,Status,updated_at,\"Last Checked\",\"Auto Trader MOT Data\"").in("id", retailCheckIds)
+    : { data: [], error: null };
+  if (retailChecksResult.error) return NextResponse.json({ error: "Unable to load vehicle checks." }, { status: 500 });
+  const vehicleCheckById = new Map<string, DealerVehicleCheckSummary | null>();
+  for (const record of (retailChecksResult.data ?? []) as RetailCheckRow[]) vehicleCheckById.set(String(record.id), dealerVehicleCheck(record));
   const activeClaimByLead = new Map<number, DealerLeadClaim>();
   for (const claim of claimRows) activeClaimByLead.set(Number(claim.website_lead_id), claim);
   const available: DealerVisibleLead[] = [];
@@ -97,7 +145,7 @@ export async function GET() {
     const lead = relatedLead(row.lead);
     if (!lead || activeClaimByLead.has(Number(row.website_lead_id))) continue;
     const redacted = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, false) as DealerVisibleLead;
-    available.push({ ...redacted, ...await dealerLeadMeta(lead, session.dealer, false), portal_allocation_id: String(row.id), customer_unlocked: false });
+    available.push({ ...redacted, ...await dealerLeadMeta(lead, session.dealer, false), portal_vehicle_check: lead.retail_check_id ? vehicleCheckById.get(String(lead.retail_check_id)) ?? null : null, portal_allocation_id: String(row.id), customer_unlocked: false });
   }
   const claimed: DealerVisibleLead[] = [];
   for (const claim of claimRows) {
@@ -105,7 +153,7 @@ export async function GET() {
     if (!lead) continue;
     const unlocked = Boolean(claim.customer_details_unlocked_at);
     const visible = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, unlocked) as DealerVisibleLead;
-    claimed.push({ ...visible, ...await dealerLeadMeta(lead, session.dealer, unlocked), portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked });
+    claimed.push({ ...visible, ...await dealerLeadMeta(lead, session.dealer, unlocked), portal_vehicle_check: lead.retail_check_id ? vehicleCheckById.get(String(lead.retail_check_id)) ?? null : null, portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked });
   }
   return NextResponse.json({ dealer: session.dealer, available, claimed });
 }

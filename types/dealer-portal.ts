@@ -108,6 +108,22 @@ export type DealerPurchaseFee = {
   updated_at: string;
 };
 
+export type DealerVehicleCheckFlag = {
+  key: string;
+  label: string;
+  state: "clear" | "warning" | "unknown";
+  detail: string;
+};
+
+export type DealerVehicleCheckSummary = {
+  status: string;
+  clear: boolean | null;
+  checked_at: string | null;
+  mot_expiry: string | null;
+  report_available: boolean;
+  flags: DealerVehicleCheckFlag[];
+};
+
 export type DealerVisibleLead = WebsiteLead & {
   portal_allocation_id?: string | null;
   portal_claim_id?: string | null;
@@ -118,5 +134,6 @@ export type DealerVisibleLead = WebsiteLead & {
   portal_distance_miles?: number | null;
   portal_distance_label?: string | null;
   portal_location_label?: string | null;
+  portal_vehicle_check?: DealerVehicleCheckSummary | null;
   customer_unlocked?: boolean;
 };
