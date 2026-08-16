@@ -80,6 +80,12 @@ export type WebsiteLead = {
   valuation_started_at?: string | null;
   valuation_completed_at?: string | null;
   valuation_error?: string | null;
+  autotrader_vehicle_id?: string | null;
+  autotrader_vehicle_lookup_data?: Record<string, unknown> | null;
+  autotrader_vehicle_check_data?: Record<string, unknown> | null;
+  vehicle_check_status?: string | null;
+  vehicle_check_checked_at?: string | null;
+  vehicle_check_error?: string | null;
   images: string[] | null;
   status: WebsiteLeadStatus | string | null;
   assigned_to: string | null;
@@ -118,4 +124,10 @@ export type WebsiteLeadUpdate = Partial<Pick<WebsiteLead,
   distance_from_yesmoto_miles?: number | null;
   driving_distance_miles?: number | null;
   estimated_drive_minutes?: number | null;
+  autotrader_vehicle_id?: string | null;
+  autotrader_vehicle_lookup_data?: Record<string, unknown> | null;
+  autotrader_vehicle_check_data?: Record<string, unknown> | null;
+  vehicle_check_status?: string | null;
+  vehicle_check_checked_at?: string | null;
+  vehicle_check_error?: string | null;
 };

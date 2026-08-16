@@ -13,8 +13,6 @@ function relatedLead(value: unknown) {
   return (Array.isArray(value) ? value[0] : value) as WebsiteLead | null;
 }
 
-type RetailCheckRow = Record<string, unknown> & { id: number | string };
-
 function distanceMiles(fromLat: number | null | undefined, fromLon: number | null | undefined, toLat: number | null | undefined, toLon: number | null | undefined) {
   if (![fromLat, fromLon, toLat, toLon].every(value => typeof value === "number" && Number.isFinite(value))) return null;
   const radiusMiles = 3958.8;
@@ -76,17 +74,42 @@ function flag(key: string, label: string, value: boolean | null, clearDetail: st
   };
 }
 
-function dealerVehicleCheck(record: RetailCheckRow | undefined): DealerVehicleCheckSummary | null {
-  if (!record) return null;
-  const motData = record["Auto Trader MOT Data"];
-  const motObject = motData && typeof motData === "object" && !Array.isArray(motData) ? motData as Record<string, unknown> : {};
-  const check = normaliseVehicleCheck(motObject.check ?? motObject.history ?? motObject, { motExpiry: String(record["MOT Expiry"] || "") });
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function textValue(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null {
+  if (lead.vehicle_check_status !== "checked" && !lead.autotrader_vehicle_check_data && !lead.autotrader_vehicle_lookup_data) return null;
+  const checkData = objectValue(lead.autotrader_vehicle_check_data);
+  const lookupData = objectValue(lead.autotrader_vehicle_lookup_data);
+  const vehicle = objectValue(lookupData.vehicle);
+  const check = normaliseVehicleCheck(checkData.vehicleCheck ?? checkData.check ?? checkData.history ?? lookupData.check ?? lookupData.history ?? lookupData, {
+    motExpiry: textValue(vehicle.motExpiry, vehicle.motExpiryDate, vehicle.lastMOTExpiry, lead.mot),
+    previousOwners: Number(textValue(vehicle.owners, objectValue(vehicle.history).previousOwners, lead.owners)) || undefined,
+  });
+  const details = [
+    ["Registration", textValue(vehicle.registration, lead.reg)],
+    ["VIN", textValue(vehicle.vin)],
+    ["Engine number", textValue(vehicle.engineNumber, vehicle.engine_number)],
+    ["Auto Trader vehicle ID", textValue(lead.autotrader_vehicle_id, vehicle.vehicleId, vehicle.vehicle_id, vehicle.id)],
+    ["Derivative", textValue(vehicle.derivative, vehicle.derivativeId, vehicle.derivative_id)],
+    ["First registered", textValue(vehicle.firstRegistrationDate)],
+  ].filter((row): row is [string, string] => Boolean(row[1]));
   return {
-    status: check.status || String(record.Status || "Vehicle check available"),
+    status: check.status || "Vehicle check available",
     clear: check.clear,
-    checked_at: typeof record["Last Checked"] === "string" ? record["Last Checked"] : typeof record.updated_at === "string" ? record.updated_at : null,
+    checked_at: lead.vehicle_check_checked_at ?? null,
     mot_expiry: check.motExpiry || null,
     report_available: Boolean(check.reportUrl),
+    details: details.map(([label, value]) => ({ label, value })),
     flags: [
       flag("identity", "Identity check", check.clear === null ? null : false, "Vehicle identity data returned", "Identity needs review"),
       flag("stolen", "Stolen", check.stolen, "Not recorded stolen", "Vehicle recorded stolen"),
@@ -127,17 +150,6 @@ export async function GET() {
     if (!note.claim_id) continue;
     notesByClaim.set(note.claim_id, [...(notesByClaim.get(note.claim_id) ?? []), note]);
   }
-  const leadRows = [
-    ...(allocationsResult.data ?? []).map(row => relatedLead(row.lead)),
-    ...claimRows.map(claim => relatedLead(claim.lead)),
-  ].filter((lead): lead is WebsiteLead => Boolean(lead));
-  const retailCheckIds = Array.from(new Set(leadRows.map(lead => lead.retail_check_id).filter((id): id is string => Boolean(id))));
-  const retailChecksResult = retailCheckIds.length
-    ? await db.from("retail_checks").select("id,Status,updated_at,\"Last Checked\",\"Auto Trader MOT Data\"").in("id", retailCheckIds)
-    : { data: [], error: null };
-  if (retailChecksResult.error) return NextResponse.json({ error: "Unable to load vehicle checks." }, { status: 500 });
-  const vehicleCheckById = new Map<string, DealerVehicleCheckSummary | null>();
-  for (const record of (retailChecksResult.data ?? []) as RetailCheckRow[]) vehicleCheckById.set(String(record.id), dealerVehicleCheck(record));
   const activeClaimByLead = new Map<number, DealerLeadClaim>();
   for (const claim of claimRows) activeClaimByLead.set(Number(claim.website_lead_id), claim);
   const available: DealerVisibleLead[] = [];
@@ -145,7 +157,7 @@ export async function GET() {
     const lead = relatedLead(row.lead);
     if (!lead || activeClaimByLead.has(Number(row.website_lead_id))) continue;
     const redacted = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, false) as DealerVisibleLead;
-    available.push({ ...redacted, ...await dealerLeadMeta(lead, session.dealer, false), portal_vehicle_check: lead.retail_check_id ? vehicleCheckById.get(String(lead.retail_check_id)) ?? null : null, portal_allocation_id: String(row.id), customer_unlocked: false });
+    available.push({ ...redacted, ...await dealerLeadMeta(lead, session.dealer, false), portal_vehicle_check: dealerVehicleCheck(lead), portal_allocation_id: String(row.id), customer_unlocked: false });
   }
   const claimed: DealerVisibleLead[] = [];
   for (const claim of claimRows) {
@@ -153,7 +165,7 @@ export async function GET() {
     if (!lead) continue;
     const unlocked = Boolean(claim.customer_details_unlocked_at);
     const visible = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, unlocked) as DealerVisibleLead;
-    claimed.push({ ...visible, ...await dealerLeadMeta(lead, session.dealer, unlocked), portal_vehicle_check: lead.retail_check_id ? vehicleCheckById.get(String(lead.retail_check_id)) ?? null : null, portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked });
+    claimed.push({ ...visible, ...await dealerLeadMeta(lead, session.dealer, unlocked), portal_vehicle_check: dealerVehicleCheck(lead), portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked });
   }
   return NextResponse.json({ dealer: session.dealer, available, claimed });
 }

@@ -189,7 +189,7 @@ function VehicleCheckPanel({ lead }: { lead: DealerVisibleLead }) {
   const check = lead.portal_vehicle_check;
   return <section className={`dealer-vehicle-check ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
     <header><div><span>Vehicle Check</span><h3>{check?.status || "Vehicle check not available yet"}</h3></div>{check?.mot_expiry && <b>MOT {check.mot_expiry}</b>}</header>
-    {!check ? <p>YesMoto has not linked a vehicle check to this opportunity yet.</p> : <div className="dealer-check-grid">{check.flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "-"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>}
+    {!check ? <p>YesMoto has not linked a vehicle check to this opportunity yet.</p> : <><div className="dealer-check-grid">{check.flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "-"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>{check.details.length > 0 && <dl className="dealer-check-details">{check.details.map(item => <Detail label={item.label} value={item.value} key={item.label} />)}</dl>}</>}
   </section>;
 }
 

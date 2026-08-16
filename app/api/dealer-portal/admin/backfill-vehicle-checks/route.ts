@@ -13,7 +13,7 @@ type BackfillLead = {
   year: string | null;
   mileage: string | null;
   price: string | null;
-  retail_check_id: string | null;
+  vehicle_check_status: string | null;
 };
 
 export async function POST(request: Request) {
@@ -22,9 +22,8 @@ export async function POST(request: Request) {
   const limit = Math.min(Math.max(Number(body.limit ?? 25) || 25, 1), 25);
   const { data, error } = await getSupabaseAdminClient()
     .from("website_leads")
-    .select("id,reg,make,model,year,mileage,price,retail_check_id")
+    .select("id,reg,make,model,year,mileage,price,vehicle_check_status")
     .not("reg", "is", null)
-    .is("retail_check_id", null)
     .order("id", { ascending: false })
     .limit(limit);
 
@@ -43,7 +42,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     requested: limit,
     processed: results.length,
-    created: results.filter(result => "retail_check_id" in result).length,
+    checked: results.filter(result => "checked" in result).length,
     failed: results.filter(result => "error" in result).length,
     skipped: results.filter(result => result.skipped).length,
     results,
