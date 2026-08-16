@@ -76,6 +76,38 @@ export type DealerLeadNote = {
   created_at: string;
 };
 
+export type DealerPurchase = {
+  id: string;
+  website_lead_id: number;
+  claim_id: string;
+  dealer_account_id: string;
+  purchase_type: "dealer_reported" | "dealer_reported_later" | "stock_matching_admin_confirmed" | "other";
+  purchase_price: number;
+  purchase_date: string;
+  collection_date: string | null;
+  mileage_at_purchase: number | null;
+  notes: string | null;
+  reported_by: string | null;
+  reported_at: string;
+  created_at: string;
+};
+
+export type DealerPurchaseFee = {
+  id: string;
+  purchase_id: string;
+  dealer_account_id: string;
+  website_lead_id: number;
+  fee_amount: number;
+  status: "pending_invoice" | "invoiced" | "paid" | "credited" | "void";
+  credit_amount: number;
+  adjustment_amount: number;
+  invoiced_at: string | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DealerVisibleLead = WebsiteLead & {
   portal_allocation_id?: string | null;
   portal_claim_id?: string | null;
