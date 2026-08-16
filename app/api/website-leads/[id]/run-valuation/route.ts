@@ -52,7 +52,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       derivativeId: lookup.derivativeId,
       autotraderVehicleId: lookup.vehicleId,
       autotraderTaxonomyData: lookup.taxonomyData,
-      autotraderMotData: { motTests: lookup.motTests ?? null, history: lookup.history ?? null },
+      autotraderMotData: { motTests: lookup.motTests ?? null, history: lookup.history ?? null, check: lookup.check ?? null },
     });
     await supabase.from("website_leads").update({ retail_check_id: String(retailCheck.id), updated_at: new Date().toISOString() }).eq("id", id);
     const completed = await waitForRetailCheck(retailCheck.id);

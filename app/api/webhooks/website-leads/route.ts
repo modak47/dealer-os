@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { leadLocationUpdate, lookupLeadLocation } from "@/lib/location";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { createAutomaticVehicleCheckForWebsiteLead } from "@/lib/website-lead-auto-check";
 import { parseWebsiteLeadWebhookPayload, websiteLeadInsertPayload } from "@/lib/website-lead-webhook";
 
 export const dynamic = "force-dynamic";
@@ -122,6 +123,7 @@ async function saveWebsiteLead(entry: unknown, supabase: ReturnType<typeof getSu
     throw new Error("Unable to save website lead.");
   }
 
+  if (lead.reg) await createAutomaticVehicleCheckForWebsiteLead(data.id, lead);
   return { lead: data, duplicate: false };
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { leadLocationUpdate, lookupLeadLocation } from "@/lib/location";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { createAutomaticVehicleCheckForWebsiteLead } from "@/lib/website-lead-auto-check";
 import { cleanText, combineLeadImages, isValidLeadStatus, safeNumber } from "@/lib/website-leads";
 import type { WebsiteLead, WebsiteLeadStatus } from "@/types/website-lead";
 
@@ -184,6 +185,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unable to save website lead." }, { status: 500 });
     }
     console.info("Website lead created from webhook.", { id: data.id, source: payload.website ?? "unknown" });
+    if (payload.reg) await createAutomaticVehicleCheckForWebsiteLead(data.id, payload);
     return NextResponse.json({ id: data.id }, { status: 201 });
   } catch (error) {
     console.error("Website leads webhook request failed.", { message: error instanceof Error ? error.message : "Unknown error" });
