@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentDealerPortalAccount, redactLeadForDealer } from "@/lib/dealer-portal";
+import { isFullUKPostcode, normaliseUKPostcode } from "@/lib/location";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { combineLeadImages } from "@/lib/website-leads";
 import type { DealerLeadClaim, DealerLeadNote, DealerVisibleLead } from "@/types/dealer-portal";
@@ -21,17 +22,44 @@ function distanceMiles(fromLat: number | null | undefined, fromLon: number | nul
   return radiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+type Coords = { latitude: number; longitude: number };
+
+const postcodeCache = new Map<string, Coords | null>();
+
 function postcodeDistrict(value: string | null | undefined) {
   return String(value ?? "").trim().split(/\s+/)[0] || null;
 }
 
-function dealerLeadMeta(lead: WebsiteLead, dealer: { latitude?: number | null; longitude?: number | null }, unlocked: boolean) {
-  const distance = distanceMiles(dealer.latitude, dealer.longitude, lead.latitude, lead.longitude);
+function validCoords(latitude: number | null | undefined, longitude: number | null | undefined) {
+  return typeof latitude === "number" && Number.isFinite(latitude) && typeof longitude === "number" && Number.isFinite(longitude) ? { latitude, longitude } : null;
+}
+
+async function postcodeCoords(postcode: string | null | undefined) {
+  const normalised = normaliseUKPostcode(postcode);
+  if (!normalised || !isFullUKPostcode(normalised)) return null;
+  if (postcodeCache.has(normalised)) return postcodeCache.get(normalised) ?? null;
+  try {
+    const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(normalised)}`, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+    const body = await response.json().catch(() => null) as { result?: { latitude?: number; longitude?: number } } | null;
+    const coords = response.ok ? validCoords(body?.result?.latitude ?? null, body?.result?.longitude ?? null) : null;
+    postcodeCache.set(normalised, coords);
+    return coords;
+  } catch {
+    postcodeCache.set(normalised, null);
+    return null;
+  }
+}
+
+async function dealerLeadMeta(lead: WebsiteLead, dealer: { postcode?: string | null; latitude?: number | null; longitude?: number | null }, unlocked: boolean) {
   const fullLocation = lead.location_town || lead.location_display_name || lead.normalised_postcode || lead.postcode || null;
   const approximateLocation = lead.location_town || postcodeDistrict(lead.normalised_postcode || lead.postcode);
+  const dealerCoords = validCoords(dealer.latitude, dealer.longitude) ?? await postcodeCoords(dealer.postcode);
+  const leadCoords = validCoords(lead.latitude, lead.longitude) ?? await postcodeCoords(lead.normalised_postcode || lead.postcode);
+  const distance = dealerCoords && leadCoords ? distanceMiles(dealerCoords.latitude, dealerCoords.longitude, leadCoords.latitude, leadCoords.longitude) : null;
+  const missingDistanceReason = !dealerCoords ? "Dealer postcode needs checking" : !leadCoords ? "Lead postcode needed for distance" : null;
   return {
     portal_distance_miles: distance,
-    portal_distance_label: distance == null ? null : `${distance.toLocaleString("en-GB", { maximumFractionDigits: 1 })} miles from your dealership`,
+    portal_distance_label: distance == null ? missingDistanceReason : `${distance.toLocaleString("en-GB", { maximumFractionDigits: 1 })} miles from your dealership`,
     portal_location_label: unlocked ? fullLocation : approximateLocation,
   };
 }
@@ -64,18 +92,20 @@ export async function GET() {
   }
   const activeClaimByLead = new Map<number, DealerLeadClaim>();
   for (const claim of claimRows) activeClaimByLead.set(Number(claim.website_lead_id), claim);
-  const available = (allocationsResult.data ?? []).flatMap(row => {
+  const available: DealerVisibleLead[] = [];
+  for (const row of allocationsResult.data ?? []) {
     const lead = relatedLead(row.lead);
-    if (!lead || activeClaimByLead.has(Number(row.website_lead_id))) return [];
+    if (!lead || activeClaimByLead.has(Number(row.website_lead_id))) continue;
     const redacted = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, false) as DealerVisibleLead;
-    return [{ ...redacted, ...dealerLeadMeta(lead, session.dealer, false), portal_allocation_id: String(row.id), customer_unlocked: false }];
-  });
-  const claimed = claimRows.flatMap(claim => {
+    available.push({ ...redacted, ...await dealerLeadMeta(lead, session.dealer, false), portal_allocation_id: String(row.id), customer_unlocked: false });
+  }
+  const claimed: DealerVisibleLead[] = [];
+  for (const claim of claimRows) {
     const lead = relatedLead(claim.lead);
-    if (!lead) return [];
+    if (!lead) continue;
     const unlocked = Boolean(claim.customer_details_unlocked_at);
     const visible = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, unlocked) as DealerVisibleLead;
-    return [{ ...visible, ...dealerLeadMeta(lead, session.dealer, unlocked), portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked }];
-  });
+    claimed.push({ ...visible, ...await dealerLeadMeta(lead, session.dealer, unlocked), portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked });
+  }
   return NextResponse.json({ dealer: session.dealer, available, claimed });
 }

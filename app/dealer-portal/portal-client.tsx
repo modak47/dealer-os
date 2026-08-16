@@ -167,16 +167,17 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
   const mapUrl = staticMapUrl(publicLocation);
   const hasLocation = Boolean(publicLocation.location_town || publicLocation.location_display_name || publicLocation.postcode || publicLocation.latitude != null);
   const dealerOrigin = dealer.postcode || dealer.trading_name || "YesMoto";
+  const lookupLabel = lead.latitude != null && lead.longitude != null ? leadLocationStatus(lead) : lead.portal_location_label ? "Approximate location only" : leadLocationStatus(lead);
 
   return <section className="dealer-location-panel">
-    <div className="dealer-map-preview">{mapUrl ? <iframe title="Approximate motorcycle location map" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /> : <span>{leadLocationStatus(lead)}</span>}</div>
+    <div className="dealer-map-preview">{mapUrl ? <iframe title="Approximate motorcycle location map" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /> : <span>{lookupLabel}</span>}</div>
     <div>
       <h3>Location</h3>
       <dl>
         <Detail label="Motorcycle" value={lead.portal_location_label || "Approximate location pending"} />
         <Detail label="Your dealership" value={dealer.postcode || "Dealer postcode not set"} />
         <Detail label="Distance" value={lead.portal_distance_label || "Distance not calculated"} />
-        <Detail label="Lookup" value={leadLocationStatus(lead)} />
+        <Detail label="Lookup" value={lookupLabel} />
       </dl>
       {hasLocation && <nav><a href={googleMapsUrl(publicLocation)} target="_blank" rel="noreferrer">View Map</a><a href={directionsUrl(dealerOrigin, publicLocation)} target="_blank" rel="noreferrer">Directions</a></nav>}
     </div>
