@@ -115,5 +115,8 @@ export type DealerVisibleLead = WebsiteLead & {
   portal_lost_reason?: string | null;
   portal_attribution_expires_at?: string | null;
   portal_notes?: DealerLeadNote[];
+  portal_distance_miles?: number | null;
+  portal_distance_label?: string | null;
+  portal_location_label?: string | null;
   customer_unlocked?: boolean;
 };

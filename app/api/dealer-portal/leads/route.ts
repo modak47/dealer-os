@@ -11,6 +11,31 @@ function relatedLead(value: unknown) {
   return (Array.isArray(value) ? value[0] : value) as WebsiteLead | null;
 }
 
+function distanceMiles(fromLat: number | null | undefined, fromLon: number | null | undefined, toLat: number | null | undefined, toLon: number | null | undefined) {
+  if (![fromLat, fromLon, toLat, toLon].every(value => typeof value === "number" && Number.isFinite(value))) return null;
+  const radiusMiles = 3958.8;
+  const toRad = (value: number) => value * Math.PI / 180;
+  const dLat = toRad(Number(toLat) - Number(fromLat));
+  const dLon = toRad(Number(toLon) - Number(fromLon));
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(Number(fromLat))) * Math.cos(toRad(Number(toLat))) * Math.sin(dLon / 2) ** 2;
+  return radiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function postcodeDistrict(value: string | null | undefined) {
+  return String(value ?? "").trim().split(/\s+/)[0] || null;
+}
+
+function dealerLeadMeta(lead: WebsiteLead, dealer: { latitude?: number | null; longitude?: number | null }, unlocked: boolean) {
+  const distance = distanceMiles(dealer.latitude, dealer.longitude, lead.latitude, lead.longitude);
+  const fullLocation = lead.location_town || lead.location_display_name || lead.normalised_postcode || lead.postcode || null;
+  const approximateLocation = lead.location_town || postcodeDistrict(lead.normalised_postcode || lead.postcode);
+  return {
+    portal_distance_miles: distance,
+    portal_distance_label: distance == null ? null : `${distance.toLocaleString("en-GB", { maximumFractionDigits: 1 })} miles from your dealership`,
+    portal_location_label: unlocked ? fullLocation : approximateLocation,
+  };
+}
+
 export async function GET() {
   const session = await getCurrentDealerPortalAccount();
   if (!session) return NextResponse.json({ error: "Dealer portal access is not available for this user." }, { status: 401 });
@@ -43,14 +68,14 @@ export async function GET() {
     const lead = relatedLead(row.lead);
     if (!lead || activeClaimByLead.has(Number(row.website_lead_id))) return [];
     const redacted = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, false) as DealerVisibleLead;
-    return [{ ...redacted, portal_allocation_id: String(row.id), customer_unlocked: false }];
+    return [{ ...redacted, ...dealerLeadMeta(lead, session.dealer, false), portal_allocation_id: String(row.id), customer_unlocked: false }];
   });
   const claimed = claimRows.flatMap(claim => {
     const lead = relatedLead(claim.lead);
     if (!lead) return [];
     const unlocked = Boolean(claim.customer_details_unlocked_at);
     const visible = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, unlocked) as DealerVisibleLead;
-    return [{ ...visible, portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked }];
+    return [{ ...visible, ...dealerLeadMeta(lead, session.dealer, unlocked), portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked }];
   });
   return NextResponse.json({ dealer: session.dealer, available, claimed });
 }

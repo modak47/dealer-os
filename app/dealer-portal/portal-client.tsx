@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { directionsUrl, googleMapsUrl, leadLocationStatus, staticMapUrl } from "@/lib/location-ui";
 import { createClient } from "@/lib/supabase/client";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
 import type { DealerLeadClaimStatus, DealerPortalAccount, DealerVisibleLead } from "@/types/dealer-portal";
@@ -90,7 +91,7 @@ export function DealerPortalClient() {
         <button className={activeTab === "purchased" ? "active" : ""} onClick={() => setActiveTab("purchased")}>Purchased</button>
         <button className={activeTab === "lost" ? "active" : ""} onClick={() => setActiveTab("lost")}>Lost / Returned</button>
       </nav>
-      {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
+      {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
     </section>}
   </main>;
 }
@@ -109,25 +110,40 @@ function emptyCopy(tab: PortalTab) {
   return "Claim a lead to unlock customer details and work the opportunity.";
 }
 
-function DealerLeadCard({ lead, busy, onClaim, onChanged }: { lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
+function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const image = images[0];
   const unlocked = Boolean(lead.customer_unlocked);
   const claimId = lead.portal_claim_id ?? "";
   const active = unlocked && claimId && !terminalStatuses.has(String(lead.portal_claim_status));
   const notes = lead.portal_notes ?? [];
+  const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
   return <article className="dealer-lead-card">
     <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <b>{images.length} photos</b>}</div>
     <div className="dealer-lead-body">
-      <header><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><h2>{[lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending"}</h2><p>{lead.reg || "Registration not shown"} - {formatMileage(lead.mileage)} - {lead.engine || "Engine n/a"}</p></header>
-      <dl>
-        <div><dt>Location</dt><dd>{lead.location_town || lead.postcode || "Approximate location pending"}</dd></div>
-        <div><dt>Expected price</dt><dd>{lead.price || "Not supplied"}</dd></div>
-        <div><dt>Colour</dt><dd>{lead.colour || "Not supplied"}</dd></div>
-        <div><dt>MOT</dt><dd>{lead.mot || "Not supplied"}</dd></div>
-        <div><dt>Condition</dt><dd>{lead.bike_condition || lead.damage || "Not supplied"}</dd></div>
-        <div><dt>Received</dt><dd>{formatLeadDate(lead.date || lead.created_at)}</dd></div>
-      </dl>
+      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><h2>{title}</h2><p>{lead.reg || "Registration not shown"} - {formatMileage(lead.mileage)} - {lead.engine || "Engine n/a"}</p></div><strong>{lead.price || "Price not supplied"}</strong></header>
+      <div className="dealer-opportunity-strip">
+        <div><span>Approx location</span><b>{lead.portal_location_label || "Location pending"}</b></div>
+        <div><span>Distance</span><b>{lead.portal_distance_label || "Distance not calculated"}</b></div>
+        <div><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
+      </div>
+      <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />
+      <section className="dealer-preview-panel">
+        <h3>Motorcycle Preview</h3>
+        <dl>
+          <Detail label="Make" value={lead.make} />
+          <Detail label="Model" value={lead.model} />
+          <Detail label="Year" value={lead.year} />
+          <Detail label="Variant / Engine" value={lead.engine} />
+          <Detail label="Colour" value={lead.colour} />
+          <Detail label="Owners" value={lead.owners} />
+          <Detail label="Service history" value={lead.service || lead.history} />
+          <Detail label="MOT" value={lead.mot} />
+          <Detail label="Finance" value={lead.finance_information} />
+          <Detail label="Condition" value={lead.bike_condition || lead.damage} />
+        </dl>
+        {(lead.customer_message || lead.extras) && <p>{lead.customer_message || lead.extras}</p>}
+      </section>
       <section className={`dealer-customer-panel ${unlocked ? "unlocked" : ""}`}>
         <h3>{unlocked ? "Customer Details" : "Customer Details Locked"}</h3>
         {unlocked ? <dl><div><dt>Name</dt><dd>{customerName(lead)}</dd></div><div><dt>Phone</dt><dd>{lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : "Not supplied"}</dd></div><div><dt>Email</dt><dd>{lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : "Not supplied"}</dd></div><div><dt>Postcode</dt><dd>{lead.postcode || "Not supplied"}</dd></div></dl> : <p>Claim this lead to unlock customer contact details. Only one dealer can claim each lead.</p>}
@@ -137,6 +153,38 @@ function DealerLeadCard({ lead, busy, onClaim, onChanged }: { lead: DealerVisibl
       {unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}
     </div>
   </article>;
+}
+
+function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; unlocked: boolean }) {
+  const publicLocation = {
+    location_town: lead.location_town || lead.portal_location_label,
+    location_display_name: unlocked ? lead.location_display_name : null,
+    postcode: unlocked ? lead.postcode : null,
+    normalised_postcode: unlocked ? lead.normalised_postcode : null,
+    latitude: unlocked ? lead.latitude : null,
+    longitude: unlocked ? lead.longitude : null,
+  };
+  const mapUrl = staticMapUrl(publicLocation);
+  const hasLocation = Boolean(publicLocation.location_town || publicLocation.location_display_name || publicLocation.postcode || publicLocation.latitude != null);
+  const dealerOrigin = dealer.postcode || dealer.trading_name || "YesMoto";
+
+  return <section className="dealer-location-panel">
+    <div className="dealer-map-preview">{mapUrl ? <iframe title="Approximate motorcycle location map" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /> : <span>{leadLocationStatus(lead)}</span>}</div>
+    <div>
+      <h3>Location</h3>
+      <dl>
+        <Detail label="Motorcycle" value={lead.portal_location_label || "Approximate location pending"} />
+        <Detail label="Your dealership" value={dealer.postcode || "Dealer postcode not set"} />
+        <Detail label="Distance" value={lead.portal_distance_label || "Distance not calculated"} />
+        <Detail label="Lookup" value={leadLocationStatus(lead)} />
+      </dl>
+      {hasLocation && <nav><a href={googleMapsUrl(publicLocation)} target="_blank" rel="noreferrer">View Map</a><a href={directionsUrl(dealerOrigin, publicLocation)} target="_blank" rel="noreferrer">Directions</a></nav>}
+    </div>
+  </section>;
+}
+
+function Detail({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return <div><dt>{label}</dt><dd>{value == null || value === "" ? "Not supplied" : value}</dd></div>;
 }
 
 function DealerWorkPanel({ claimId, lead, onChanged }: { claimId: string; lead: DealerVisibleLead; onChanged: () => Promise<void> }) {
