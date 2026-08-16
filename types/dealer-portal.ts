@@ -121,6 +121,7 @@ export type DealerVehicleCheckSummary = {
   checked_at: string | null;
   mot_expiry: string | null;
   report_available: boolean;
+  report_url?: string | null;
   details: { label: string; value: string }[];
   flags: DealerVehicleCheckFlag[];
 };

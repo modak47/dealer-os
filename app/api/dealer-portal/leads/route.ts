@@ -91,7 +91,7 @@ function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null
   const checkData = objectValue(lead.autotrader_vehicle_check_data);
   const lookupData = objectValue(lead.autotrader_vehicle_lookup_data);
   const vehicle = objectValue(lookupData.vehicle);
-  const check = normaliseVehicleCheck(checkData.vehicleCheck ?? checkData.check ?? checkData.history ?? lookupData.check ?? lookupData.history ?? lookupData, {
+  const check = normaliseVehicleCheck(checkData.check ?? lookupData.check ?? checkData.history ?? lookupData.history ?? checkData.vehicleCheck ?? lookupData, {
     motExpiry: textValue(vehicle.motExpiry, vehicle.motExpiryDate, vehicle.lastMOTExpiry, lead.mot),
     previousOwners: Number(textValue(vehicle.owners, objectValue(vehicle.history).previousOwners, lead.owners)) || undefined,
   });
@@ -110,6 +110,7 @@ function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null
     checked_at: lead.vehicle_check_checked_at ?? null,
     mot_expiry: check.motExpiry || null,
     report_available: Boolean(check.reportUrl),
+    report_url: check.reportUrl || null,
     details: details.map(([label, value]) => ({ label, value })),
     flags: [
       flag("identity", "Identity check", identityReturned ? false : null, "Vehicle identity data returned", "Identity needs review"),

@@ -120,11 +120,12 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   const active = unlocked && claimId && !terminalStatuses.has(String(lead.portal_claim_status));
   const notes = lead.portal_notes ?? [];
   const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
+  const askingPrice = safeNumber(lead.price);
   const tabs: [LeadCardTab, string][] = [["overview", "Overview"], ["location", "Location"], ["check", "Vehicle check"], ...(unlocked ? [["customer", "Customer"] as [LeadCardTab, string]] : [])];
   return <article className="dealer-lead-card">
     <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <b>{images.length} photos</b>}</div>
     <div className="dealer-lead-body">
-      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><h2>{title}</h2><p>{lead.reg || "Registration not shown"} - {formatMileage(lead.mileage)} - {lead.engine || "Engine n/a"}</p></div><strong><span>Customer asking price</span>{lead.price || "Not supplied"}</strong></header>
+      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><h2>{title}</h2><p>{lead.reg || "Registration not shown"} - {formatMileage(lead.mileage)} - {lead.engine || "Engine n/a"}</p></div><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></header>
       <div className="dealer-opportunity-strip">
         <div><span>Approx location</span><b>{lead.portal_location_label || "Location pending"}</b></div>
         <div><span>Distance</span><b>{lead.portal_distance_label || "Distance not calculated"}</b></div>
@@ -135,8 +136,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
       {cardTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
       {cardTab === "check" && <VehicleCheckPanel lead={lead} />}
       {cardTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
-      {!unlocked && <CustomerPanel lead={lead} unlocked={false} />}
-      {!unlocked && <button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button>}
+      {!unlocked && <div className="dealer-claim-row"><CustomerPanel lead={lead} unlocked={false} /><button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button></div>}
     </div>
   </article>;
 }
@@ -200,9 +200,10 @@ function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead;
   const check = lead.portal_vehicle_check;
   const priorityFlags = check?.flags.filter(item => ["stolen", "finance", "mileage", "write_off", "mot"].includes(item.key)) ?? [];
   const flags = compact ? priorityFlags : check?.flags ?? [];
+  const reportHref = check?.report_url ? `/api/autotrader/vehicle-check-report?url=${encodeURIComponent(check.report_url)}` : "";
   return <section className={`dealer-vehicle-check ${compact ? "compact" : ""} ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
-    <header><div><span>Vehicle Check</span><h3>{check?.status || "Vehicle check not available yet"}</h3></div>{check?.mot_expiry && <b>MOT {check.mot_expiry}</b>}</header>
-    {!check ? <p>YesMoto has not linked a vehicle check to this opportunity yet.</p> : <><div className="dealer-check-grid">{flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "-"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>{check.details.length > 0 && !compact && <details className="dealer-check-details"><summary>Technical identity details</summary><dl>{check.details.map(item => <Detail label={item.label} value={item.value} key={item.label} />)}</dl></details>}</>}
+    <header><div><span>Vehicle Check</span><h3>{check?.status || "Vehicle check not available yet"}</h3></div><nav>{check?.mot_expiry && <b>MOT {check.mot_expiry}</b>}{reportHref && <a href={reportHref} target="_blank" rel="noreferrer">View report</a>}</nav></header>
+    {!check ? <p>YesMoto has not linked a vehicle check to this opportunity yet.</p> : <><div className="dealer-check-grid">{flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "N/A"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>{check.details.length > 0 && !compact && <details className="dealer-check-details"><summary>Technical identity details</summary><dl>{check.details.map(item => <Detail label={item.label} value={item.value} key={item.label} />)}</dl></details>}</>}
   </section>;
 }
 
