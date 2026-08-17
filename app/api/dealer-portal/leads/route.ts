@@ -152,7 +152,7 @@ function extractMotHistory(...sources: unknown[]): DealerMotHistoryItem[] {
       const expiry = dateValue(record.expiryDate, record.motExpiryDate, record.testExpiryDate, record.expiresAt) || null;
       const result = textValue(record.result, record.testResult, record.status, record.outcome).toLowerCase();
       const status: DealerMotHistoryItem["status"] = /\bfail/.test(result) ? "fail" : /\bpass/.test(result) ? "pass" : "unknown";
-      const mileage = numberValue(record.odometerReadingMiles, record.odometerReading, record.mileage, record.mileageMiles);
+      const mileage = numberValue(record.odometerReadingMiles, record.odometerValue, record.odometerReading, record.mileage, record.mileageMiles);
       const details = [
         ...detailText(record.advisories ?? record.advisoryItems),
         ...detailText(record.failures ?? record.failureItems),
