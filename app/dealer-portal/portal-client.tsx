@@ -113,8 +113,9 @@ function emptyCopy(tab: PortalTab) {
 
 function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
   const [cardTab, setCardTab] = useState<LeadCardTab>("overview");
+  const [imageIndex, setImageIndex] = useState(0);
   const images = lead.resolved_images ?? combineLeadImages(lead);
-  const image = images[0];
+  const image = images[imageIndex] ?? images[0];
   const unlocked = Boolean(lead.customer_unlocked);
   const claimId = lead.portal_claim_id ?? "";
   const active = unlocked && claimId && !terminalStatuses.has(String(lead.portal_claim_status));
@@ -123,8 +124,12 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
   const askingPrice = safeNumber(lead.price);
   const tabs: [LeadCardTab, string][] = [["overview", "Overview"], ["location", "Location"], ["check", "Vehicle check"], ...(unlocked ? [["customer", "Customer"] as [LeadCardTab, string]] : [])];
+  useEffect(() => setImageIndex(0), [lead.id, images.length]);
+  function moveImage(direction: -1 | 1) {
+    setImageIndex(current => (current + direction + images.length) % images.length);
+  }
   return <article className="dealer-lead-card">
-    <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <b>{images.length} photos</b>}</div>
+    <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
     <div className="dealer-lead-body">
       <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><h2>{title}</h2><p>{lead.reg || "Registration not shown"} - {formatMileage(lead.mileage)} - {lead.engine || "Engine n/a"}</p></div><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></header>
       <div className="dealer-opportunity-strip">
