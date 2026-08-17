@@ -86,22 +86,35 @@ function textValue(...values: unknown[]) {
   return "";
 }
 
+function firstObject(...values: unknown[]) {
+  for (const value of values) {
+    const record = objectValue(value);
+    if (Object.keys(record).length > 0) return record;
+  }
+  return {};
+}
+
 function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null {
   if (lead.vehicle_check_status !== "checked" && !lead.autotrader_vehicle_check_data && !lead.autotrader_vehicle_lookup_data) return null;
   const checkData = objectValue(lead.autotrader_vehicle_check_data);
   const lookupData = objectValue(lead.autotrader_vehicle_lookup_data);
   const vehicle = objectValue(lookupData.vehicle);
-  const check = normaliseVehicleCheck(checkData.check ?? lookupData.check ?? checkData.history ?? lookupData.history ?? checkData.vehicleCheck ?? lookupData, {
+  const rawCheck = firstObject(checkData.check, lookupData.check, checkData.history, lookupData.history, checkData.vehicleCheck, lookupData.vehicleCheck, checkData, lookupData);
+  const check = normaliseVehicleCheck(rawCheck, {
     motExpiry: textValue(vehicle.motExpiry, vehicle.motExpiryDate, vehicle.lastMOTExpiry, lead.mot),
     previousOwners: Number(textValue(vehicle.owners, objectValue(vehicle.history).previousOwners, lead.owners)) || undefined,
   });
+  const reportUrl = check.reportUrl || textValue(checkData.reportUrl, lookupData.reportUrl, vehicle.reportUrl);
+  const writtenOff = check.writtenOff ?? (check.category ? true : null);
   const details = [
     ["Registration", textValue(vehicle.registration, lead.reg)],
     ["VIN", textValue(vehicle.vin)],
     ["Engine number", textValue(vehicle.engineNumber, vehicle.engine_number)],
     ["Auto Trader vehicle ID", textValue(lead.autotrader_vehicle_id, vehicle.vehicleId, vehicle.vehicle_id, vehicle.id)],
-    ["Derivative", textValue(vehicle.derivative, vehicle.derivativeId, vehicle.derivative_id)],
+    ["Derivative", textValue(vehicle.derivative, vehicle.derivativeName, vehicle.derivativeId, vehicle.derivative_id)],
     ["First registered", textValue(vehicle.firstRegistrationDate)],
+    ["Fuel type", textValue(vehicle.fuelType, vehicle.fuel)],
+    ["Current V5C issue date", textValue(vehicle.v5cIssueDate, vehicle.v5c_date)],
   ].filter((row): row is [string, string] => Boolean(row[1]));
   const identityReturned = details.some(([label]) => ["Registration", "VIN", "Engine number", "Auto Trader vehicle ID"].includes(label));
   return {
@@ -109,18 +122,19 @@ function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null
     clear: check.clear,
     checked_at: lead.vehicle_check_checked_at ?? null,
     mot_expiry: check.motExpiry || null,
-    report_available: Boolean(check.reportUrl),
-    report_url: check.reportUrl || null,
+    report_available: Boolean(reportUrl),
+    report_url: reportUrl || null,
     details: details.map(([label, value]) => ({ label, value })),
     flags: [
       flag("identity", "Identity check", identityReturned ? false : null, "Vehicle identity data returned", "Identity needs review"),
       flag("stolen", "Stolen", check.stolen, "Not recorded stolen", "Vehicle recorded stolen"),
       flag("finance", "Finance", check.outstandingFinance, "No finance recorded", "Outstanding finance recorded"),
-      flag("write_off", "Insurance write-off", check.writtenOff, "No insurance total loss recorded", check.category ? `Insurance loss recorded: ${check.category}` : "Insurance loss recorded"),
+      flag("write_off", "Insurance write-off", writtenOff, "No insurance total loss recorded", check.category ? `Insurance loss recorded: ${check.category}` : "Insurance loss recorded"),
       flag("scrapped", "Scrapped", check.scrapped, "Not recorded scrapped", "Vehicle recorded scrapped"),
       flag("mileage", "Mileage", check.mileageDiscrepancy, "Mileage consistent", "Mileage discrepancy recorded"),
       flag("imported", "Imported", check.imported, "Not recorded imported", "Imported marker recorded"),
       flag("exported", "Exported", check.exported, "Not recorded exported", "Export marker recorded"),
+      flag("high_risk", "High risk", check.highRisk, "No high risk marker", "High risk marker recorded"),
       flag("mot", "MOT history", check.motExpiry || check.motStatus ? false : null, check.motExpiry ? `MOT expiry ${check.motExpiry}` : check.motStatus || "MOT data returned", "MOT needs review"),
     ],
   };
