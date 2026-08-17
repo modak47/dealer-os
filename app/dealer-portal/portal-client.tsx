@@ -118,6 +118,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   const unlocked = Boolean(lead.customer_unlocked);
   const claimId = lead.portal_claim_id ?? "";
   const active = unlocked && claimId && !terminalStatuses.has(String(lead.portal_claim_status));
+  const canReportPurchasedLater = unlocked && claimId && lead.portal_claim_status === "lost";
   const notes = lead.portal_notes ?? [];
   const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
   const askingPrice = safeNumber(lead.price);
@@ -135,7 +136,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
       {cardTab === "overview" && <><VehicleCheckPanel lead={lead} compact /><MotorcyclePreviewPanel lead={lead} /></>}
       {cardTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
       {cardTab === "check" && <VehicleCheckPanel lead={lead} />}
-      {cardTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
+      {cardTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
       {!unlocked && <div className="dealer-claim-row"><CustomerPanel lead={lead} unlocked={false} /><button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button></div>}
     </div>
   </article>;
@@ -290,6 +291,50 @@ function DealerWorkPanel({ claimId, lead, onChanged }: { claimId: string; lead: 
     </form>
     <details className="dealer-outcome-panel"><summary>Lost / Return</summary><div><select value={lostReason} onChange={event => setLostReason(event.target.value)}>{lostReasons.map(reason => <option key={reason}>{reason}</option>)}</select><button type="button" disabled={Boolean(busy)} onClick={() => void updateStatus("lost", { lost_reason: lostReason })}>Mark Lost</button><button type="button" disabled={Boolean(busy)} onClick={() => void updateStatus("returned_to_pool")}>Return to Pool</button></div></details>
     <details className="dealer-outcome-panel"><summary>Report Purchase</summary><form onSubmit={reportPurchase}><Input label="Purchase price" value={purchase.purchase_price} set={value => setPurchase(current => ({ ...current, purchase_price: value }))} type="number" required /><Input label="Purchase date" value={purchase.purchase_date} set={value => setPurchase(current => ({ ...current, purchase_date: value }))} type="date" required /><Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" /><Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" /><label className="full"><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} /></label><button disabled={Boolean(busy)}>{busy === "purchase" ? "Reporting..." : "Mark as Purchased"}</button></form></details>
+  </section>;
+}
+
+function PurchasedLaterPanel({ claimId, lead, onChanged }: { claimId: string; lead: DealerVisibleLead; onChanged: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [purchase, setPurchase] = useState(() => ({
+    purchase_price: String(safeNumber(lead.price) ?? ""),
+    purchase_date: new Date().toISOString().slice(0, 10),
+    collection_date: "",
+    mileage_at_purchase: String(safeNumber(lead.mileage) ?? ""),
+    notes: "",
+  }));
+
+  async function reportPurchase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    const response = await fetch(`/api/dealer-portal/claims/${claimId}/purchase`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(purchase),
+    });
+    const payload = await response.json();
+    if (!response.ok) setMessage(payload.error || "Unable to report later purchase.");
+    else {
+      setMessage("Purchased Later reported and Successful Purchase Fee created.");
+      await onChanged();
+    }
+    setBusy(false);
+  }
+
+  return <section className="dealer-work-panel purchased-later-panel">
+    <h3>Customer Came Back - Purchased</h3>
+    <p>This records the purchase as a later outcome from the original YesMoto introduction.</p>
+    {message && <p className={message.includes("Unable") ? "dealer-work-error" : "dealer-work-success"}>{message}</p>}
+    <form className="dealer-later-purchase-form" onSubmit={reportPurchase}>
+      <Input label="Purchase price" value={purchase.purchase_price} set={value => setPurchase(current => ({ ...current, purchase_price: value }))} type="number" required />
+      <Input label="Purchase date" value={purchase.purchase_date} set={value => setPurchase(current => ({ ...current, purchase_date: value }))} type="date" required />
+      <Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" />
+      <Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" />
+      <label className="full"><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} placeholder="Briefly explain what happened after the lead was marked lost." /></label>
+      <button disabled={busy}>{busy ? "Reporting..." : "Report Purchased Later"}</button>
+    </form>
   </section>;
 }
 
