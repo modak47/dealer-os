@@ -680,6 +680,7 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 
 /* Dealer-facing portal redesign. Scoped so admin DealerOS screens keep their existing layout. */
 body:has(.dealer-portal-redesign)>header,
+body:has(.dealer-portal-redesign)>.topbar,
 body:has(.dealer-portal-redesign)>footer{display:none!important}
 body:has(.dealer-portal-redesign),
 body:has(.dealer-portal-redesign)>main{background:#071018!important}
@@ -813,3 +814,29 @@ body:has(.dealer-portal-redesign)>main{min-height:100vh!important;padding:0!impo
 .dealer-portal-redesign .portal-empty,.dealer-portal-redesign .dealer-account-panel{border-color:var(--portal-line)!important;background:#0d1721!important;color:#fff!important}
 @media(max-width:1180px){.dealer-portal-redesign .dealer-shell{grid-template-columns:1fr}.dealer-portal-redesign .dealer-sidebar{position:relative;height:auto}.dealer-sidebar nav{grid-template-columns:repeat(2,minmax(0,1fr))}.dealer-sidebar nav hr{grid-column:1/-1}.dealer-sidebar-fee{align-self:auto}.dealer-portal-redesign .dealer-main{padding:0 18px 30px}.dealer-portal-redesign .dealer-lead-card{grid-template-columns:1fr!important}.dealer-portal-redesign .dealer-lead-image{height:360px!important}.dealer-overview-grid{grid-template-columns:1fr}.dealer-portal-redesign .dealer-location-panel{grid-template-columns:1fr!important}}
 @media(max-width:760px){.dealer-portal-redesign .dealer-sidebar{padding:16px}.dealer-sidebar nav{grid-template-columns:1fr}.dealer-mainbar-account strong{display:none}.dealer-welcome{display:grid}.dealer-workflow-tabs{grid-template-columns:1fr 1fr}.dealer-workflow-tabs button{min-height:54px;font-size:13px}.dealer-portal-redesign .dealer-lead-body{padding:20px 14px!important}.dealer-portal-redesign .dealer-lead-title{display:grid!important}.dealer-portal-redesign .dealer-lead-title>strong{min-width:0}.dealer-lead-facts,.dealer-portal-redesign .dealer-preview-panel dl,.dealer-portal-redesign .dealer-location-panel dl{grid-template-columns:1fr!important}.dealer-lead-facts>div{border-right:0;border-bottom:1px solid var(--portal-line);padding:0 0 10px}.dealer-portal-redesign .dealer-check-summary{grid-template-columns:1fr!important}.dealer-lead-actions{justify-content:stretch;display:grid}.dealer-portal-redesign .dealer-card-tabs{overflow-x:auto!important}.dealer-portal-redesign .dealer-card-tabs button{flex:0 0 auto}.dealer-portal-redesign .dealer-preview-panel dl>div{grid-template-columns:28px 1fr!important}}
+
+/* Dealer portal follow-up polish: remove dead top controls and tighten lead header/details. */
+.dealer-portal-redesign .dealer-mainbar{justify-content:flex-end!important;min-height:64px!important}
+.dealer-portal-redesign .dealer-menu-button{display:none!important}
+.dealer-portal-redesign .dealer-lead-body{grid-template-rows:auto auto auto auto 1fr!important}
+.dealer-portal-redesign .dealer-lead-title{align-items:center!important}
+.dealer-title-side{display:grid;grid-template-columns:auto auto;align-items:center;gap:16px}
+.dealer-portal-redesign .dealer-lead-title .dealer-title-side>strong{min-width:148px;padding:13px 15px;border:1px solid #6f5421!important;border-radius:7px;background:#20190c!important;color:var(--portal-amber)!important;text-align:left;font-size:23px!important;line-height:1.1!important}
+.dealer-portal-redesign .dealer-lead-title .dealer-title-side>strong span{margin-bottom:6px;color:#ffd77c!important;font-size:10px!important}
+.dealer-portal-redesign .dealer-lead-title>strong{display:none!important}
+.dealer-portal-redesign .dealer-lead-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.dealer-portal-redesign .dealer-secondary-button,.dealer-portal-redesign .dealer-claim-button{min-height:48px!important;padding:11px 20px!important;font-size:14px!important;white-space:nowrap}
+.dealer-portal-redesign .dealer-check-summary{grid-template-columns:minmax(180px,.26fr) minmax(0,1fr) auto!important;gap:18px!important;padding:14px 16px!important;background:#111d27!important}
+.dealer-portal-redesign .dealer-check-summary header{padding:0!important;border:0!important;background:transparent!important}
+.dealer-portal-redesign .dealer-summary-flags{grid-column:auto!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px!important;padding:0!important}
+.dealer-portal-redesign .dealer-summary-flags article{min-width:0!important;padding:8px 9px;border:1px solid var(--portal-line);border-radius:7px;background:#0d1721}
+.dealer-portal-redesign .dealer-summary-flags article>b{width:22px!important;height:22px!important;font-size:9px!important}
+.dealer-portal-redesign .dealer-summary-flags strong{font-size:12px!important}
+.dealer-portal-redesign .dealer-summary-flags span{font-size:10px!important;text-transform:none!important}
+.dealer-portal-redesign .dealer-preview-panel dl{gap:0 26px!important}
+.dealer-portal-redesign .dealer-preview-panel dl>div{grid-template-columns:116px minmax(0,1fr)!important;padding:10px 0!important}
+.dealer-portal-redesign .dealer-preview-panel dl>div:before{display:none!important}
+.dealer-portal-redesign .dealer-preview-panel dt{font-size:10px!important;color:#8ea4b1!important}
+.dealer-portal-redesign .dealer-preview-panel dd{font-size:15px!important}
+@media(max-width:1300px){.dealer-title-side{grid-template-columns:1fr}.dealer-portal-redesign .dealer-lead-actions{justify-content:start}.dealer-portal-redesign .dealer-check-summary{grid-template-columns:1fr!important}.dealer-portal-redesign .dealer-summary-flags{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.dealer-title-side{grid-template-columns:1fr}.dealer-portal-redesign .dealer-lead-actions{display:grid;justify-content:stretch}.dealer-portal-redesign .dealer-summary-flags{grid-template-columns:1fr}.dealer-portal-redesign .dealer-preview-panel dl>div{grid-template-columns:1fr!important}}
