@@ -30,6 +30,7 @@ const statusActions: [DealerLeadClaimStatus, string][] = [
 export function DealerPortalClient() {
   const [data, setData] = useState<PortalData | null>(null);
   const [activeTab, setActiveTab] = useState<PortalTab>("available");
+  const [leadView, setLeadView] = useState<LeadCardTab>("overview");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -92,7 +93,12 @@ export function DealerPortalClient() {
         <button className={activeTab === "purchased" ? "active" : ""} onClick={() => setActiveTab("purchased")}>Purchased</button>
         <button className={activeTab === "lost" ? "active" : ""} onClick={() => setActiveTab("lost")}>Lost / Returned</button>
       </nav>
-      {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
+      <nav className="dealer-view-tabs" aria-label="Lead card view">
+        <button className={leadView === "overview" ? "active" : ""} onClick={() => setLeadView("overview")} type="button">Overview</button>
+        <button className={leadView === "location" ? "active" : ""} onClick={() => setLeadView("location")} type="button">Location</button>
+        <button className={leadView === "check" ? "active" : ""} onClick={() => setLeadView("check")} type="button">Vehicle check</button>
+      </nav>
+      {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard view={leadView} dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
     </section>}
   </main>;
 }
@@ -111,8 +117,7 @@ function emptyCopy(tab: PortalTab) {
   return "Claim a lead to unlock customer details and work the opportunity.";
 }
 
-function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
-  const [cardTab, setCardTab] = useState<LeadCardTab>("overview");
+function DealerLeadCard({ view, dealer, lead, busy, onClaim, onChanged }: { view: LeadCardTab; dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
   const [imageIndex, setImageIndex] = useState(0);
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const image = images[imageIndex] ?? images[0];
@@ -123,8 +128,6 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   const notes = lead.portal_notes ?? [];
   const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
   const askingPrice = safeNumber(lead.price);
-  const engineLabel = lead.engine ? (/^\d+$/.test(String(lead.engine)) ? `${lead.engine}cc` : String(lead.engine)) : "Engine n/a";
-  const tabs: [LeadCardTab, string][] = [["overview", "Overview"], ["location", "Location"], ["check", "Vehicle check"], ...(unlocked ? [["customer", "Customer"] as [LeadCardTab, string]] : [])];
   useEffect(() => setImageIndex(0), [lead.id, images.length]);
   function moveImage(direction: -1 | 1) {
     setImageIndex(current => (current + direction + images.length) % images.length);
@@ -132,19 +135,18 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   return <article className="dealer-lead-card">
     <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
     <div className="dealer-lead-body">
-      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><div className="dealer-title-line"><h2>{title}</h2><p><b>{lead.reg || "Registration not shown"}</b><b>{formatMileage(lead.mileage)}</b><b>{engineLabel}</b></p></div></div><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></header>
+      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><div className="dealer-title-line"><h2>{title}</h2></div></div><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></header>
       <div className="dealer-opportunity-strip">
         <div><span>Approx location</span><b>{lead.portal_location_label || "Location pending"}</b></div>
         <div><span>Distance</span><b>{lead.portal_distance_label || "Distance not calculated"}</b></div>
         <div><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
       </div>
-      <nav className="dealer-card-tabs" aria-label={`${title} lead details`}>{tabs.map(([tab, label]) => <button className={cardTab === tab ? "active" : ""} onClick={() => setCardTab(tab)} type="button" key={tab}>{label}</button>)}</nav>
       <div className="dealer-card-tab-panel">
-        {cardTab === "overview" && <><VehicleCheckPanel lead={lead} compact /><MotorcyclePreviewPanel lead={lead} /></>}
-        {cardTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
-        {cardTab === "check" && <VehicleCheckPanel lead={lead} />}
-        {cardTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
+        {view === "overview" && <><VehicleCheckPanel lead={lead} compact /><MotorcyclePreviewPanel lead={lead} /></>}
+        {view === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
+        {view === "check" && <VehicleCheckPanel lead={lead} />}
       </div>
+      {unlocked && <div className="dealer-card-customer-view"><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</div>}
       {!unlocked && <div className="dealer-claim-row"><CustomerPanel lead={lead} unlocked={false} /><button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button></div>}
     </div>
   </article>;
@@ -152,6 +154,8 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
 
 function MotorcyclePreviewPanel({ lead }: { lead: DealerVisibleLead }) {
   const rows = [
+    ["Registration", lead.reg],
+    ["Mileage", formatMileage(lead.mileage)],
     ["Make", lead.make],
     ["Model", lead.model],
     ["Year", lead.year],
