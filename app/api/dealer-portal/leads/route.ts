@@ -4,7 +4,7 @@ import { normaliseVehicleCheck } from "@/lib/autotrader-vehicle-check";
 import { isFullUKPostcode, normaliseUKPostcode } from "@/lib/location";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { combineLeadImages } from "@/lib/website-leads";
-import type { DealerLeadClaim, DealerLeadNote, DealerVehicleCheckFlag, DealerVehicleCheckSummary, DealerVisibleLead } from "@/types/dealer-portal";
+import type { DealerLeadClaim, DealerLeadNote, DealerMileageHistoryItem, DealerMotHistoryItem, DealerVehicleCheckFlag, DealerVehicleCheckSummary, DealerVisibleLead } from "@/types/dealer-portal";
 import type { WebsiteLead } from "@/types/website-lead";
 
 export const dynamic = "force-dynamic";
@@ -87,12 +87,93 @@ function textValue(...values: unknown[]) {
   return "";
 }
 
+function numberValue(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value.replace(/[^0-9.]/g, ""));
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function dateValue(...values: unknown[]) {
+  for (const value of values) {
+    const text = textValue(value);
+    const match = text.match(/\d{4}-\d{2}-\d{2}/) ?? text.match(/\d{2}\/\d{2}\/\d{4}/);
+    if (!match) continue;
+    if (match[0].includes("/")) {
+      const [day, month, year] = match[0].split("/");
+      return `${year}-${month}-${day}`;
+    }
+    return match[0];
+  }
+  return "";
+}
+
 function firstObject(...values: unknown[]) {
   for (const value of values) {
     const record = objectValue(value);
     if (Object.keys(record).length > 0) return record;
   }
   return {};
+}
+
+function arraysNamed(value: unknown, names: string[], found: unknown[][] = []) {
+  if (!value || typeof value !== "object") return found;
+  if (Array.isArray(value)) {
+    for (const item of value) arraysNamed(item, names, found);
+    return found;
+  }
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (Array.isArray(child) && names.includes(key.toLowerCase())) found.push(child);
+    arraysNamed(child, names, found);
+  }
+  return found;
+}
+
+function detailText(value: unknown): string[] {
+  if (!value) return [];
+  const items = Array.isArray(value) ? value : [value];
+  return items.map(item => {
+    if (typeof item === "string") return item.trim();
+    const record = objectValue(item);
+    return textValue(record.description, record.text, record.detail, record.type, record.reason, record.comment);
+  }).filter(Boolean).slice(0, 6);
+}
+
+function extractMotHistory(...sources: unknown[]): DealerMotHistoryItem[] {
+  const rows = sources.flatMap(source => arraysNamed(source, ["mottests", "mot_tests", "mothistory", "tests", "results"])).flat()
+    .map(item => objectValue(item))
+    .filter(record => Object.keys(record).length > 0)
+    .map(record => {
+      const date = dateValue(record.testDate, record.completedDate, record.testCompletedDate, record.date, record.createdAt);
+      const expiry = dateValue(record.expiryDate, record.motExpiryDate, record.testExpiryDate, record.expiresAt) || null;
+      const result = textValue(record.result, record.testResult, record.status, record.outcome).toLowerCase();
+      const status: DealerMotHistoryItem["status"] = /\bfail/.test(result) ? "fail" : /\bpass/.test(result) ? "pass" : "unknown";
+      const mileage = numberValue(record.odometerReadingMiles, record.odometerReading, record.mileage, record.mileageMiles);
+      const details = [
+        ...detailText(record.advisories ?? record.advisoryItems),
+        ...detailText(record.failures ?? record.failureItems),
+        ...detailText(record.dangerousDefects),
+        ...detailText(record.majorDefects),
+        ...detailText(record.minorDefects),
+      ];
+      return { date, status, mileage, expiry, details };
+    })
+    .filter(row => row.date || row.mileage != null || row.details.length > 0);
+  const unique = new Map<string, DealerMotHistoryItem>();
+  for (const row of rows) unique.set(`${row.date}-${row.mileage ?? ""}-${row.status}`, row);
+  return [...unique.values()].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 8);
+}
+
+function mileageHistory(motHistory: DealerMotHistoryItem[], sellerMileage: number | null): DealerMileageHistoryItem[] {
+  const rows = motHistory
+    .filter(row => row.mileage != null)
+    .map(row => ({ date: row.date || "Unknown date", mileage: Number(row.mileage), source: "MOT" }));
+  if (sellerMileage != null) rows.push({ date: "Seller declared", mileage: sellerMileage, source: "Seller" });
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null {
@@ -107,6 +188,15 @@ function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null
   });
   const reportUrl = check.reportUrl || textValue(checkData.reportUrl, lookupData.reportUrl, vehicle.reportUrl);
   const writtenOff = check.writtenOff ?? (check.category ? true : null);
+  const motHistory = extractMotHistory(checkData, lookupData, vehicle, rawCheck);
+  const sellerMileage = numberValue(lead.mileage);
+  const history = mileageHistory(motHistory, sellerMileage);
+  const latestMotMileage = motHistory.find(row => row.mileage != null)?.mileage ?? null;
+  const mileageWarning = check.mileageDiscrepancy === true
+    ? "Vehicle check reports a mileage discrepancy."
+    : sellerMileage != null && latestMotMileage != null && sellerMileage + 100 < latestMotMileage
+      ? "Seller declared mileage is below the latest MOT mileage."
+      : null;
   const details = [
     ["Registration", textValue(vehicle.registration, lead.reg)],
     ["VIN", textValue(vehicle.vin)],
@@ -126,6 +216,10 @@ function dealerVehicleCheck(lead: WebsiteLead): DealerVehicleCheckSummary | null
     report_available: Boolean(reportUrl),
     report_url: reportUrl || null,
     details: details.map(([label, value]) => ({ label, value })),
+    mot_history: motHistory,
+    mileage_history: history,
+    seller_mileage: sellerMileage,
+    mileage_warning: mileageWarning,
     flags: [
       flag("identity", "Identity check", identityReturned ? false : null, "Vehicle identity data returned", "Identity needs review"),
       flag("stolen", "Stolen", check.stolen, "Not recorded stolen", "Vehicle recorded stolen"),

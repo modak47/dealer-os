@@ -124,6 +124,24 @@ export type DealerVehicleCheckSummary = {
   report_url?: string | null;
   details: { label: string; value: string }[];
   flags: DealerVehicleCheckFlag[];
+  mot_history?: DealerMotHistoryItem[];
+  mileage_history?: DealerMileageHistoryItem[];
+  seller_mileage?: number | null;
+  mileage_warning?: string | null;
+};
+
+export type DealerMotHistoryItem = {
+  date: string;
+  status: "pass" | "fail" | "unknown";
+  mileage: number | null;
+  expiry: string | null;
+  details: string[];
+};
+
+export type DealerMileageHistoryItem = {
+  date: string;
+  mileage: number;
+  source: string;
 };
 
 export type DealerVisibleLead = WebsiteLead & {

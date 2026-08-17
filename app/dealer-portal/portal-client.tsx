@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { directionsUrl, googleMapsUrl, leadLocationStatus, staticMapUrl } from "@/lib/location-ui";
 import { createClient } from "@/lib/supabase/client";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
-import type { DealerLeadClaimStatus, DealerPortalAccount, DealerVisibleLead } from "@/types/dealer-portal";
+import type { DealerLeadClaimStatus, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerVisibleLead } from "@/types/dealer-portal";
 
 type PortalData = {
   dealer: DealerPortalAccount;
@@ -211,8 +211,47 @@ function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead;
   const reportHref = check?.report_url ? `/api/autotrader/vehicle-check-report?url=${encodeURIComponent(check.report_url)}` : "";
   return <section className={`dealer-vehicle-check ${compact ? "compact" : ""} ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
     <header><div><span>Vehicle Check</span><h3>{check?.status || "Vehicle check not yet available"}</h3></div><nav>{check?.mot_expiry && <b>MOT {check.mot_expiry}</b>}{reportHref && <a href={reportHref} target="_blank" rel="noreferrer">View report</a>}</nav></header>
-    {!check ? <p>Vehicle check not yet available. YesMoto will show the HPI-style summary here once the Auto Trader vehicle check has been stored.</p> : <><div className="dealer-check-grid">{flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "N/A"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>{check.details.length > 0 && !compact && <details className="dealer-check-details"><summary>Technical identity details</summary><dl>{check.details.map(item => <Detail label={item.label} value={item.value} key={item.label} />)}</dl></details>}</>}
+    {!check ? <p>Vehicle check not yet available. YesMoto will show the HPI-style summary here once the Auto Trader vehicle check has been stored.</p> : <><div className="dealer-check-grid">{flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "N/A"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>{!compact && <VehicleHistoryPanel check={check} />}{check.details.length > 0 && !compact && <details className="dealer-check-details"><summary>Technical identity details</summary><dl>{check.details.map(item => <Detail label={item.label} value={item.value} key={item.label} />)}</dl></details>}</>}
   </section>;
+}
+
+function VehicleHistoryPanel({ check }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]> }) {
+  const motHistory = check.mot_history ?? [];
+  const mileageHistory = check.mileage_history ?? [];
+  return <div className="dealer-history-grid">
+    <section>
+      <h4>MOT History</h4>
+      {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <div className="dealer-mot-list">{motHistory.map((item, index) => <MotHistoryRow item={item} key={`${item.date}-${index}`} />)}</div>}
+    </section>
+    <section>
+      <h4>Mileage History</h4>
+      {check.mileage_warning && <b className="dealer-mileage-warning">{check.mileage_warning}</b>}
+      {!mileageHistory.length ? <p>Mileage history is not available from the stored vehicle check yet.</p> : <MileageGraph history={mileageHistory} />}
+    </section>
+  </div>;
+}
+
+function MotHistoryRow({ item }: { item: DealerMotHistoryItem }) {
+  const label = item.status === "pass" ? "Pass" : item.status === "fail" ? "Fail" : "Unknown";
+  return <article className={item.status}>
+    <header><strong>{item.date || "Date not returned"}</strong><b>{label}</b></header>
+    <dl><Detail label="Mileage" value={item.mileage == null ? null : `${item.mileage.toLocaleString("en-GB")} miles`} /><Detail label="Expiry" value={item.expiry} /></dl>
+    {item.details.length > 0 && <ul>{item.details.map(detail => <li key={detail}>{detail}</li>)}</ul>}
+  </article>;
+}
+
+function MileageGraph({ history }: { history: DealerMileageHistoryItem[] }) {
+  const mileages = history.map(item => item.mileage);
+  const min = Math.min(...mileages);
+  const max = Math.max(...mileages);
+  const range = Math.max(1, max - min);
+  return <div className="dealer-mileage-graph">
+    <div>{history.map((item, index) => {
+      const height = 24 + ((item.mileage - min) / range) * 66;
+      return <span style={{ height: `${height}px` }} title={`${item.source}: ${item.mileage.toLocaleString("en-GB")} miles`} key={`${item.date}-${index}`}><i>{item.mileage.toLocaleString("en-GB")}</i></span>;
+    })}</div>
+    <ol>{history.map((item, index) => <li key={`${item.source}-${item.date}-${index}`}><b>{item.date}</b><small>{item.source}</small></li>)}</ol>
+  </div>;
 }
 
 function Detail({ label, value }: { label: string; value: string | number | null | undefined }) {
