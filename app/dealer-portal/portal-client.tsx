@@ -218,16 +218,17 @@ function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead;
 function VehicleHistoryPanel({ check }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]> }) {
   const motHistory = check.mot_history ?? [];
   const mileageHistory = check.mileage_history ?? [];
+  const hasMileageHistory = mileageHistory.length > 0;
   return <div className="dealer-history-grid">
     <section>
       <h4>MOT History</h4>
       {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <div className="dealer-mot-list">{motHistory.map((item, index) => <MotHistoryRow item={item} key={`${item.date}-${index}`} />)}</div>}
     </section>
-    <section>
+    <section className={hasMileageHistory ? "" : "dealer-mileage-empty"}>
       <h4>Mileage History</h4>
       {check.mileage_warning && <b className="dealer-mileage-warning">{check.mileage_warning}</b>}
-      {!mileageHistory.length ? <p>Mileage history is not available from the stored vehicle check yet.</p> : <MileageGraph history={mileageHistory} />}
-      {check.seller_mileage != null && <p className="dealer-seller-mileage"><strong>Seller declared</strong><span>{check.seller_mileage.toLocaleString("en-GB")} miles</span></p>}
+      {hasMileageHistory ? <MileageGraph history={mileageHistory} /> : <p>MOT mileage readings were not returned by the stored vehicle check yet.</p>}
+      {hasMileageHistory && check.seller_mileage != null && <p className="dealer-seller-mileage"><strong>Seller declared</strong><span>{check.seller_mileage.toLocaleString("en-GB")} miles</span></p>}
     </section>
   </div>;
 }
