@@ -140,7 +140,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
         <div><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
       </div>
       <div className="dealer-card-tab-panel">
-        {cardTab === "overview" && <><VehicleCheckPanel lead={lead} compact /><MotorcyclePreviewPanel lead={lead} /></>}
+        {cardTab === "overview" && <><VehicleCheckSummaryPanel lead={lead} /><MotorcyclePreviewPanel lead={lead} /></>}
         {cardTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
         {cardTab === "check" && <VehicleCheckPanel lead={lead} />}
         {cardTab === "mot" && <VehicleMotPanel lead={lead} />}
@@ -205,6 +205,15 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
       </dl>
       {hasLocation && <nav><a href={googleMapsUrl(publicLocation)} target="_blank" rel="noreferrer">View Map</a><a href={directionsUrl(dealerOrigin, publicLocation)} target="_blank" rel="noreferrer">Directions</a></nav>}
     </div>
+  </section>;
+}
+
+function VehicleCheckSummaryPanel({ lead }: { lead: DealerVisibleLead }) {
+  const check = lead.portal_vehicle_check;
+  const reportHref = check?.report_url ? `/api/autotrader/vehicle-check-report?url=${encodeURIComponent(check.report_url)}` : "";
+  return <section className={`dealer-check-summary ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
+    <div><span>Vehicle check</span><strong>{check?.status || "Vehicle check not yet available"}</strong></div>
+    <nav>{check?.mot_expiry && <b>MOT {check.mot_expiry}</b>}{reportHref && <a href={reportHref} target="_blank" rel="noreferrer">View report</a>}</nav>
   </section>;
 }
 
