@@ -579,3 +579,19 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-portal .dealer-vehicle-check header span{color:#91a198!important}
 .dealer-portal .dealer-check-details summary{color:#c4d2ca!important}
 .dealer-portal .dealer-check-details summary:hover{color:#00e51d!important}
+
+/* Make per-lead tabs read as obvious clickable controls. */
+.dealer-portal .dealer-card-tabs{gap:6px!important;padding:12px 0 0!important;border-bottom:2px solid #315c39!important}
+.dealer-portal .dealer-card-tabs button{min-height:44px!important;padding:11px 18px!important;border:1px solid #355044!important;border-bottom:0!important;border-radius:8px 8px 0 0!important;background:linear-gradient(180deg,#18231d,#0c130f)!important;color:#dce8e1!important;font-size:12px!important;letter-spacing:.1px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 -1px 0 rgba(0,0,0,.35);transition:background .15s ease,color .15s ease,transform .15s ease,border-color .15s ease}
+.dealer-portal .dealer-card-tabs button::after{content:"";position:absolute;left:14px;right:14px;bottom:6px;height:2px;border-radius:999px;background:#4a5c51}
+.dealer-portal .dealer-card-tabs button:hover,.dealer-portal .dealer-card-tabs button:focus-visible{border-color:#00e51d!important;background:linear-gradient(180deg,#1f3526,#102015)!important;color:#fff!important;transform:translateY(-1px);outline:none}
+.dealer-portal .dealer-card-tabs button:hover::after,.dealer-portal .dealer-card-tabs button:focus-visible::after{background:#00e51d}
+.dealer-portal .dealer-card-tabs button.active{border-color:#00e51d!important;border-bottom:0!important;background:#101714!important;color:#00e51d!important;box-shadow:inset 0 4px 0 #00e51d,0 -4px 14px rgba(0,229,29,.12)!important}
+.dealer-portal .dealer-card-tabs button.active::after{background:#00e51d}
+.dealer-portal .dealer-tabs{border-color:#2f4538!important;background:#0b100e!important;box-shadow:0 10px 26px rgba(0,0,0,.18)!important}
+.dealer-portal .dealer-tabs button{position:relative;min-height:46px!important;border-right-color:#2f4538!important;background:#0b100e!important;color:#c8d5ce!important;font-size:12px!important;font-weight:950!important;cursor:pointer;transition:background .15s ease,color .15s ease,box-shadow .15s ease}
+.dealer-portal .dealer-tabs button::after{content:"";position:absolute;left:18px;right:18px;bottom:8px;height:2px;border-radius:999px;background:#3c5146}
+.dealer-portal .dealer-tabs button:hover,.dealer-portal .dealer-tabs button:focus-visible{background:#142019!important;color:#fff!important;outline:none}
+.dealer-portal .dealer-tabs button:hover::after,.dealer-portal .dealer-tabs button:focus-visible::after{background:#00e51d}
+.dealer-portal .dealer-tabs button.active{background:#132b19!important;color:#00e51d!important;box-shadow:inset 0 -3px 0 #00e51d!important}
+.dealer-portal .dealer-tabs button.active::after{background:#00e51d}
