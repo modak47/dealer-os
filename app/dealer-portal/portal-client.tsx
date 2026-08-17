@@ -123,6 +123,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   const notes = lead.portal_notes ?? [];
   const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
   const askingPrice = safeNumber(lead.price);
+  const engineLabel = lead.engine ? (/^\d+$/.test(String(lead.engine)) ? `${lead.engine}cc` : String(lead.engine)) : "Engine n/a";
   const tabs: [LeadCardTab, string][] = [["overview", "Overview"], ["location", "Location"], ["check", "Vehicle check"], ...(unlocked ? [["customer", "Customer"] as [LeadCardTab, string]] : [])];
   useEffect(() => setImageIndex(0), [lead.id, images.length]);
   function moveImage(direction: -1 | 1) {
@@ -131,7 +132,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   return <article className={`dealer-lead-card ${cardTab === "overview" ? "overview-tab" : "detail-tab"}`}>
     <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
     <div className="dealer-lead-body">
-      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><h2>{title}</h2><p><b>{lead.reg || "Registration not shown"}</b><b>{formatMileage(lead.mileage)}</b><b>{lead.engine || "Engine n/a"}</b></p></div><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></header>
+      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><div className="dealer-title-line"><h2>{title}</h2><p><b>{lead.reg || "Registration not shown"}</b><b>{formatMileage(lead.mileage)}</b><b>{engineLabel}</b></p></div></div><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></header>
       <div className="dealer-opportunity-strip">
         <div><span>Approx location</span><b>{lead.portal_location_label || "Location pending"}</b></div>
         <div><span>Distance</span><b>{lead.portal_distance_label || "Distance not calculated"}</b></div>
@@ -221,10 +222,11 @@ function VehicleHistoryPanel({ check }: { check: NonNullable<DealerVisibleLead["
   const motHistory = check.mot_history ?? [];
   const mileageHistory = check.mileage_history ?? [];
   const hasMileageHistory = mileageHistory.length > 0;
+  const visibleMotHistory = motHistory.slice(0, 2);
   return <div className="dealer-history-grid">
     <section>
       <h4>MOT History</h4>
-      {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <div className="dealer-mot-list">{motHistory.map((item, index) => <MotHistoryRow item={item} key={`${item.date}-${index}`} />)}</div>}
+      {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <><div className="dealer-mot-list">{visibleMotHistory.map((item, index) => <MotHistoryRow item={item} key={`${item.date}-${index}`} />)}</div>{motHistory.length > visibleMotHistory.length && <p className="dealer-history-note">{motHistory.length - visibleMotHistory.length} more MOT record(s) in the report.</p>}</>}
     </section>
     <section className={hasMileageHistory ? "" : "dealer-mileage-empty"}>
       <h4>Mileage History</h4>
