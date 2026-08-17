@@ -84,13 +84,15 @@ export default function DealerPortalAdminPage() {
     }).slice(0, 18);
   }, [releaseQuery, releaseableLeads]);
   const selectedLeads = useMemo(() => releaseableLeads.filter(lead => selectedLeadIds.includes(String(lead.id))), [releaseableLeads, selectedLeadIds]);
+  const pendingFees = useMemo(() => overview.fees.filter(fee => fee.status === "pending_invoice"), [overview.fees]);
+  const pendingFeeTotal = useMemo(() => pendingFees.reduce((total, fee) => total + (Number(fee.fee_amount) || 0), 0), [pendingFees]);
   const kpis = [
     ["Active Dealers", activeAccounts.length],
     ["Portal Leads", portalLeads.length],
     ["Available to Release", releaseableLeads.length],
     ["Claims", overview.claims.length],
     ["Purchases", overview.purchases.length],
-    ["Fees Pending", overview.fees.filter(fee => fee.status === "pending_invoice").length],
+    [`Fees Pending (${pendingFees.length})`, money(pendingFeeTotal)],
   ];
 
   function setField(key: keyof DealerPortalAccount, value: string | number) {
@@ -216,7 +218,7 @@ export default function DealerPortalAdminPage() {
       {activeTab === "daily" && <section className="dealer-admin-panel dealer-admin-daily">
         <form className="website-detail-card dealer-release-card" onSubmit={releaseLead}>
           <header><div><h2>Leads Ready to Release</h2><p>Pick from the visible queue before releasing to dealers.</p></div><span>{releaseableLeads.length} ready</span></header>
-          <div className="dealer-release-search"><input value={releaseQuery} onChange={event => setReleaseQuery(event.target.value)} placeholder="Search reg, bike, location or price" aria-label="Search releasable leads" /><button type="button" onClick={selectVisibleQueue} disabled={!releaseQueue.length}>Select visible</button>{releaseQuery && <button type="button" onClick={() => setReleaseQuery("")}>Clear</button>}</div>
+          <div className="dealer-release-search"><input value={releaseQuery} onChange={event => setReleaseQuery(event.target.value)} placeholder="Search reg, bike, location or price" aria-label="Search releasable leads" /><button className="secondary" type="button" onClick={selectVisibleQueue} disabled={!releaseQueue.length}>Select visible</button>{releaseQuery && <button className="ghost" type="button" onClick={() => setReleaseQuery("")}>Clear</button>}</div>
           <div className="dealer-release-queue">
             {loading ? <p>Loading leads...</p> : !releaseQueue.length ? <p>No releasable leads match this search.</p> : releaseQueue.map(lead => <ReleaseQueueRow lead={lead} selected={selectedLeadIds.includes(String(lead.id))} saving={saving} key={lead.id} onSelect={() => toggleLead(String(lead.id))} />)}
           </div>
@@ -224,7 +226,7 @@ export default function DealerPortalAdminPage() {
             <div className="dealer-release-selected"><span>Selected</span><b>{selectedLeads.length ? `${selectedLeads.length} lead(s): ${selectedLeads.slice(0, 3).map(lead => `#${lead.id} ${lead.reg || "No reg"}`).join(", ")}${selectedLeads.length > 3 ? "..." : ""}` : "No leads selected"}</b>{selectedLeads.length > 0 && <button type="button" onClick={() => setSelectedLeadIds([])}>Clear selection</button>}</div>
             <label><span>Distribution</span><select value={method} onChange={event => setMethod(event.target.value as typeof method)}><option value="matching_pool">Open matching pool</option><option value="direct">Specific dealer</option><option value="dealer_group">Dealer group</option></select></label>
             {method !== "matching_pool" && <div className="dealer-picker">{activeAccounts.map(account => <label key={account.id}><input type="checkbox" checked={selectedDealers.includes(account.id)} onChange={() => toggleDealer(account.id)} />{account.trading_name}</label>)}</div>}
-            <div className="website-actions"><button disabled={saving || !selectedLeadIds.length || (method !== "matching_pool" && !selectedDealers.length)}>{saving ? "Releasing..." : selectedLeadIds.length > 1 ? `Release ${selectedLeadIds.length} Leads` : "Release to Portal"}</button><Link href="/dealer-login" target="_blank">Open Dealer Login</Link></div>
+            <div className="website-actions dealer-release-actions"><button className="dealer-release-submit" disabled={saving || !selectedLeadIds.length || (method !== "matching_pool" && !selectedDealers.length)}>{saving ? "Releasing..." : selectedLeadIds.length > 1 ? `Release ${selectedLeadIds.length} Leads` : "Release to Portal"}</button><Link href="/dealer-login" target="_blank">Open Dealer Login</Link></div>
           </div>
         </form>
         <section className="website-detail-card status-actions dealer-recent-leads">
@@ -264,7 +266,7 @@ function ReleaseQueueRow({ lead, selected, saving, onSelect }: { lead: WebsiteLe
   const location = lead.location_town || lead.postcode || "Location not set";
   const checkStatus = lead.vehicle_check_status === "checked" ? "Check done" : lead.vehicle_check_status === "failed" ? "Check failed" : lead.reg ? "Check pending" : "No reg";
   return <article className={selected ? "selected" : ""}>
-    <button type="button" disabled={saving} onClick={onSelect}><span>{selected ? "Remove" : "Select"}</span></button>
+    <button className="dealer-release-toggle" type="button" disabled={saving} onClick={onSelect}><span>{selected ? "Remove" : "Select"}</span></button>
     <div className="dealer-release-bike"><b>#{lead.id} {lead.reg || "No reg"}</b><strong>{lead.year ? `${lead.year} ` : ""}{title}</strong><small>{statusLabel(lead.status)} · {formatLeadDate(lead.date || lead.created_at)}</small></div>
     <dl>
       <div><dt>Location</dt><dd>{location}</dd></div>
@@ -272,7 +274,7 @@ function ReleaseQueueRow({ lead, selected, saving, onSelect }: { lead: WebsiteLe
       <div><dt>Asking</dt><dd>{price === null ? "Not set" : formatGbp(price)}</dd></div>
       <div><dt>Vehicle Check</dt><dd>{checkStatus}</dd></div>
     </dl>
-    <Link href={`/website-leads/${lead.id}`}>Open</Link>
+    <Link className="dealer-release-open" href={`/website-leads/${lead.id}`}>Open</Link>
   </article>;
 }
 
