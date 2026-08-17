@@ -414,3 +414,10 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-portal .dealer-preview-panel dd{font-size:14px!important;font-weight:950!important;color:#0f1913!important}
 .dealer-portal .dealer-preview-panel p{font-size:13px!important;font-weight:750!important;color:#26362d!important}
 .dealer-portal .dealer-claim-button{font-size:16px!important;font-weight:950!important}
+.dealer-portal .dealer-location-panel{border-width:2px!important;background:#fbfdf9!important}
+.dealer-portal .dealer-location-panel>div:last-child{background:#fbfdf9!important}
+.dealer-portal .dealer-location-panel h3{font-size:18px!important;font-weight:950!important;color:#101914!important}
+.dealer-portal .dealer-location-panel dl div{padding:12px!important;border:1px solid #c8d7ca!important;background:#fff!important;color:#17231b!important}
+.dealer-portal .dealer-location-panel dt{font-size:10px!important;color:#516359!important}
+.dealer-portal .dealer-location-panel dd{margin-top:5px!important;color:#0f1913!important;font-size:14px!important;font-weight:950!important}
+.dealer-portal .dealer-location-panel nav a{min-height:38px!important;padding:10px 13px!important;border-width:2px!important;background:#e8f9eb!important;color:#057b18!important;font-size:11px!important;font-weight:950!important}
