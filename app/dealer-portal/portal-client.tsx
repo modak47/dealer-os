@@ -128,7 +128,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   function moveImage(direction: -1 | 1) {
     setImageIndex(current => (current + direction + images.length) % images.length);
   }
-  return <article className="dealer-lead-card">
+  return <article className={`dealer-lead-card ${cardTab === "overview" ? "overview-tab" : "detail-tab"}`}>
     <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
     <div className="dealer-lead-body">
       <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><h2>{title}</h2><p><b>{lead.reg || "Registration not shown"}</b><b>{formatMileage(lead.mileage)}</b><b>{lead.engine || "Engine n/a"}</b></p></div><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></header>
