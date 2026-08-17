@@ -646,3 +646,34 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-modal-checks span{color:#eef4f0!important;font-size:12px!important;text-transform:none!important}
 @media(max-width:1050px){.dealer-account-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.dealer-account-grid,.dealer-account-admin-grid,.dealer-modal-grid{grid-template-columns:1fr!important}}
 @media(max-width:760px){.dealer-portal .dealer-tabs{grid-template-columns:1fr 1fr!important}.dealer-account-panel>header{display:grid}.dealer-account-summary,.dealer-form-grid,.dealer-modal-checks{grid-template-columns:1fr}}
+
+/* Tabbed internal dealer editor. */
+.dealer-account-modal{width:min(1500px,calc(100vw - 48px));max-height:88vh;overflow:hidden;background:#0e171d!important;border-color:#263844!important}
+.dealer-account-modal>header,.dealer-account-modal>footer{background:#111c23!important;border-color:#263844!important}
+.dealer-modal-shell{display:grid;grid-template-columns:230px minmax(0,1fr);gap:14px;padding:14px 18px 18px;background:#0b1116}
+.dealer-modal-tabs{display:grid;align-content:start;gap:8px}
+.dealer-modal-tabs button{position:relative;display:grid;gap:2px;min-height:58px;padding:10px 12px 10px 42px;border:1px solid #263844;border-radius:7px;background:#101a21;color:#d8e7ef;text-align:left;cursor:pointer}
+.dealer-modal-tabs button:before{content:"";position:absolute;left:12px;top:14px;width:18px;height:18px;border:1px solid #275f8c;border-radius:5px;background:linear-gradient(135deg,#102a3d,#153952);box-shadow:0 0 0 2px rgba(56,157,230,.08)}
+.dealer-modal-tabs button b{font-size:13px;font-weight:950}
+.dealer-modal-tabs button span{color:#8ba4b4;font-size:10px;font-weight:850}
+.dealer-modal-tabs button:hover,.dealer-modal-tabs button.active{border-color:#389de6;background:linear-gradient(135deg,#102334,#101a21);color:#fff}
+.dealer-modal-tabs button.active{box-shadow:inset 3px 0 0 #389de6,0 10px 24px rgba(0,0,0,.2)}
+.dealer-modal-tabs button.active:before{border-color:#00e51d;background:linear-gradient(135deg,#123d4f,#0f5622)}
+.dealer-modal-tab-body{min-height:510px}
+.dealer-account-modal .dealer-modal-section{height:100%;padding:16px;border-color:#28404d;background:#09100d}
+.dealer-account-modal .dealer-modal-section h3{display:flex;align-items:center;gap:9px;margin-bottom:2px}
+.dealer-account-modal .dealer-modal-section h3 span{display:inline-grid;place-items:center;min-width:28px;height:28px;border:1px solid #389de6;border-radius:7px;background:#0f2330;color:#8fd0ff;font-size:10px;font-weight:950}
+.dealer-account-modal .dealer-modal-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 11px}
+.dealer-account-modal .dealer-modal-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.dealer-account-modal .dealer-modal-grid input,.dealer-account-modal .dealer-modal-grid select,.dealer-account-modal .dealer-modal-grid textarea,.dealer-account-modal .dealer-modal-section>label input{border-color:#315060;background:#07100d;color:#fff}
+.dealer-account-modal .dealer-modal-grid textarea{min-height:54px}
+.dealer-account-modal .dealer-modal-grid .compact-notes textarea{min-height:42px}
+.dealer-modal-split{grid-template-columns:.42fr .58fr;align-items:start}
+.dealer-modal-split p{margin-top:8px;color:#9fb3be;font-size:13px;line-height:1.45}
+.dealer-modal-split>div:last-child{min-width:0}
+.dealer-account-modal .dealer-modal-checks{grid-template-columns:repeat(2,minmax(0,1fr))}
+.dealer-account-modal .dealer-modal-checks label{border-color:#2b4654;background:#101a21}
+.dealer-account-modal .dealer-modal-radius{max-width:360px;margin-top:12px}
+.dealer-account-modal .dealer-login-fields{display:grid;align-content:start;justify-items:start;gap:8px;padding:0;border:0;background:transparent}
+.dealer-account-modal .dealer-login-fields a{min-height:36px;padding:9px 12px;border:1px solid #389de6;border-radius:5px;background:#102334;color:#8fd0ff;text-decoration:none;font-weight:950}
+@media(max-width:1050px){.dealer-account-modal{max-height:94vh;overflow:auto}.dealer-modal-shell,.dealer-modal-split{grid-template-columns:1fr}.dealer-modal-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.dealer-modal-tab-body{min-height:0}.dealer-account-modal .dealer-modal-grid,.dealer-account-modal .dealer-modal-grid.two,.dealer-account-modal .dealer-modal-checks{grid-template-columns:1fr!important}}
