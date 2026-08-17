@@ -5,15 +5,15 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { directionsUrl, googleMapsUrl, leadLocationStatus, staticMapUrl } from "@/lib/location-ui";
 import { createClient } from "@/lib/supabase/client";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
-import type { DealerLeadClaimStatus, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerVisibleLead } from "@/types/dealer-portal";
+import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaimStatus, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerVisibleLead } from "@/types/dealer-portal";
 
 type PortalData = {
-  dealer: DealerPortalAccount;
+  dealer: DealerPortalAccountWithPreferences;
   available: DealerVisibleLead[];
   claimed: DealerVisibleLead[];
 };
 
-type PortalTab = "available" | "active" | "purchased" | "lost";
+type PortalTab = "available" | "active" | "purchased" | "lost" | "account";
 type LeadCardTab = "overview" | "location" | "check" | "mot" | "customer";
 
 const terminalStatuses = new Set(["purchased", "purchased_later", "lost", "returned_to_pool"]);
@@ -53,7 +53,7 @@ export function DealerPortalClient() {
   const activeLeads = useMemo(() => data?.claimed.filter(lead => !terminalStatuses.has(String(lead.portal_claim_status))) ?? [], [data]);
   const purchasedLeads = useMemo(() => data?.claimed.filter(lead => ["purchased", "purchased_later"].includes(String(lead.portal_claim_status))) ?? [], [data]);
   const lostLeads = useMemo(() => data?.claimed.filter(lead => ["lost", "returned_to_pool"].includes(String(lead.portal_claim_status))) ?? [], [data]);
-  const leads = activeTab === "available" ? data?.available ?? [] : activeTab === "active" ? activeLeads : activeTab === "purchased" ? purchasedLeads : lostLeads;
+  const leads = activeTab === "available" ? data?.available ?? [] : activeTab === "active" ? activeLeads : activeTab === "purchased" ? purchasedLeads : activeTab === "lost" ? lostLeads : [];
   const kpis = useMemo(() => [
     ["Available", data?.available.length ?? 0],
     ["Active", activeLeads.length],
@@ -91,8 +91,9 @@ export function DealerPortalClient() {
         <button className={activeTab === "active" ? "active" : ""} onClick={() => setActiveTab("active")}>Active Leads</button>
         <button className={activeTab === "purchased" ? "active" : ""} onClick={() => setActiveTab("purchased")}>Purchased</button>
         <button className={activeTab === "lost" ? "active" : ""} onClick={() => setActiveTab("lost")}>Lost / Returned</button>
+        <button className={activeTab === "account" ? "active" : ""} onClick={() => setActiveTab("account")}>Account</button>
       </nav>
-      {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
+      {activeTab === "account" ? <DealerAccountPanel dealer={data.dealer} onSaved={dealer => setData(current => current ? { ...current, dealer } : current)} /> : !leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
     </section>}
   </main>;
 }
@@ -109,6 +110,161 @@ function emptyCopy(tab: PortalTab) {
   if (tab === "purchased") return "Purchased motorcycles will appear here after you report them.";
   if (tab === "lost") return "Leads you mark as lost or returned will stay here for your records.";
   return "Claim a lead to unlock customer details and work the opportunity.";
+}
+
+function arrayText(value: string[] | null | undefined) {
+  return (value ?? []).join(", ");
+}
+
+function splitArrayText(value: string) {
+  return Array.from(new Set(value.split(",").map(item => item.trim()).filter(Boolean)));
+}
+
+function preferenceSummary(values: string[] | null | undefined, empty = "Any") {
+  return values?.length ? values.join(", ") : empty;
+}
+
+function accountBuyingDefaults(dealer: DealerPortalAccountWithPreferences): DealerBuyingPreferences {
+  return dealer.buying_preferences ?? {
+    dealer_account_id: dealer.id,
+    motorcycle_types: [],
+    makes_wanted: [],
+    makes_excluded: [],
+    models_wanted: [],
+    minimum_year: null,
+    maximum_age_years: null,
+    minimum_value: null,
+    maximum_value: null,
+    maximum_mileage: null,
+    minimum_engine_cc: null,
+    maximum_engine_cc: null,
+    accepts_non_running: false,
+    accepts_insurance_category: false,
+    accepts_outstanding_finance: false,
+    accepts_imported: false,
+    accepts_modified: false,
+  };
+}
+
+function accountGeographyDefaults(dealer: DealerPortalAccountWithPreferences): DealerGeographyPreferences {
+  return dealer.geography_preferences ?? {
+    dealer_account_id: dealer.id,
+    england: true,
+    wales: true,
+    scotland: false,
+    northern_ireland: false,
+    republic_of_ireland: false,
+    maximum_radius_miles: null,
+  };
+}
+
+function DealerAccountPanel({ dealer, onSaved }: { dealer: DealerPortalAccountWithPreferences; onSaved: (dealer: DealerPortalAccountWithPreferences) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState(() => ({
+    trading_address: dealer.trading_address ?? "",
+    main_contact: dealer.main_contact ?? "",
+    telephone: dealer.telephone ?? "",
+    mobile_whatsapp: dealer.mobile_whatsapp ?? "",
+    main_email: dealer.main_email ?? "",
+    accounts_email: dealer.accounts_email ?? "",
+    website: dealer.website ?? "",
+    postcode: dealer.postcode ?? "",
+  }));
+  const [buying, setBuying] = useState(() => accountBuyingDefaults(dealer));
+  const [geography, setGeography] = useState(() => accountGeographyDefaults(dealer));
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage("");
+    const response = await fetch("/api/dealer-portal/account", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, buying_preferences: buying, geography_preferences: geography }),
+    });
+    const payload = await response.json();
+    if (response.ok) {
+      onSaved(payload.dealer as DealerPortalAccountWithPreferences);
+      setMessage("Account preferences saved.");
+    } else setMessage(payload.error || "Unable to save account preferences.");
+    setSaving(false);
+  }
+
+  function setFormField(key: keyof typeof form, value: string) {
+    setForm(current => ({ ...current, [key]: value }));
+  }
+  function setBuyingField<K extends keyof DealerBuyingPreferences>(key: K, value: DealerBuyingPreferences[K]) {
+    setBuying(current => ({ ...current, [key]: value }));
+  }
+  function setGeographyField<K extends keyof DealerGeographyPreferences>(key: K, value: DealerGeographyPreferences[K]) {
+    setGeography(current => ({ ...current, [key]: value }));
+  }
+
+  return <form className="dealer-account-panel" onSubmit={save}>
+    <header><div><span>Dealer Account</span><h2>{dealer.trading_name}</h2><p>Keep your buying profile current so YesMoto can release the right opportunities.</p></div><button disabled={saving}>{saving ? "Saving..." : "Save Account"}</button></header>
+    {message && <p className={message.includes("Unable") ? "dealer-work-error" : "dealer-work-success"}>{message}</p>}
+    <section className="dealer-account-summary">
+      <Detail label="Company" value={dealer.limited_company_name || dealer.trading_name} />
+      <Detail label="Purchase fee" value={formatGbp(dealer.successful_purchase_fee)} />
+      <Detail label="Attribution period" value={`${dealer.attribution_period_days} days`} />
+      <Detail label="Status" value={statusLabel(dealer.account_status)} />
+      <Detail label="Makes wanted" value={preferenceSummary(buying.makes_wanted)} />
+      <Detail label="Buying radius" value={geography.maximum_radius_miles == null ? "No limit set" : `${geography.maximum_radius_miles} miles`} />
+    </section>
+    <section className="dealer-account-grid">
+      <div className="dealer-account-card">
+        <h3>Company Details</h3>
+        <div className="dealer-form-grid">
+          <Input label="Main contact" value={form.main_contact} set={value => setFormField("main_contact", value)} />
+          <Input label="Main email" value={form.main_email} set={value => setFormField("main_email", value)} type="email" />
+          <Input label="Telephone" value={form.telephone} set={value => setFormField("telephone", value)} />
+          <Input label="WhatsApp/mobile" value={form.mobile_whatsapp} set={value => setFormField("mobile_whatsapp", value)} />
+          <Input label="Accounts email" value={form.accounts_email} set={value => setFormField("accounts_email", value)} type="email" />
+          <Input label="Website" value={form.website} set={value => setFormField("website", value)} />
+          <Input label="Postcode" value={form.postcode} set={value => setFormField("postcode", value)} />
+          <label className="full"><span>Trading address</span><textarea value={form.trading_address} onChange={event => setFormField("trading_address", event.target.value)} /></label>
+        </div>
+      </div>
+      <div className="dealer-account-card">
+        <h3>Buying Preferences</h3>
+        <div className="dealer-form-grid">
+          <TextListInput label="Types" value={buying.motorcycle_types} set={value => setBuyingField("motorcycle_types", value)} placeholder="Roadster, adventure, scooter" />
+          <TextListInput label="Makes wanted" value={buying.makes_wanted} set={value => setBuyingField("makes_wanted", value)} placeholder="Honda, Yamaha, KTM" />
+          <TextListInput label="Makes excluded" value={buying.makes_excluded} set={value => setBuyingField("makes_excluded", value)} />
+          <TextListInput label="Models wanted" value={buying.models_wanted} set={value => setBuyingField("models_wanted", value)} />
+          <NumberPreference label="Minimum year" value={buying.minimum_year} set={value => setBuyingField("minimum_year", value)} />
+          <NumberPreference label="Maximum age years" value={buying.maximum_age_years} set={value => setBuyingField("maximum_age_years", value)} />
+          <NumberPreference label="Minimum value" value={buying.minimum_value} set={value => setBuyingField("minimum_value", value)} />
+          <NumberPreference label="Maximum value" value={buying.maximum_value} set={value => setBuyingField("maximum_value", value)} />
+          <NumberPreference label="Maximum mileage" value={buying.maximum_mileage} set={value => setBuyingField("maximum_mileage", value)} />
+          <NumberPreference label="Minimum engine cc" value={buying.minimum_engine_cc} set={value => setBuyingField("minimum_engine_cc", value)} />
+          <NumberPreference label="Maximum engine cc" value={buying.maximum_engine_cc} set={value => setBuyingField("maximum_engine_cc", value)} />
+        </div>
+      </div>
+      <div className="dealer-account-card">
+        <h3>History Rules</h3>
+        <div className="dealer-checklist">
+          <Checkbox label="Accept non-running bikes" checked={buying.accepts_non_running} set={value => setBuyingField("accepts_non_running", value)} />
+          <Checkbox label="Accept insurance category bikes" checked={buying.accepts_insurance_category} set={value => setBuyingField("accepts_insurance_category", value)} />
+          <Checkbox label="Accept outstanding finance marker" checked={buying.accepts_outstanding_finance} set={value => setBuyingField("accepts_outstanding_finance", value)} />
+          <Checkbox label="Accept imported bikes" checked={buying.accepts_imported} set={value => setBuyingField("accepts_imported", value)} />
+          <Checkbox label="Accept modified bikes" checked={buying.accepts_modified} set={value => setBuyingField("accepts_modified", value)} />
+        </div>
+      </div>
+      <div className="dealer-account-card">
+        <h3>Geography</h3>
+        <div className="dealer-checklist geography">
+          <Checkbox label="England" checked={geography.england} set={value => setGeographyField("england", value)} />
+          <Checkbox label="Wales" checked={geography.wales} set={value => setGeographyField("wales", value)} />
+          <Checkbox label="Scotland" checked={geography.scotland} set={value => setGeographyField("scotland", value)} />
+          <Checkbox label="Northern Ireland" checked={geography.northern_ireland} set={value => setGeographyField("northern_ireland", value)} />
+          <Checkbox label="Republic of Ireland" checked={geography.republic_of_ireland} set={value => setGeographyField("republic_of_ireland", value)} />
+        </div>
+        <NumberPreference label="Buying radius miles" value={geography.maximum_radius_miles} set={value => setGeographyField("maximum_radius_miles", value)} />
+      </div>
+    </section>
+  </form>;
 }
 
 function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
@@ -412,4 +568,16 @@ function PurchasedLaterPanel({ claimId, lead, onChanged }: { claimId: string; le
 
 function Input({ label, value, set, type = "text", required = false }: { label: string; value: string; set: (value: string) => void; type?: string; required?: boolean }) {
   return <label><span>{label}</span><input type={type} value={value} required={required} min={type === "number" ? "0" : undefined} onChange={event => set(event.target.value)} /></label>;
+}
+
+function TextListInput({ label, value, set, placeholder = "" }: { label: string; value: string[]; set: (value: string[]) => void; placeholder?: string }) {
+  return <label><span>{label}</span><input value={arrayText(value)} placeholder={placeholder} onChange={event => set(splitArrayText(event.target.value))} /></label>;
+}
+
+function NumberPreference({ label, value, set }: { label: string; value: number | null; set: (value: number | null) => void }) {
+  return <label><span>{label}</span><input type="number" min="0" value={value ?? ""} onChange={event => set(event.target.value === "" ? null : Number(event.target.value))} /></label>;
+}
+
+function Checkbox({ label, checked, set }: { label: string; checked: boolean; set: (value: boolean) => void }) {
+  return <label><input type="checkbox" checked={checked} onChange={event => set(event.target.checked)} /><span>{label}</span></label>;
 }

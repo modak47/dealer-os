@@ -605,3 +605,44 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-portal .dealer-timeline p{color:#c8d5ce!important}
 .dealer-portal .dealer-outcome-panel summary{color:#eef4f0!important}
 .dealer-portal .dealer-note-form select,.dealer-portal .dealer-note-form textarea,.dealer-portal .dealer-outcome-panel select,.dealer-portal .dealer-outcome-panel input,.dealer-portal .dealer-outcome-panel textarea{border-color:#35463c!important;background:#080d0a!important;color:#fff!important}
+
+/* Pass 9 dealer account/preferences UI. */
+.dealer-portal .dealer-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}
+.dealer-account-panel{display:grid;gap:14px;padding:16px;border:1px solid #26362d;border-radius:8px;background:#101714;color:#eef4f0;box-shadow:0 16px 34px rgba(0,0,0,.24)}
+.dealer-account-panel>header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px;border:1px solid #26362d;border-radius:7px;background:#0b100e}
+.dealer-account-panel>header span{display:block;color:#00e51d;font-size:10px;font-weight:950;text-transform:uppercase;letter-spacing:.8px}
+.dealer-account-panel>header h2{margin-top:4px;color:#fff;font-size:24px}
+.dealer-account-panel>header p{margin-top:5px;color:#a9b8b0;font-size:13px}
+.dealer-account-panel>header button{min-height:42px;padding:10px 16px;border:1px solid #00e51d;border-radius:5px;background:#00e51d;color:#061009;font-weight:950;cursor:pointer}
+.dealer-account-summary{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.dealer-account-summary>div,.dealer-account-card{border:1px solid #26362d;border-radius:6px;background:#0b100e;color:#eef4f0}
+.dealer-account-summary>div{padding:10px}
+.dealer-account-summary dt,.dealer-account-card label span,.dealer-account-card h3{color:#91a198;font-size:9px;font-weight:950;text-transform:uppercase}
+.dealer-account-summary dd{margin-top:4px;color:#fff;font-size:12px;font-weight:900;overflow-wrap:anywhere}
+.dealer-account-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dealer-account-card{display:grid;gap:12px;padding:14px}
+.dealer-account-card h3{color:#fff;font-size:17px;text-transform:none}
+.dealer-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.dealer-form-grid label,.dealer-account-card>label{display:grid;gap:6px}
+.dealer-form-grid .full{grid-column:1/-1}
+.dealer-form-grid input,.dealer-form-grid textarea,.dealer-account-card>label input{min-height:40px;padding:9px;border:1px solid #35463c;border-radius:4px;background:#080d0a;color:#fff;font-weight:800}
+.dealer-form-grid textarea{min-height:86px;resize:vertical}
+.dealer-checklist{display:grid;gap:8px}
+.dealer-checklist label{display:flex;align-items:center;gap:9px;min-height:38px;padding:8px 10px;border:1px solid #2b3d32;border-radius:5px;background:#111a15;color:#eef4f0;font-weight:900}
+.dealer-checklist input{width:16px;height:16px;accent-color:#00e51d}
+.dealer-checklist span{color:#eef4f0!important;font-size:12px!important;text-transform:none!important}
+.dealer-account-modal{width:min(1280px,100%)}
+.dealer-account-admin-grid{grid-template-columns:1fr 1fr!important}
+.dealer-modal-section{display:grid;gap:12px;padding:14px;border:1px solid #2b3d32;border-radius:7px;background:#0b100e}
+.dealer-modal-section h3{color:#fff;font-size:17px}
+.dealer-modal-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.dealer-modal-grid label{display:grid;gap:6px}
+.dealer-modal-grid .full{grid-column:1/-1}
+.dealer-modal-grid input,.dealer-modal-grid select,.dealer-modal-grid textarea,.dealer-modal-section>label input{min-height:40px;padding:9px;border:1px solid #35463c;border-radius:4px;background:#080d0a;color:#fff}
+.dealer-modal-grid textarea{min-height:76px;resize:vertical}
+.dealer-modal-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dealer-modal-checks label{display:flex;align-items:center;gap:8px;min-height:38px;padding:8px 10px;border:1px solid #2b3d32;border-radius:5px;background:#111a15}
+.dealer-modal-checks input{width:16px;height:16px;accent-color:#00e51d}
+.dealer-modal-checks span{color:#eef4f0!important;font-size:12px!important;text-transform:none!important}
+@media(max-width:1050px){.dealer-account-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.dealer-account-grid,.dealer-account-admin-grid,.dealer-modal-grid{grid-template-columns:1fr!important}}
+@media(max-width:760px){.dealer-portal .dealer-tabs{grid-template-columns:1fr 1fr!important}.dealer-account-panel>header{display:grid}.dealer-account-summary,.dealer-form-grid,.dealer-modal-checks{grid-template-columns:1fr}}

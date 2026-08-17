@@ -3,7 +3,9 @@ import "server-only";
 import { getCurrentUserId } from "@/lib/current-user";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText, safeNumber } from "@/lib/website-leads";
-import type { DealerLeadClaim, DealerPortalAccount } from "@/types/dealer-portal";
+import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaim, DealerPortalAccount, DealerPortalAccountWithPreferences } from "@/types/dealer-portal";
+
+const preferenceArrayLimit = 30;
 
 export async function getCurrentDealerPortalAccount() {
   const userId = await getCurrentUserId();
@@ -18,7 +20,7 @@ export async function getCurrentDealerPortalAccount() {
   if (error || !relatedDealer) return null;
   const dealer = relatedDealer as unknown as DealerPortalAccount;
   if (dealer.account_status !== "active") return null;
-  return { userId, role: String(data?.role ?? "dealer_user"), dealer };
+  return { userId, role: String(data?.role ?? "dealer_user"), dealer: await withDealerPreferences(dealer) };
 }
 
 export function cleanDealerAccountPayload(body: Record<string, unknown>, userId: string | null, creating: boolean) {
@@ -49,6 +51,143 @@ export function cleanDealerAccountPayload(body: Record<string, unknown>, userId:
   if (!["pending", "active", "suspended", "closed"].includes(String(payload.account_status))) throw new Error("Account status is invalid.");
   if (creating) payload.created_by = userId;
   return payload;
+}
+
+export function defaultBuyingPreferences(dealerAccountId: string): DealerBuyingPreferences {
+  return {
+    dealer_account_id: dealerAccountId,
+    motorcycle_types: [],
+    makes_wanted: [],
+    makes_excluded: [],
+    models_wanted: [],
+    minimum_year: null,
+    maximum_age_years: null,
+    minimum_value: null,
+    maximum_value: null,
+    maximum_mileage: null,
+    minimum_engine_cc: null,
+    maximum_engine_cc: null,
+    accepts_non_running: false,
+    accepts_insurance_category: false,
+    accepts_outstanding_finance: false,
+    accepts_imported: false,
+    accepts_modified: false,
+  };
+}
+
+export function defaultGeographyPreferences(dealerAccountId: string): DealerGeographyPreferences {
+  return {
+    dealer_account_id: dealerAccountId,
+    england: true,
+    wales: true,
+    scotland: false,
+    northern_ireland: false,
+    republic_of_ireland: false,
+    maximum_radius_miles: null,
+  };
+}
+
+function cleanPreferenceArray(value: unknown) {
+  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
+  return Array.from(new Set(raw.map(item => cleanText(item, 80)).filter((item): item is string => Boolean(item)))).slice(0, preferenceArrayLimit);
+}
+
+function cleanPositiveNumber(value: unknown) {
+  const number = safeNumber(value);
+  return number == null ? null : Math.max(0, Math.round(number));
+}
+
+function cleanBoolean(value: unknown) {
+  return value === true || value === "true" || value === "on" || value === 1 || value === "1";
+}
+
+export function cleanDealerBuyingPreferencesPayload(body: Record<string, unknown>, dealerAccountId: string) {
+  return {
+    dealer_account_id: dealerAccountId,
+    motorcycle_types: cleanPreferenceArray(body.motorcycle_types),
+    makes_wanted: cleanPreferenceArray(body.makes_wanted),
+    makes_excluded: cleanPreferenceArray(body.makes_excluded),
+    models_wanted: cleanPreferenceArray(body.models_wanted),
+    minimum_year: cleanPositiveNumber(body.minimum_year),
+    maximum_age_years: cleanPositiveNumber(body.maximum_age_years),
+    minimum_value: cleanPositiveNumber(body.minimum_value),
+    maximum_value: cleanPositiveNumber(body.maximum_value),
+    maximum_mileage: cleanPositiveNumber(body.maximum_mileage),
+    minimum_engine_cc: cleanPositiveNumber(body.minimum_engine_cc),
+    maximum_engine_cc: cleanPositiveNumber(body.maximum_engine_cc),
+    accepts_non_running: cleanBoolean(body.accepts_non_running),
+    accepts_insurance_category: cleanBoolean(body.accepts_insurance_category),
+    accepts_outstanding_finance: cleanBoolean(body.accepts_outstanding_finance),
+    accepts_imported: cleanBoolean(body.accepts_imported),
+    accepts_modified: cleanBoolean(body.accepts_modified),
+  };
+}
+
+export function cleanDealerGeographyPreferencesPayload(body: Record<string, unknown>, dealerAccountId: string) {
+  return {
+    dealer_account_id: dealerAccountId,
+    england: cleanBoolean(body.england),
+    wales: cleanBoolean(body.wales),
+    scotland: cleanBoolean(body.scotland),
+    northern_ireland: cleanBoolean(body.northern_ireland),
+    republic_of_ireland: cleanBoolean(body.republic_of_ireland),
+    maximum_radius_miles: cleanPositiveNumber(body.maximum_radius_miles),
+  };
+}
+
+export function cleanDealerSelfAccountPayload(body: Record<string, unknown>) {
+  return {
+    trading_address: cleanText(body.trading_address, 600),
+    main_contact: cleanText(body.main_contact, 160),
+    telephone: cleanText(body.telephone, 80),
+    mobile_whatsapp: cleanText(body.mobile_whatsapp, 80),
+    main_email: cleanText(body.main_email, 180),
+    accounts_email: cleanText(body.accounts_email, 180),
+    website: cleanText(body.website, 240),
+    postcode: cleanText(body.postcode, 30),
+  };
+}
+
+export async function withDealerPreferences(account: DealerPortalAccount): Promise<DealerPortalAccountWithPreferences> {
+  const db = getSupabaseAdminClient();
+  const [buying, geography] = await Promise.all([
+    db.from("dealer_buying_preferences").select("*").eq("dealer_account_id", account.id).maybeSingle(),
+    db.from("dealer_geography_preferences").select("*").eq("dealer_account_id", account.id).maybeSingle(),
+  ]);
+  return {
+    ...account,
+    buying_preferences: buying.data ? buying.data as DealerBuyingPreferences : defaultBuyingPreferences(account.id),
+    geography_preferences: geography.data ? geography.data as DealerGeographyPreferences : defaultGeographyPreferences(account.id),
+  };
+}
+
+export async function withDealerPreferencesList(accounts: DealerPortalAccount[]): Promise<DealerPortalAccountWithPreferences[]> {
+  if (!accounts.length) return [];
+  const ids = accounts.map(account => account.id);
+  const db = getSupabaseAdminClient();
+  const [buying, geography] = await Promise.all([
+    db.from("dealer_buying_preferences").select("*").in("dealer_account_id", ids),
+    db.from("dealer_geography_preferences").select("*").in("dealer_account_id", ids),
+  ]);
+  const buyingByDealer = new Map((buying.data ?? []).map(row => [String(row.dealer_account_id), row as DealerBuyingPreferences]));
+  const geographyByDealer = new Map((geography.data ?? []).map(row => [String(row.dealer_account_id), row as DealerGeographyPreferences]));
+  return accounts.map(account => ({
+    ...account,
+    buying_preferences: buyingByDealer.get(account.id) ?? defaultBuyingPreferences(account.id),
+    geography_preferences: geographyByDealer.get(account.id) ?? defaultGeographyPreferences(account.id),
+  }));
+}
+
+export async function saveDealerPreferencePayloads(dealerAccountId: string, body: Record<string, unknown>) {
+  const db = getSupabaseAdminClient();
+  const writes: PromiseLike<unknown>[] = [];
+  if (body.buying_preferences && typeof body.buying_preferences === "object") {
+    writes.push(db.from("dealer_buying_preferences").upsert(cleanDealerBuyingPreferencesPayload(body.buying_preferences as Record<string, unknown>, dealerAccountId), { onConflict: "dealer_account_id" }).throwOnError());
+  }
+  if (body.geography_preferences && typeof body.geography_preferences === "object") {
+    writes.push(db.from("dealer_geography_preferences").upsert(cleanDealerGeographyPreferencesPayload(body.geography_preferences as Record<string, unknown>, dealerAccountId), { onConflict: "dealer_account_id" }).throwOnError());
+  }
+  await Promise.all(writes);
 }
 
 export function redactLeadForDealer<T extends Record<string, unknown>>(lead: T, unlocked: boolean): T {

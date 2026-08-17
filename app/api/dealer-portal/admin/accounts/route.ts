@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { cleanDealerAccountPayload } from "@/lib/dealer-portal";
+import { cleanDealerAccountPayload, saveDealerPreferencePayloads, withDealerPreferences, withDealerPreferencesList } from "@/lib/dealer-portal";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
-import type { DealerPortalAccount } from "@/types/dealer-portal";
+import type { DealerPortalAccount, DealerPortalAccountWithPreferences } from "@/types/dealer-portal";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export async function GET() {
     .select("*")
     .order("trading_name", { ascending: true });
   if (error) return NextResponse.json({ error: "Unable to load dealer portal accounts." }, { status: 500 });
-  return NextResponse.json({ accounts: (data ?? []) as DealerPortalAccount[] });
+  return NextResponse.json({ accounts: await withDealerPreferencesList((data ?? []) as DealerPortalAccount[]) });
 }
 
 export async function POST(request: Request) {
@@ -29,7 +29,8 @@ export async function POST(request: Request) {
       .select("*")
       .single();
     if (error) return NextResponse.json({ error: `Unable to create dealer portal account: ${error.message}` }, { status: 500 });
-    return NextResponse.json({ account: data as DealerPortalAccount }, { status: 201 });
+    await saveDealerPreferencePayloads(data.id, body);
+    return NextResponse.json({ account: await withDealerPreferences(data as DealerPortalAccount) as DealerPortalAccountWithPreferences }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to create dealer portal account." }, { status: 400 });
   }

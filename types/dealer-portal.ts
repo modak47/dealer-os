@@ -33,6 +33,45 @@ export type DealerPortalAccount = {
   updated_at: string;
 };
 
+export type DealerBuyingPreferences = {
+  dealer_account_id: string;
+  motorcycle_types: string[];
+  makes_wanted: string[];
+  makes_excluded: string[];
+  models_wanted: string[];
+  minimum_year: number | null;
+  maximum_age_years: number | null;
+  minimum_value: number | null;
+  maximum_value: number | null;
+  maximum_mileage: number | null;
+  minimum_engine_cc: number | null;
+  maximum_engine_cc: number | null;
+  accepts_non_running: boolean;
+  accepts_insurance_category: boolean;
+  accepts_outstanding_finance: boolean;
+  accepts_imported: boolean;
+  accepts_modified: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type DealerGeographyPreferences = {
+  dealer_account_id: string;
+  england: boolean;
+  wales: boolean;
+  scotland: boolean;
+  northern_ireland: boolean;
+  republic_of_ireland: boolean;
+  maximum_radius_miles: number | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type DealerPortalAccountWithPreferences = DealerPortalAccount & {
+  buying_preferences?: DealerBuyingPreferences | null;
+  geography_preferences?: DealerGeographyPreferences | null;
+};
+
 export type DealerLeadAllocation = {
   id: string;
   website_lead_id: number;

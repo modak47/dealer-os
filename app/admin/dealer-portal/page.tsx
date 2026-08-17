@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Children, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
-import type { DealerLeadClaim, DealerLeadNote, DealerPortalAccount, DealerPurchase, DealerPurchaseFee } from "@/types/dealer-portal";
+import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaim, DealerLeadNote, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPurchase, DealerPurchaseFee } from "@/types/dealer-portal";
 import type { WebsiteLead } from "@/types/website-lead";
 
 type RelatedDealer = { id: string; trading_name: string; successful_purchase_fee?: number | null } | null;
@@ -17,7 +17,7 @@ type BackfillResult = { id?: number; reg?: string | null; error?: string; skippe
 type BackfillPayload = { processed?: number; checked?: number; failed?: number; skipped?: number; results?: BackfillResult[]; error?: string };
 type AdminTab = "daily" | "dealers" | "oversight";
 
-const emptyAccount: Partial<DealerPortalAccount> = {
+const emptyAccount: Partial<DealerPortalAccountWithPreferences> = {
   trading_name: "",
   main_contact: "",
   main_email: "",
@@ -31,11 +31,62 @@ const emptyAccount: Partial<DealerPortalAccount> = {
 
 const emptyAccess = { email: "", password: "", role: "dealer_admin" };
 
+function defaultBuyingPreferences(dealerId = ""): DealerBuyingPreferences {
+  return {
+    dealer_account_id: dealerId,
+    motorcycle_types: [],
+    makes_wanted: [],
+    makes_excluded: [],
+    models_wanted: [],
+    minimum_year: null,
+    maximum_age_years: null,
+    minimum_value: null,
+    maximum_value: null,
+    maximum_mileage: null,
+    minimum_engine_cc: null,
+    maximum_engine_cc: null,
+    accepts_non_running: false,
+    accepts_insurance_category: false,
+    accepts_outstanding_finance: false,
+    accepts_imported: false,
+    accepts_modified: false,
+  };
+}
+
+function defaultGeographyPreferences(dealerId = ""): DealerGeographyPreferences {
+  return {
+    dealer_account_id: dealerId,
+    england: true,
+    wales: true,
+    scotland: false,
+    northern_ireland: false,
+    republic_of_ireland: false,
+    maximum_radius_miles: null,
+  };
+}
+
+function prepareEditingAccount(account: Partial<DealerPortalAccountWithPreferences>): Partial<DealerPortalAccountWithPreferences> {
+  return {
+    ...emptyAccount,
+    ...account,
+    buying_preferences: { ...defaultBuyingPreferences(account.id), ...(account.buying_preferences ?? {}) },
+    geography_preferences: { ...defaultGeographyPreferences(account.id), ...(account.geography_preferences ?? {}) },
+  };
+}
+
+function arrayText(value: string[] | null | undefined) {
+  return (value ?? []).join(", ");
+}
+
+function splitArrayText(value: string) {
+  return Array.from(new Set(value.split(",").map(item => item.trim()).filter(Boolean)));
+}
+
 export default function DealerPortalAdminPage() {
-  const [accounts, setAccounts] = useState<DealerPortalAccount[]>([]);
+  const [accounts, setAccounts] = useState<DealerPortalAccountWithPreferences[]>([]);
   const [leads, setLeads] = useState<WebsiteLead[]>([]);
   const [overview, setOverview] = useState<AdminOverview>({ claims: [], notes: [], purchases: [], fees: [] });
-  const [editing, setEditing] = useState<Partial<DealerPortalAccount> | null>(null);
+  const [editing, setEditing] = useState<Partial<DealerPortalAccountWithPreferences> | null>(null);
   const [access, setAccess] = useState(emptyAccess);
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [releaseQuery, setReleaseQuery] = useState("");
@@ -99,8 +150,22 @@ export default function DealerPortalAdminPage() {
     setEditing(current => ({ ...(current ?? emptyAccount), [key]: value }));
   }
 
-  function startEditing(account: Partial<DealerPortalAccount>) {
-    setEditing(account);
+  function setBuyingField<K extends keyof DealerBuyingPreferences>(key: K, value: DealerBuyingPreferences[K]) {
+    setEditing(current => {
+      const account = prepareEditingAccount(current ?? emptyAccount);
+      return { ...account, buying_preferences: { ...defaultBuyingPreferences(account.id), ...(account.buying_preferences ?? {}), [key]: value } };
+    });
+  }
+
+  function setGeographyField<K extends keyof DealerGeographyPreferences>(key: K, value: DealerGeographyPreferences[K]) {
+    setEditing(current => {
+      const account = prepareEditingAccount(current ?? emptyAccount);
+      return { ...account, geography_preferences: { ...defaultGeographyPreferences(account.id), ...(account.geography_preferences ?? {}), [key]: value } };
+    });
+  }
+
+  function startEditing(account: Partial<DealerPortalAccountWithPreferences>) {
+    setEditing(prepareEditingAccount(account));
     setAccess({ email: account.main_email ?? "", password: "", role: "dealer_admin" });
   }
 
@@ -118,7 +183,7 @@ export default function DealerPortalAdminPage() {
     });
     const payload = await response.json();
     if (response.ok) {
-      const savedAccount = payload.account as DealerPortalAccount;
+      const savedAccount = payload.account as DealerPortalAccountWithPreferences;
       if (access.email.trim()) {
         const accessResponse = await fetch(`/api/dealer-portal/admin/accounts/${savedAccount.id}/users`, {
           method: "POST",
@@ -252,12 +317,56 @@ export default function DealerPortalAdminPage() {
         </section>
       </section>}
     </section>
-    {editing && <div className="website-modal-backdrop" role="dialog" aria-modal="true"><form className="website-book-modal dealer-contact-modal" onSubmit={saveAccount}><header><div><h2>{editing.id ? "Edit Portal Dealer" : "Add Portal Dealer"}</h2><p>Save the dealer and optionally create/link their portal login in one step.</p></div><button type="button" onClick={() => { setEditing(null); setAccess(emptyAccess); }}>Close</button></header><div className="website-book-grid"><Input label="Trading name" value={editing.trading_name ?? ""} set={v => setField("trading_name", v)} required /><Input label="Limited company" value={editing.limited_company_name ?? ""} set={v => setField("limited_company_name", v)} /><Input label="Main contact" value={editing.main_contact ?? ""} set={v => setField("main_contact", v)} /><Input label="Main email" value={editing.main_email ?? ""} set={v => setField("main_email", v)} type="email" /><Input label="Telephone" value={editing.telephone ?? ""} set={v => setField("telephone", v)} /><Input label="WhatsApp/mobile" value={editing.mobile_whatsapp ?? ""} set={v => setField("mobile_whatsapp", v)} /><Input label="Postcode" value={editing.postcode ?? ""} set={v => setField("postcode", v)} /><Input label="Auto Trader ref" value={editing.autotrader_dealer_ref ?? ""} set={v => setField("autotrader_dealer_ref", v)} /><label><span>Status</span><select value={editing.account_status ?? "pending"} onChange={event => setField("account_status", event.target.value)}><option value="pending">Pending</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="closed">Closed</option></select></label><Input label="Purchase fee" value={String(editing.successful_purchase_fee ?? 50)} set={v => setField("successful_purchase_fee", Number(v))} type="number" /><Input label="Attribution days" value={String(editing.attribution_period_days ?? 60)} set={v => setField("attribution_period_days", Number(v))} type="number" /><label className="full"><span>Internal notes</span><textarea value={editing.internal_notes ?? ""} onChange={event => setField("internal_notes", event.target.value)} /></label><div className="full dealer-login-fields"><h3>Dealer Login</h3><p>Enter an email and temporary password to create or link this dealer&apos;s login. Leave blank if you only want to save the dealer record.</p></div><Input label="Login email" value={access.email} set={v => setAccess(current => ({ ...current, email: v }))} type="email" /><Input label="Temporary password" value={access.password} set={v => setAccess(current => ({ ...current, password: v }))} type="password" /><label><span>Portal role</span><select value={access.role} onChange={event => setAccess(current => ({ ...current, role: event.target.value }))}><option value="dealer_admin">Dealer Admin</option><option value="dealer_user">Dealer User</option></select></label><div className="dealer-login-link"><span>Login page</span><Link href="/dealer-login" target="_blank">Open dealer login</Link></div></div><footer><button type="button" onClick={() => { setEditing(null); setAccess(emptyAccess); }}>Cancel</button><button className="primary" disabled={saving}>{saving ? "Saving..." : access.email.trim() ? "Save Dealer & Login" : "Save Dealer"}</button></footer></form></div>}
+    {editing && <DealerAccountModal editing={editing} access={access} saving={saving} setAccess={setAccess} setField={setField} setBuyingField={setBuyingField} setGeographyField={setGeographyField} onSubmit={saveAccount} onClose={() => { setEditing(null); setAccess(emptyAccess); }} />}
   </main>;
+}
+
+function DealerAccountModal({ editing, access, saving, setAccess, setField, setBuyingField, setGeographyField, onSubmit, onClose }: {
+  editing: Partial<DealerPortalAccountWithPreferences>;
+  access: typeof emptyAccess;
+  saving: boolean;
+  setAccess: (updater: typeof emptyAccess | ((current: typeof emptyAccess) => typeof emptyAccess)) => void;
+  setField: (key: keyof DealerPortalAccount, value: string | number) => void;
+  setBuyingField: <K extends keyof DealerBuyingPreferences>(key: K, value: DealerBuyingPreferences[K]) => void;
+  setGeographyField: <K extends keyof DealerGeographyPreferences>(key: K, value: DealerGeographyPreferences[K]) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onClose: () => void;
+}) {
+  const buying = editing.buying_preferences ?? defaultBuyingPreferences(editing.id);
+  const geography = editing.geography_preferences ?? defaultGeographyPreferences(editing.id);
+  return <div className="website-modal-backdrop" role="dialog" aria-modal="true">
+    <form className="website-book-modal dealer-contact-modal dealer-account-modal" onSubmit={onSubmit}>
+      <header><div><h2>{editing.id ? "Edit Portal Dealer" : "Add Portal Dealer"}</h2><p>Company details, login setup, buying preferences and geography rules.</p></div><button type="button" onClick={onClose}>Close</button></header>
+      <div className="website-book-grid dealer-account-admin-grid">
+        <section className="full dealer-modal-section"><h3>Dealer Account</h3><div className="dealer-modal-grid"><Input label="Trading name" value={editing.trading_name ?? ""} set={v => setField("trading_name", v)} required /><Input label="Limited company" value={editing.limited_company_name ?? ""} set={v => setField("limited_company_name", v)} /><Input label="Company reg" value={editing.company_registration_number ?? ""} set={v => setField("company_registration_number", v)} /><Input label="VAT number" value={editing.vat_number ?? ""} set={v => setField("vat_number", v)} /><Input label="Main contact" value={editing.main_contact ?? ""} set={v => setField("main_contact", v)} /><Input label="Main email" value={editing.main_email ?? ""} set={v => setField("main_email", v)} type="email" /><Input label="Telephone" value={editing.telephone ?? ""} set={v => setField("telephone", v)} /><Input label="WhatsApp/mobile" value={editing.mobile_whatsapp ?? ""} set={v => setField("mobile_whatsapp", v)} /><Input label="Accounts email" value={editing.accounts_email ?? ""} set={v => setField("accounts_email", v)} type="email" /><Input label="Website" value={editing.website ?? ""} set={v => setField("website", v)} /><Input label="Postcode" value={editing.postcode ?? ""} set={v => setField("postcode", v)} /><Input label="Auto Trader ref" value={editing.autotrader_dealer_ref ?? ""} set={v => setField("autotrader_dealer_ref", v)} /><label><span>Status</span><select value={editing.account_status ?? "pending"} onChange={event => setField("account_status", event.target.value)}><option value="pending">Pending</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="closed">Closed</option></select></label><Input label="Purchase fee" value={String(editing.successful_purchase_fee ?? 50)} set={v => setField("successful_purchase_fee", Number(v))} type="number" /><Input label="Attribution days" value={String(editing.attribution_period_days ?? 60)} set={v => setField("attribution_period_days", Number(v))} type="number" /><label className="full"><span>Trading address</span><textarea value={editing.trading_address ?? ""} onChange={event => setField("trading_address", event.target.value)} /></label><label className="full"><span>Registered address</span><textarea value={editing.registered_address ?? ""} onChange={event => setField("registered_address", event.target.value)} /></label><label className="full"><span>Internal notes</span><textarea value={editing.internal_notes ?? ""} onChange={event => setField("internal_notes", event.target.value)} /></label></div></section>
+        <section className="full dealer-modal-section"><h3>Buying Preferences</h3><div className="dealer-modal-grid"><AdminTextListInput label="Types" value={buying.motorcycle_types} set={value => setBuyingField("motorcycle_types", value)} /><AdminTextListInput label="Makes wanted" value={buying.makes_wanted} set={value => setBuyingField("makes_wanted", value)} /><AdminTextListInput label="Makes excluded" value={buying.makes_excluded} set={value => setBuyingField("makes_excluded", value)} /><AdminTextListInput label="Models wanted" value={buying.models_wanted} set={value => setBuyingField("models_wanted", value)} /><AdminNumberPreference label="Minimum year" value={buying.minimum_year} set={value => setBuyingField("minimum_year", value)} /><AdminNumberPreference label="Max age years" value={buying.maximum_age_years} set={value => setBuyingField("maximum_age_years", value)} /><AdminNumberPreference label="Min value" value={buying.minimum_value} set={value => setBuyingField("minimum_value", value)} /><AdminNumberPreference label="Max value" value={buying.maximum_value} set={value => setBuyingField("maximum_value", value)} /><AdminNumberPreference label="Max mileage" value={buying.maximum_mileage} set={value => setBuyingField("maximum_mileage", value)} /><AdminNumberPreference label="Min engine cc" value={buying.minimum_engine_cc} set={value => setBuyingField("minimum_engine_cc", value)} /><AdminNumberPreference label="Max engine cc" value={buying.maximum_engine_cc} set={value => setBuyingField("maximum_engine_cc", value)} /></div></section>
+        <section className="dealer-modal-section"><h3>Vehicle History Rules</h3><div className="dealer-modal-checks"><AdminCheckbox label="Accept non-running" checked={buying.accepts_non_running} set={value => setBuyingField("accepts_non_running", value)} /><AdminCheckbox label="Accept insurance category" checked={buying.accepts_insurance_category} set={value => setBuyingField("accepts_insurance_category", value)} /><AdminCheckbox label="Accept outstanding finance" checked={buying.accepts_outstanding_finance} set={value => setBuyingField("accepts_outstanding_finance", value)} /><AdminCheckbox label="Accept imported" checked={buying.accepts_imported} set={value => setBuyingField("accepts_imported", value)} /><AdminCheckbox label="Accept modified" checked={buying.accepts_modified} set={value => setBuyingField("accepts_modified", value)} /></div></section>
+        <section className="dealer-modal-section"><h3>Geography</h3><div className="dealer-modal-checks"><AdminCheckbox label="England" checked={geography.england} set={value => setGeographyField("england", value)} /><AdminCheckbox label="Wales" checked={geography.wales} set={value => setGeographyField("wales", value)} /><AdminCheckbox label="Scotland" checked={geography.scotland} set={value => setGeographyField("scotland", value)} /><AdminCheckbox label="Northern Ireland" checked={geography.northern_ireland} set={value => setGeographyField("northern_ireland", value)} /><AdminCheckbox label="Republic of Ireland" checked={geography.republic_of_ireland} set={value => setGeographyField("republic_of_ireland", value)} /></div><AdminNumberPreference label="Buying radius miles" value={geography.maximum_radius_miles} set={value => setGeographyField("maximum_radius_miles", value)} /></section>
+        <div className="full dealer-login-fields"><h3>Dealer Login</h3><p>Enter an email and temporary password to create or link this dealer&apos;s login. Leave blank if you only want to save the dealer record.</p></div>
+        <Input label="Login email" value={access.email} set={v => setAccess(current => ({ ...current, email: v }))} type="email" />
+        <Input label="Temporary password" value={access.password} set={v => setAccess(current => ({ ...current, password: v }))} type="password" />
+        <label><span>Portal role</span><select value={access.role} onChange={event => setAccess(current => ({ ...current, role: event.target.value }))}><option value="dealer_admin">Dealer Admin</option><option value="dealer_user">Dealer User</option></select></label>
+        <div className="dealer-login-link"><span>Login page</span><Link href="/dealer-login" target="_blank">Open dealer login</Link></div>
+      </div>
+      <footer><button type="button" onClick={onClose}>Cancel</button><button className="primary" disabled={saving}>{saving ? "Saving..." : access.email.trim() ? "Save Dealer & Login" : "Save Dealer"}</button></footer>
+    </form>
+  </div>;
 }
 
 function Input({ label, value, set, type = "text", required = false }: { label: string; value: string; set: (value: string) => void; type?: string; required?: boolean }) {
   return <label><span>{label}</span><input type={type} value={value} required={required} min={type === "number" ? "0" : undefined} onChange={event => set(event.target.value)} /></label>;
+}
+
+function AdminTextListInput({ label, value, set }: { label: string; value: string[]; set: (value: string[]) => void }) {
+  return <label><span>{label}</span><input value={arrayText(value)} onChange={event => set(splitArrayText(event.target.value))} placeholder="Comma separated" /></label>;
+}
+
+function AdminNumberPreference({ label, value, set }: { label: string; value: number | null; set: (value: number | null) => void }) {
+  return <label><span>{label}</span><input type="number" min="0" value={value ?? ""} onChange={event => set(event.target.value === "" ? null : Number(event.target.value))} /></label>;
+}
+
+function AdminCheckbox({ label, checked, set }: { label: string; checked: boolean; set: (value: boolean) => void }) {
+  return <label><input type="checkbox" checked={checked} onChange={event => set(event.target.checked)} /><span>{label}</span></label>;
 }
 
 function ReleaseQueueRow({ lead, selected, saving, onSelect }: { lead: WebsiteLead; selected: boolean; saving: boolean; onSelect: () => void }) {
