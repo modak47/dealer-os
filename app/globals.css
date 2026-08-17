@@ -595,3 +595,13 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-portal .dealer-tabs button:hover::after,.dealer-portal .dealer-tabs button:focus-visible::after{background:#00e51d}
 .dealer-portal .dealer-tabs button.active{background:#132b19!important;color:#00e51d!important;box-shadow:inset 0 -3px 0 #00e51d!important}
 .dealer-portal .dealer-tabs button.active::after{background:#00e51d}
+
+/* Claimed/empty-state dark polish. */
+.dealer-portal .dealer-lead-image{background:#070b09!important;color:#7f9188!important}
+.dealer-portal .dealer-lead-image>span{display:grid!important;place-items:center!important;width:100%!important;height:100%!important;min-height:260px!important;background:#070b09!important;color:#8ea097!important;font-size:16px!important}
+.dealer-portal .dealer-work-panel,.dealer-portal .dealer-timeline{border-color:#26362d!important;background:#0b100e!important;color:#eef4f0!important}
+.dealer-portal .dealer-work-panel h3,.dealer-portal .dealer-timeline h3{color:#fff!important}
+.dealer-portal .dealer-timeline article,.dealer-portal .dealer-outcome-panel{border-color:#2b3d32!important;background:#111a15!important;color:#eef4f0!important}
+.dealer-portal .dealer-timeline p{color:#c8d5ce!important}
+.dealer-portal .dealer-outcome-panel summary{color:#eef4f0!important}
+.dealer-portal .dealer-note-form select,.dealer-portal .dealer-note-form textarea,.dealer-portal .dealer-outcome-panel select,.dealer-portal .dealer-outcome-panel input,.dealer-portal .dealer-outcome-panel textarea{border-color:#35463c!important;background:#080d0a!important;color:#fff!important}
