@@ -367,3 +367,24 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-portal .dealer-timeline article,.dealer-portal .dealer-outcome-panel{border-color:#d4dfd5;background:#fff}
 .dealer-portal .dealer-timeline p{color:#4d5f55}
 .dealer-portal .dealer-note-form select,.dealer-portal .dealer-note-form textarea,.dealer-portal .dealer-outcome-panel select,.dealer-portal .dealer-outcome-panel input,.dealer-portal .dealer-outcome-panel textarea{border-color:#cfd9d0;background:#fff;color:#17231b}
+.dealer-portal .dealer-lead-card{overflow:hidden;background:#fff!important}
+.dealer-portal .dealer-lead-image{align-self:stretch!important;height:auto!important;min-height:260px!important;background:#eef3ee!important}
+.dealer-portal .dealer-lead-image img{height:100%!important;min-height:260px!important;object-fit:cover}
+.dealer-portal .dealer-lead-image span{color:#66756c}
+.dealer-portal .dealer-lead-title{display:flex;align-items:start;justify-content:space-between;gap:16px;padding:0 0 13px;border-bottom:1px solid #dbe5dc;background:#fff!important;color:#17231b!important}
+.dealer-portal .dealer-lead-title>div{min-width:0}
+.dealer-portal .dealer-lead-title h2{color:#101914!important}
+.dealer-portal .dealer-lead-title p{color:#65756d!important}
+.dealer-portal .dealer-lead-title strong{background:#fff6d7!important;color:#49360e!important}
+.dealer-portal .dealer-tabs button{background:#fff!important;color:#52645a!important}
+.dealer-portal .dealer-tabs button.active{border-bottom:2px solid #00c91d!important;background:#eaf8ec!important;color:#067d18!important}
+.dealer-portal .dealer-vehicle-check{box-shadow:inset 0 0 0 1px rgba(7,141,29,.02)}
+.dealer-portal .dealer-vehicle-check header{border-bottom:1px solid #dce6dd;background:#fff!important;color:#17231b}
+.dealer-portal .dealer-vehicle-check.compact header{margin:-8px -10px 0;padding:8px 10px}
+.dealer-portal .dealer-vehicle-check header h3{color:#101914!important}
+.dealer-portal .dealer-vehicle-check.compact .dealer-check-grid article{border-color:#cfded2!important;background:#fff!important;color:#17231b!important}
+.dealer-portal .dealer-vehicle-check.compact .dealer-check-grid article.clear{background:#f6fff7!important}
+.dealer-portal .dealer-vehicle-check.compact .dealer-check-grid strong{color:#17231b!important}
+.dealer-portal .dealer-vehicle-check.compact .dealer-check-grid span{color:#52645a!important}
+.dealer-portal .dealer-claim-button{box-shadow:0 10px 20px rgba(0,155,24,.16)}
+@media(max-width:760px){.dealer-portal .dealer-lead-title{display:grid}.dealer-portal .dealer-lead-image,.dealer-portal .dealer-lead-image img{height:230px!important;min-height:230px!important}}
