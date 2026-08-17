@@ -26,6 +26,7 @@ function distanceMiles(fromLat: number | null | undefined, fromLon: number | nul
 type Coords = { latitude: number; longitude: number };
 
 const postcodeCache = new Map<string, Coords | null>();
+const dealerVisibleAvailableStatuses = new Set(["dealer_pool_available", "dealer_allocated", "referred_to_dealer"]);
 
 function postcodeDistrict(value: string | null | undefined) {
   return String(value ?? "").trim().split(/\s+/)[0] || null;
@@ -172,6 +173,7 @@ export async function GET() {
   for (const row of allocationsResult.data ?? []) {
     const lead = relatedLead(row.lead);
     if (!lead || activeClaimByLead.has(Number(row.website_lead_id))) continue;
+    if (!dealerVisibleAvailableStatuses.has(String(lead.status ?? ""))) continue;
     const redacted = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, false) as DealerVisibleLead;
     available.push({ ...redacted, ...await dealerLeadMeta(lead, session.dealer, false), portal_vehicle_check: dealerVehicleCheck(lead), portal_allocation_id: String(row.id), customer_unlocked: false });
   }

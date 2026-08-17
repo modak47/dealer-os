@@ -27,6 +27,7 @@ export default function WebsiteLeadsPage() {
   const [sort, setSort] = useState<SortKey>("newest");
   const [runningId, setRunningId] = useState<number | null>(null);
   const [locatingId, setLocatingId] = useState<number | null>(null);
+  const [keepingId, setKeepingId] = useState<number | null>(null);
   const [cardErrors, setCardErrors] = useState<Record<number, string>>({});
   const [bookingLead, setBookingLead] = useState<WebsiteLead | null>(null);
   const [referralLead, setReferralLead] = useState<WebsiteLead | null>(null);
@@ -117,6 +118,22 @@ export default function WebsiteLeadsPage() {
     }
   }
 
+  async function keepForYesMoto(lead: WebsiteLead) {
+    if (!window.confirm("Keep this lead for YesMoto and remove it from any open dealer portal allocations?")) return;
+    setKeepingId(lead.id);
+    setCardErrors(current => ({ ...current, [lead.id]: "" }));
+    try {
+      const response = await fetch(`/api/website-leads/${lead.id}/keep-internal`, { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Unable to keep lead for YesMoto.");
+      setLeads(current => current.map(item => item.id === lead.id ? payload.lead : item));
+    } catch (keepError) {
+      setCardErrors(current => ({ ...current, [lead.id]: keepError instanceof Error ? keepError.message : "Unable to keep lead for YesMoto." }));
+    } finally {
+      setKeepingId(null);
+    }
+  }
+
   return <main className="admin-page website-leads-page">
     <div className="admin-heading">
       <div><h1>Website Leads</h1><p>Bike valuation enquiries from the public websites, ready for review and offer work.</p></div>
@@ -134,19 +151,20 @@ export default function WebsiteLeadsPage() {
     {error && <div className="website-state error">{error}</div>}
     {loading && <div className="website-card-grid">{Array.from({ length: 6 }).map((_, index) => <article className="website-lead-card skeleton" key={index}><i /><div><span /><span /><span /></div></article>)}</div>}
     {!loading && !error && !filtered.length && <div className="website-state">No website leads match these filters.</div>}
-    {!loading && !error && <section className="website-card-grid">{filtered.map(lead => <LeadCard lead={lead} muted={isLeadMuted(lead, viewedLeadIds, oldBatchMaxId)} running={runningId === lead.id} locating={locatingId === lead.id} error={cardErrors[lead.id]} onOpen={() => openLead(lead)} onRun={() => void runValuation(lead)} onRefreshLocation={() => void refreshLocation(lead)} onRefer={() => setReferralLead(lead)} onBook={() => { setBookingLead(lead); setBookingResult(null); }} key={lead.id} />)}</section>}
+    {!loading && !error && <section className="website-card-grid">{filtered.map(lead => <LeadCard lead={lead} muted={isLeadMuted(lead, viewedLeadIds, oldBatchMaxId)} running={runningId === lead.id} locating={locatingId === lead.id} keeping={keepingId === lead.id} error={cardErrors[lead.id]} onOpen={() => openLead(lead)} onRun={() => void runValuation(lead)} onRefreshLocation={() => void refreshLocation(lead)} onRefer={() => setReferralLead(lead)} onKeep={() => void keepForYesMoto(lead)} onBook={() => { setBookingLead(lead); setBookingResult(null); }} key={lead.id} />)}</section>}
     {bookingLead && <BookIntoStockModal lead={bookingLead} result={bookingResult} onBooked={(stockId, stockNumber) => { setBookingResult({ stockId, stockNumber }); setLeads(current => current.map(item => item.id === bookingLead.id ? { ...item, status: "purchase_agreed", stock_bike_id: stockId, purchase_agreed_at: new Date().toISOString() } : item)); }} onClose={() => setBookingLead(null)} />}
     {referralLead && <ReferralModal lead={referralLead} onClose={() => setReferralLead(null)} onReferred={lead => { setLeads(current => current.map(item => item.id === lead.id ? lead : item)); setReferralLead(null); }} />}
   </main>;
 }
 
-function LeadCard({ lead, muted, running, locating, error, onOpen, onRun, onRefreshLocation, onRefer, onBook }: { lead: WebsiteLead; muted: boolean; running: boolean; locating: boolean; error?: string; onOpen: () => void; onRun: () => void; onRefreshLocation: () => void; onRefer: () => void; onBook: () => void }) {
+function LeadCard({ lead, muted, running, locating, keeping, error, onOpen, onRun, onRefreshLocation, onRefer, onKeep, onBook }: { lead: WebsiteLead; muted: boolean; running: boolean; locating: boolean; keeping: boolean; error?: string; onOpen: () => void; onRun: () => void; onRefreshLocation: () => void; onRefer: () => void; onKeep: () => void; onBook: () => void }) {
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const [imageIndex, setImageIndex] = useState(0);
   const margin = safeNumber(lead.estimated_margin);
   const processing = lead.valuation_status === "processing";
   const hasReg = Boolean(lead.reg?.trim());
   const runLabel = processing ? "Valuation in progress" : running ? "Valuing..." : lead.retail_check_id && lead.valuation_status === "completed" ? "Re-run Valuation" : "Run Retail Check";
+  const keptInternal = lead.status === "internal_buying";
   const locationAvailable = Boolean(lead.postcode || lead.normalised_postcode || lead.location_display_name || lead.latitude != null);
   const locationResolved = lead.latitude != null && lead.longitude != null;
   const primaryImage = imageIndex >= 0 ? images[imageIndex] : null;
@@ -169,6 +187,7 @@ function LeadCard({ lead, muted, running, locating, error, onOpen, onRun, onRefr
         {locationAvailable && <a href={directionsUrl("YesMoto", lead)} target="_blank" rel="noreferrer">Get Directions</a>}
         {(!locationResolved || lead.geocoding_status === "failed") && locationAvailable && <button disabled={locating} onClick={onRefreshLocation}>{locating ? "Refreshing..." : "Refresh Location"}</button>}
         <button onClick={onRefer}>Send to Dealer</button>
+        <button disabled={keeping || keptInternal} onClick={onKeep}>{keptInternal ? "Kept for YesMoto" : keeping ? "Keeping..." : "Keep for YesMoto"}</button>
         {lead.stock_bike_id ? <Link href={`/admin/stock/${lead.stock_bike_id}`}>View Pending Stock</Link> : <button onClick={onBook}>Book Into Stock</button>}
         {hasReg ? <button disabled={running || processing} onClick={onRun}>{runLabel}</button> : <span>Registration required</span>}
         {lead.retail_check_id && <Link href={`/admin/retail-check?recordId=${encodeURIComponent(lead.retail_check_id)}&leadId=${lead.id}`}>View Valuation</Link>}

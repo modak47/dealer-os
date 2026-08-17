@@ -31,7 +31,7 @@ describe("Auto Trader Connect client", () => {
         return jsonResponse({ access_token: "token-123", expires_at: "2099-01-01T00:00:00.000Z" });
       }
 
-      assert.equal(url, "https://api-sandbox.autotrader.co.uk/advertisers?advertiserId=10014506");
+      assert.equal(url, "https://api-sandbox.autotrader.co.uk/advertisers?advertiserId=10014506&autotraderAdvertAllowances=true");
       assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer token-123");
       return jsonResponse({
         results: [{ advertiserId: "10014506", name: "YesMoto", status: "Good" }],

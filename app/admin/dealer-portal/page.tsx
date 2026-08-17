@@ -72,7 +72,7 @@ export default function DealerPortalAdminPage() {
 
   const activeAccounts = useMemo(() => accounts.filter(account => account.account_status === "active"), [accounts]);
   const portalLeads = useMemo(() => leads.filter(lead => String(lead.status ?? "").startsWith("dealer_")), [leads]);
-  const releaseableLeads = useMemo(() => leads.filter(lead => !["purchased", "purchase_agreed", "dealer_claimed", "dealer_purchased"].includes(String(lead.status ?? ""))), [leads]);
+  const releaseableLeads = useMemo(() => leads.filter(lead => !["purchased", "internal_buying", "purchase_agreed", "dealer_claimed", "dealer_purchased"].includes(String(lead.status ?? ""))), [leads]);
   const kpis = [
     ["Active Dealers", activeAccounts.length],
     ["Portal Leads", portalLeads.length],
