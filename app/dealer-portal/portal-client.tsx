@@ -168,7 +168,7 @@ function MotorcyclePreviewPanel({ lead }: { lead: DealerVisibleLead }) {
   return <section className="dealer-preview-panel">
     <h3>Motorcycle Preview</h3>
     <dl>{rows.map(([label, value]) => <Detail label={label} value={value} key={label} />)}</dl>
-    {(lead.customer_message || lead.extras) && <p>{lead.customer_message || lead.extras}</p>}
+    {(lead.customer_message || lead.extras) && <p><strong>Notes</strong>{lead.customer_message || lead.extras}</p>}
   </section>;
 }
 
