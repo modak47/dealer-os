@@ -429,7 +429,7 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-portal .dealer-image-dots button{width:7px;height:7px;padding:0;border:0;border-radius:999px;background:rgba(255,255,255,.55);cursor:pointer}
 .dealer-portal .dealer-image-dots button.active{width:18px;background:var(--green)}
 .dealer-portal .dealer-lead-image b{z-index:4;background:rgba(6,16,9,.88)!important;color:#c5ffca!important;font-weight:950!important}
-.dealer-portal .dealer-lead-card{align-items:stretch;min-height:760px}
+.dealer-portal .dealer-lead-card{align-items:stretch;min-height:760px!important}
 .dealer-portal .dealer-lead-body{grid-template-rows:auto;min-height:0}
 .dealer-portal .dealer-card-tab-panel{display:grid;align-content:start;gap:12px;min-height:0;overflow:visible;padding-right:0}
 .dealer-portal .dealer-lead-image{position:relative!important;overflow:hidden!important;height:auto!important;min-height:100%!important}
@@ -469,6 +469,10 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-title-line h2{margin-top:0!important}
 .dealer-portal .dealer-lead-title p{display:inline-flex;flex-wrap:wrap;gap:6px;margin-top:0!important}
 .dealer-portal .dealer-lead-title p b{display:inline-grid;place-items:center;min-height:24px;padding:4px 9px;border:1px solid #b9cabd;border-radius:999px;background:#f6fbf6;color:#122018;font-size:12px;font-weight:950;line-height:1.15;box-shadow:0 1px 0 rgba(14,34,20,.05)}
+.dealer-portal .dealer-preview-panel dl{display:flex!important;flex-wrap:wrap!important;gap:7px!important;border-top:0!important}
+.dealer-portal .dealer-preview-panel dl div{display:grid!important;grid-template-columns:auto auto!important;align-items:center;gap:6px;min-height:32px;padding:7px 9px!important;border:1px solid #c8d7ca!important;border-radius:999px!important;background:#fff!important}
+.dealer-portal .dealer-preview-panel dt{font-size:9px!important}
+.dealer-portal .dealer-preview-panel dd{font-size:12px!important}
 .dealer-seller-mileage{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px!important;padding:9px 10px;border:1px solid #c8d7ca;border-radius:5px;background:#fff!important;color:#122018!important}
 .dealer-seller-mileage strong,.dealer-seller-mileage span{font-size:12px!important;font-weight:950!important;color:#122018!important}
 .dealer-seller-mileage strong{color:#516359!important;text-transform:uppercase}
