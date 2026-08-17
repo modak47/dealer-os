@@ -884,3 +884,38 @@ body:has(.dealer-portal-redesign)>main{min-height:100vh!important;padding:0!impo
 .dealer-portal-redesign .dealer-claim-row{padding:0 26px 26px!important}
 @media(max-width:1180px){.dealer-card-summary{grid-template-columns:1fr}.dealer-portal-redesign .dealer-lead-image{border-right:0;border-bottom:1px solid var(--portal-line)}.dealer-title-side{justify-items:start}.dealer-portal-redesign .dealer-lead-title .dealer-title-side>strong{text-align:left!important}.dealer-overview-grid{grid-template-columns:1fr!important}}
 @media(max-width:760px){.dealer-portal-redesign .dealer-card-tab-panel{padding:14px!important}.dealer-portal-redesign .dealer-card-tabs{margin:14px 14px 0!important}.dealer-portal-redesign .dealer-preview-panel dl{grid-template-columns:1fr!important}.dealer-portal-redesign .dealer-lead-image{height:260px!important;min-height:260px!important}}
+
+/* Dealer portal final layout polish: left navigation owns workflow, cards keep their height between detail tabs. */
+.dealer-portal-redesign .dealer-workflow-tabs{display:none!important}
+.dealer-portal-redesign .dealer-welcome{padding-bottom:26px!important}
+.dealer-portal-redesign .dealer-lead-grid{gap:22px!important}
+.dealer-portal-redesign .dealer-lead-card{border-color:#243949!important;background:#0b151e!important}
+.dealer-portal-redesign .dealer-card-tab-panel{min-height:390px!important;padding:18px 26px 28px!important}
+.dealer-portal-redesign .dealer-card-tab-panel>.dealer-overview-grid,
+.dealer-portal-redesign .dealer-card-tab-panel>.dealer-location-panel,
+.dealer-portal-redesign .dealer-card-tab-panel>.dealer-vehicle-check,
+.dealer-portal-redesign .dealer-card-tab-panel>.dealer-mot-panel{min-height:360px!important}
+.dealer-portal-redesign .dealer-lead-facts{gap:24px!important;padding:2px 0 4px!important}
+.dealer-portal-redesign .dealer-lead-facts>div{grid-template-columns:44px minmax(0,1fr)!important;padding-right:24px!important}
+.dealer-portal-redesign .dealer-lead-facts i{width:40px!important;height:40px!important;border-color:rgba(38,211,66,.44)!important;background:rgba(38,211,66,.1)!important;color:var(--portal-green)!important}
+.dealer-portal-redesign .dealer-lead-facts i svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.dealer-portal-redesign .dealer-lead-facts span{color:#9db0bd!important;font-size:13px!important}
+.dealer-portal-redesign .dealer-lead-facts b{font-size:16px!important}
+.dealer-portal-redesign .dealer-card-tabs{margin-top:20px!important}
+.dealer-portal-redesign .dealer-card-tabs button{border:1px solid var(--portal-line)!important;border-bottom:0!important;border-radius:8px 8px 0 0!important;background:#0d1721!important}
+.dealer-portal-redesign .dealer-card-tabs button.active{border-color:rgba(38,211,66,.65)!important;background:#102519!important}
+.dealer-portal-redesign .dealer-location-panel{background:#0d1721!important}
+.dealer-portal-redesign .dealer-location-panel>div:last-child{background:#0d1721!important;color:#fff!important}
+.dealer-portal-redesign .dealer-location-panel dl div{background:#101d28!important;color:#fff!important}
+.dealer-portal-redesign .dealer-location-panel h3,
+.dealer-portal-redesign .dealer-location-panel dt,
+.dealer-portal-redesign .dealer-location-panel dd{color:#fff!important}
+.dealer-portal-redesign .dealer-mot-panel>header span,
+.dealer-portal-redesign .dealer-mot-panel>header p,
+.dealer-portal-redesign .dealer-vehicle-check header strong,
+.dealer-portal-redesign .dealer-check-details summary{color:#dbe9f0!important}
+.dealer-portal-redesign .dealer-preview-panel p strong{display:block;margin-bottom:5px;color:#9db0bd!important;font-size:11px;text-transform:uppercase}
+.dealer-portal-redesign .dealer-card-summary .dealer-check-summary{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:16px!important;min-height:66px!important;padding:13px 16px!important;border-color:rgba(38,211,66,.32)!important;background:#0f1b25!important}
+.dealer-portal-redesign .dealer-card-summary .dealer-check-summary header strong{font-size:18px!important}
+.dealer-portal-redesign .dealer-card-summary .dealer-check-summary nav a{min-height:38px!important;padding:9px 14px!important}
+@media(max-width:1180px){.dealer-portal-redesign .dealer-card-tab-panel{min-height:0!important}.dealer-portal-redesign .dealer-card-tab-panel>.dealer-overview-grid,.dealer-portal-redesign .dealer-card-tab-panel>.dealer-location-panel,.dealer-portal-redesign .dealer-card-tab-panel>.dealer-vehicle-check,.dealer-portal-redesign .dealer-card-tab-panel>.dealer-mot-panel{min-height:0!important}}

@@ -99,7 +99,6 @@ export function DealerPortalClient() {
         </section>
         {error && <div className="portal-message error">{error}</div>}{notice && <div className="portal-message">{notice}</div>}
         {activeTab === "account" ? <DealerAccountPanel dealer={data.dealer} onSaved={dealer => setData(current => current ? { ...current, dealer } : current)} /> : <>
-          <LeadWorkflowTabs activeTab={activeTab} onTab={setActiveTab} />
           {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
         </>}
       </section>
@@ -144,6 +143,12 @@ function displayEngine(value: string | number | null | undefined) {
   return /\bcc\b/i.test(text) ? text : `${text}cc`;
 }
 
+function LeadFactIcon({ type }: { type: "location" | "distance" | "received" }) {
+  if (type === "location") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11Z" /><circle cx="12" cy="10" r="2.5" /></svg>;
+  if (type === "distance") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16" /><path d="M7 19 10 5l4 14 3-10 2 10" /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></svg>;
+}
+
 function DealerSidebar({ dealer, activeTab, counts, onTab }: { dealer: DealerPortalAccountWithPreferences; activeTab: PortalTab; counts: { available: number; active: number; purchased: number; lost: number }; onTab: (tab: PortalTab) => void }) {
   const items: { tab: PortalTab; label: string; count?: number; icon: string }[] = [
     { tab: "available", label: "Available Leads", count: counts.available, icon: "A" },
@@ -163,16 +168,6 @@ function DealerSidebar({ dealer, activeTab, counts, onTab }: { dealer: DealerPor
     </nav>
     <section className="dealer-sidebar-fee"><span>Purchase Fee</span><strong>{formatGbp(dealer.successful_purchase_fee ?? 50)}</strong><p>Only charged when a lead is purchased.</p></section>
   </aside>;
-}
-
-function LeadWorkflowTabs({ activeTab, onTab }: { activeTab: PortalTab; onTab: (tab: PortalTab) => void }) {
-  const items: { tab: PortalTab; label: string; icon: string }[] = [
-    { tab: "available", label: "Available Leads", icon: "A" },
-    { tab: "active", label: "Active Leads", icon: "T" },
-    { tab: "purchased", label: "Purchased", icon: "P" },
-    { tab: "lost", label: "Lost / Returned", icon: "R" },
-  ];
-  return <nav className="dealer-workflow-tabs" aria-label="Dealer lead sections">{items.map(item => <button className={activeTab === item.tab ? "active" : ""} type="button" onClick={() => onTab(item.tab)} key={item.tab}><span>{item.icon}</span>{item.label}</button>)}</nav>;
 }
 
 function accountBuyingDefaults(dealer: DealerPortalAccountWithPreferences): DealerBuyingPreferences {
@@ -343,9 +338,9 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
       <div className="dealer-lead-body">
         <header className="dealer-lead-title"><div><span>{displayStatus}</span><div className="dealer-title-line"><h2>{title}</h2>{meta && <p>{meta}</p>}</div></div><aside className="dealer-title-side"><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong><div className="dealer-lead-actions"><button className="dealer-secondary-button" type="button" onClick={() => setCardTab("overview")}>View Details</button>{!unlocked && <button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button>}</div></aside></header>
         <div className="dealer-lead-facts">
-          <div><i>L</i><span>Location</span><b>{lead.portal_location_label || "Location pending"}</b></div>
-          <div><i>M</i><span>Distance</span><b>{lead.portal_distance_label?.replace(" from your dealership", " away") || "Distance not calculated"}</b></div>
-          <div><i>D</i><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
+          <div><i><LeadFactIcon type="location" /></i><span>Location</span><b>{lead.portal_location_label || "Location pending"}</b></div>
+          <div><i><LeadFactIcon type="distance" /></i><span>Distance</span><b>{lead.portal_distance_label?.replace(" from your dealership", " away") || "Distance not calculated"}</b></div>
+          <div><i><LeadFactIcon type="received" /></i><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
         </div>
         <VehicleCheckSummaryPanel lead={lead} />
       </div>
@@ -431,22 +426,11 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
 
 function VehicleCheckSummaryPanel({ lead }: { lead: DealerVisibleLead }) {
   const check = lead.portal_vehicle_check;
-  const priorityKeys = ["finance", "stolen", "write_off", "mileage", "identity"];
-  const priorityFlags = check?.flags.filter(item => priorityKeys.includes(item.key)).slice(0, 5) ?? [];
   const reportHref = check?.report_url ? `/api/autotrader/vehicle-check-report?url=${encodeURIComponent(check.report_url)}` : "";
   return <section className={`dealer-check-summary ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
-    <header><span>Vehicle check summary</span><strong>{check?.status || "Vehicle check not yet available"}</strong></header>
-    {priorityFlags.length > 0 && <div className="dealer-summary-flags">{priorityFlags.map(flag => <article className={flag.state} key={flag.key}><b>{flag.state === "warning" ? "!" : "OK"}</b><div><strong>{summaryFlagLabel(flag.label, flag.key)}</strong><span>{flag.detail}</span></div></article>)}</div>}
-    <nav>{reportHref && <a href={reportHref} target="_blank" rel="noreferrer">View full report</a>}</nav>
+    <header><span>Vehicle check</span><strong>{check?.status || "Vehicle check not yet available"}</strong></header>
+    <nav>{reportHref && <a href={reportHref} target="_blank" rel="noreferrer">View report</a>}</nav>
   </section>;
-}
-
-function summaryFlagLabel(label: string, key: string) {
-  if (key === "finance") return "Clear HPI";
-  if (key === "write_off") return "No write-off";
-  if (key === "stolen") return "Not stolen";
-  if (key === "mileage") return "Mileage OK";
-  return label;
 }
 
 function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead; compact?: boolean }) {
