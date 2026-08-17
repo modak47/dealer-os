@@ -840,3 +840,47 @@ body:has(.dealer-portal-redesign)>main{min-height:100vh!important;padding:0!impo
 .dealer-portal-redesign .dealer-preview-panel dd{font-size:15px!important}
 @media(max-width:1300px){.dealer-title-side{grid-template-columns:1fr}.dealer-portal-redesign .dealer-lead-actions{justify-content:start}.dealer-portal-redesign .dealer-check-summary{grid-template-columns:1fr!important}.dealer-portal-redesign .dealer-summary-flags{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.dealer-title-side{grid-template-columns:1fr}.dealer-portal-redesign .dealer-lead-actions{display:grid;justify-content:stretch}.dealer-portal-redesign .dealer-summary-flags{grid-template-columns:1fr}.dealer-portal-redesign .dealer-preview-panel dl>div{grid-template-columns:1fr!important}}
+
+/* Closer mock-up structure: compact summary top, details below. */
+.dealer-portal-redesign .dealer-mainbar{display:none!important}
+.dealer-portal-redesign .dealer-welcome{padding-top:28px!important}
+.dealer-portal-redesign .dealer-lead-card{display:block!important;overflow:hidden!important;background:#0b151e!important}
+.dealer-card-summary{display:grid;grid-template-columns:minmax(320px,480px) minmax(0,1fr);gap:0}
+.dealer-portal-redesign .dealer-lead-image{height:318px!important;min-height:318px!important;align-self:start!important;border-right:1px solid var(--portal-line)}
+.dealer-portal-redesign .dealer-lead-body{display:grid!important;grid-template-rows:auto auto auto!important;gap:18px!important;padding:30px 26px 24px!important;background:linear-gradient(180deg,#0c1620,#0b151e)!important}
+.dealer-portal-redesign .dealer-lead-title{padding-bottom:16px!important}
+.dealer-portal-redesign .dealer-title-line h2{font-size:31px!important}
+.dealer-portal-redesign .dealer-title-line p{color:#b4c4ce!important}
+.dealer-title-side{grid-template-columns:auto!important;justify-items:end}
+.dealer-portal-redesign .dealer-lead-title .dealer-title-side>strong{min-width:170px!important;text-align:right!important;font-size:30px!important}
+.dealer-portal-redesign .dealer-lead-actions{margin-top:12px}
+.dealer-portal-redesign .dealer-lead-facts{padding:6px 0 4px!important}
+.dealer-portal-redesign .dealer-lead-facts>div{grid-template-columns:34px 1fr!important}
+.dealer-portal-redesign .dealer-lead-facts i{width:30px!important;height:30px!important;border:1px solid rgba(38,211,66,.35);border-radius:999px;background:rgba(38,211,66,.08);font-size:14px!important;font-weight:950}
+.dealer-portal-redesign .dealer-check-summary{display:grid!important;grid-template-columns:1fr auto!important;padding:16px!important;border-color:var(--portal-line)!important;background:#0f1b25!important}
+.dealer-portal-redesign .dealer-check-summary header{display:block!important}
+.dealer-portal-redesign .dealer-check-summary header strong{font-size:15px!important}
+.dealer-portal-redesign .dealer-summary-flags{grid-column:1/-1!important;display:flex!important;align-items:center!important;gap:22px!important;flex-wrap:wrap!important;margin-top:2px!important}
+.dealer-portal-redesign .dealer-summary-flags article{display:flex!important;align-items:center!important;gap:9px!important;min-width:auto!important;padding:0!important;border:0!important;background:transparent!important}
+.dealer-portal-redesign .dealer-summary-flags article>b{width:21px!important;height:21px!important;border-radius:999px!important;background:#103d20!important;color:#9fffaf!important;font-size:9px!important}
+.dealer-portal-redesign .dealer-summary-flags strong{font-size:13px!important}
+.dealer-portal-redesign .dealer-summary-flags span{font-size:12px!important;color:#aebdca!important;text-transform:none!important}
+.dealer-portal-redesign .dealer-check-summary nav a{min-height:40px!important;padding:10px 16px!important}
+.dealer-portal-redesign .dealer-card-tabs{margin:18px 26px 0!important;padding-top:0!important}
+.dealer-portal-redesign .dealer-card-tab-panel{padding:16px 26px 26px!important}
+.dealer-overview-grid{grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr)!important}
+.dealer-portal-redesign .dealer-preview-panel,.dealer-notes-panel{min-height:260px;padding:22px 26px!important;background:#0c1620!important}
+.dealer-portal-redesign .dealer-preview-panel h3,.dealer-notes-panel h3{display:flex;align-items:center;gap:10px;font-size:20px!important}
+.dealer-portal-redesign .dealer-preview-panel h3:before,.dealer-notes-panel h3:before{content:"";display:block;width:24px;height:24px;border:1px solid var(--portal-green);border-radius:6px;background:rgba(38,211,66,.08)}
+.dealer-portal-redesign .dealer-preview-panel dl{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0 34px!important}
+.dealer-portal-redesign .dealer-preview-panel dl>div{grid-template-columns:128px minmax(0,1fr)!important;padding:12px 0!important}
+.dealer-portal-redesign .dealer-preview-panel dt{color:#94a8b5!important;font-size:11px!important}
+.dealer-portal-redesign .dealer-preview-panel dd{font-size:16px!important}
+.dealer-notes-panel{justify-items:center;text-align:center}
+.dealer-notes-panel h3{justify-self:start}
+.dealer-notes-panel p{margin-top:18px!important;color:#c9d4dc!important;font-size:18px!important}
+.dealer-notes-panel small{font-size:14px!important}
+.dealer-notes-panel button{margin-top:10px;justify-self:center!important;min-width:150px}
+.dealer-portal-redesign .dealer-claim-row{padding:0 26px 26px!important}
+@media(max-width:1180px){.dealer-card-summary{grid-template-columns:1fr}.dealer-portal-redesign .dealer-lead-image{border-right:0;border-bottom:1px solid var(--portal-line)}.dealer-title-side{justify-items:start}.dealer-portal-redesign .dealer-lead-title .dealer-title-side>strong{text-align:left!important}.dealer-overview-grid{grid-template-columns:1fr!important}}
+@media(max-width:760px){.dealer-portal-redesign .dealer-card-tab-panel{padding:14px!important}.dealer-portal-redesign .dealer-card-tabs{margin:14px 14px 0!important}.dealer-portal-redesign .dealer-preview-panel dl{grid-template-columns:1fr!important}.dealer-portal-redesign .dealer-lead-image{height:260px!important;min-height:260px!important}}
