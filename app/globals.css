@@ -462,3 +462,20 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-mileage-graph li b{color:#101914;font-size:10px;font-weight:950}
 .dealer-mileage-graph li small{margin-top:2px;color:#516359;font-size:9px;font-weight:850;text-transform:uppercase}
 @media(max-width:980px){.dealer-history-grid{grid-template-columns:1fr}}
+.dealer-portal .dealer-lead-title p{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px!important}
+.dealer-portal .dealer-lead-title p b{display:inline-grid;place-items:center;min-height:26px;padding:5px 8px;border:1px solid #c8d7ca;border-radius:999px;background:#f5faf5;color:#122018;font-size:12px;font-weight:950;line-height:1}
+.dealer-seller-mileage{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px!important;padding:9px 10px;border:1px solid #c8d7ca;border-radius:5px;background:#fff!important;color:#122018!important}
+.dealer-seller-mileage strong,.dealer-seller-mileage span{font-size:12px!important;font-weight:950!important;color:#122018!important}
+.dealer-seller-mileage strong{color:#516359!important;text-transform:uppercase}
+.dealer-mileage-graph>div{position:relative;min-height:150px!important;padding:28px 14px 14px!important}
+.dealer-mileage-graph>div:before{content:"";position:absolute;left:14px;right:14px;bottom:14px;height:1px;background:#b9cabb}
+.dealer-mileage-graph span{align-self:end;min-width:30px!important}
+.dealer-mileage-graph span:after{content:"";position:absolute;left:50%;bottom:-5px;width:8px;height:8px;border:2px solid #0c8f20;border-radius:50%;background:#fff;transform:translateX(-50%)}
+.dealer-mileage-graph ol{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))!important}
+.dealer-portal .dealer-check-details{display:block!important;padding-top:7px!important}
+.dealer-portal .dealer-check-details summary{padding:8px 0;color:#314238!important;font-size:12px!important;font-weight:950!important}
+.dealer-portal .dealer-check-details dl{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;margin-top:6px!important}
+.dealer-portal .dealer-check-details dl>div{display:block!important;min-height:78px;padding:11px!important;border:1px solid #c8d7ca!important;border-radius:6px!important;background:#fff!important}
+.dealer-portal .dealer-check-details dt{font-size:10px!important;color:#516359!important}
+.dealer-portal .dealer-check-details dd{font-size:13px!important;font-weight:950!important;color:#122018!important;line-height:1.35!important;word-break:break-word}
+@media(max-width:760px){.dealer-portal .dealer-check-details dl{grid-template-columns:1fr!important}}

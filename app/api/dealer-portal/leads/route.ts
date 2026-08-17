@@ -172,7 +172,6 @@ function mileageHistory(motHistory: DealerMotHistoryItem[], sellerMileage: numbe
   const rows = motHistory
     .filter(row => row.mileage != null)
     .map(row => ({ date: row.date || "Unknown date", mileage: Number(row.mileage), source: "MOT" }));
-  if (sellerMileage != null) rows.push({ date: "Seller declared", mileage: sellerMileage, source: "Seller" });
   return rows.sort((a, b) => a.date.localeCompare(b.date));
 }
 
