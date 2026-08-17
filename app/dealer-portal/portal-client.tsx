@@ -14,7 +14,7 @@ type PortalData = {
 };
 
 type PortalTab = "available" | "active" | "purchased" | "lost";
-type LeadCardTab = "overview" | "location" | "check" | "customer";
+type LeadCardTab = "overview" | "location" | "check" | "mot" | "customer";
 
 const terminalStatuses = new Set(["purchased", "purchased_later", "lost", "returned_to_pool"]);
 const lostReasons = ["Couldn't agree price", "Customer stopped responding", "Customer sold elsewhere", "Condition not as described", "Mileage", "Vehicle history", "Outstanding finance", "Too far away", "Specification unsuitable", "Customer decided not to sell", "Other"];
@@ -30,7 +30,6 @@ const statusActions: [DealerLeadClaimStatus, string][] = [
 export function DealerPortalClient() {
   const [data, setData] = useState<PortalData | null>(null);
   const [activeTab, setActiveTab] = useState<PortalTab>("available");
-  const [leadView, setLeadView] = useState<LeadCardTab>("overview");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -93,12 +92,7 @@ export function DealerPortalClient() {
         <button className={activeTab === "purchased" ? "active" : ""} onClick={() => setActiveTab("purchased")}>Purchased</button>
         <button className={activeTab === "lost" ? "active" : ""} onClick={() => setActiveTab("lost")}>Lost / Returned</button>
       </nav>
-      <nav className="dealer-view-tabs" aria-label="Lead card view">
-        <button className={leadView === "overview" ? "active" : ""} onClick={() => setLeadView("overview")} type="button">Overview</button>
-        <button className={leadView === "location" ? "active" : ""} onClick={() => setLeadView("location")} type="button">Location</button>
-        <button className={leadView === "check" ? "active" : ""} onClick={() => setLeadView("check")} type="button">Vehicle check</button>
-      </nav>
-      {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard view={leadView} dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
+      {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
     </section>}
   </main>;
 }
@@ -117,7 +111,8 @@ function emptyCopy(tab: PortalTab) {
   return "Claim a lead to unlock customer details and work the opportunity.";
 }
 
-function DealerLeadCard({ view, dealer, lead, busy, onClaim, onChanged }: { view: LeadCardTab; dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
+function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
+  const [cardTab, setCardTab] = useState<LeadCardTab>("overview");
   const [imageIndex, setImageIndex] = useState(0);
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const image = images[imageIndex] ?? images[0];
@@ -128,6 +123,8 @@ function DealerLeadCard({ view, dealer, lead, busy, onClaim, onChanged }: { view
   const notes = lead.portal_notes ?? [];
   const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
   const askingPrice = safeNumber(lead.price);
+  const displayStatus = statusLabel(lead.portal_claim_status || lead.status || "available").replace(/^Dealer Pool Available$/i, "Available");
+  const tabs: [LeadCardTab, string][] = [["overview", "Overview"], ["location", "Location"], ["check", "Vehicle check"], ["mot", "MOT data"], ...(unlocked ? [["customer", "Customer"] as [LeadCardTab, string]] : [])];
   useEffect(() => setImageIndex(0), [lead.id, images.length]);
   function moveImage(direction: -1 | 1) {
     setImageIndex(current => (current + direction + images.length) % images.length);
@@ -135,18 +132,20 @@ function DealerLeadCard({ view, dealer, lead, busy, onClaim, onChanged }: { view
   return <article className="dealer-lead-card">
     <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
     <div className="dealer-lead-body">
-      <header className="dealer-lead-title"><div><span>{statusLabel(lead.portal_claim_status || lead.status || "available")}</span><div className="dealer-title-line"><h2>{title}</h2></div></div><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></header>
+      <nav className="dealer-card-tabs" aria-label={`${title} lead details`}>{tabs.map(([tab, label]) => <button className={cardTab === tab ? "active" : ""} onClick={() => setCardTab(tab)} type="button" key={tab}>{label}</button>)}</nav>
+      <header className="dealer-lead-title"><div><span>{displayStatus}</span><div className="dealer-title-line"><h2>{title}</h2></div></div><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></header>
       <div className="dealer-opportunity-strip">
         <div><span>Approx location</span><b>{lead.portal_location_label || "Location pending"}</b></div>
         <div><span>Distance</span><b>{lead.portal_distance_label || "Distance not calculated"}</b></div>
         <div><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
       </div>
       <div className="dealer-card-tab-panel">
-        {view === "overview" && <><VehicleCheckPanel lead={lead} compact /><MotorcyclePreviewPanel lead={lead} /></>}
-        {view === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
-        {view === "check" && <VehicleCheckPanel lead={lead} />}
+        {cardTab === "overview" && <><VehicleCheckPanel lead={lead} compact /><MotorcyclePreviewPanel lead={lead} /></>}
+        {cardTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
+        {cardTab === "check" && <VehicleCheckPanel lead={lead} />}
+        {cardTab === "mot" && <VehicleMotPanel lead={lead} />}
+        {cardTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
       </div>
-      {unlocked && <div className="dealer-card-customer-view"><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</div>}
       {!unlocked && <div className="dealer-claim-row"><CustomerPanel lead={lead} unlocked={false} /><button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button></div>}
     </div>
   </article>;
@@ -218,7 +217,15 @@ function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead;
   const reportHref = check?.report_url ? `/api/autotrader/vehicle-check-report?url=${encodeURIComponent(check.report_url)}` : "";
   return <section className={`dealer-vehicle-check ${compact ? "compact" : ""} ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
     <header><div><span>Vehicle Check</span><h3>{check?.status || "Vehicle check not yet available"}</h3></div><nav>{check?.mot_expiry && <b>MOT {check.mot_expiry}</b>}{reportHref && <a href={reportHref} target="_blank" rel="noreferrer">View report</a>}</nav></header>
-    {!check ? <p>Vehicle check not yet available. YesMoto will show the HPI-style summary here once the Auto Trader vehicle check has been stored.</p> : <><div className="dealer-check-grid">{flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "N/A"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>{!compact && <VehicleHistoryPanel check={check} />}{check.details.length > 0 && !compact && <details className="dealer-check-details"><summary>Technical identity details</summary><dl>{check.details.map(item => <Detail label={item.label} value={item.value} key={item.label} />)}</dl></details>}</>}
+    {!check ? <p>Vehicle check not yet available. YesMoto will show the HPI-style summary here once the Auto Trader vehicle check has been stored.</p> : <><div className="dealer-check-grid">{flags.map(item => <article className={item.state} key={item.key}><b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "N/A"}</b><div><strong>{item.label}</strong><span>{item.detail}</span></div></article>)}</div>{check.details.length > 0 && !compact && <details className="dealer-check-details"><summary>Technical identity details</summary><dl>{check.details.map(item => <Detail label={item.label} value={item.value} key={item.label} />)}</dl></details>}</>}
+  </section>;
+}
+
+function VehicleMotPanel({ lead }: { lead: DealerVisibleLead }) {
+  const check = lead.portal_vehicle_check;
+  return <section className="dealer-vehicle-check dealer-mot-panel">
+    <header><div><span>MOT data</span><h3>{check ? "MOT and mileage history" : "MOT data not yet available"}</h3></div></header>
+    {!check ? <p>MOT and mileage history will show here once the Auto Trader vehicle check has been stored.</p> : <VehicleHistoryPanel check={check} />}
   </section>;
 }
 
