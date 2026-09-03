@@ -428,10 +428,32 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
 function VehicleCheckSummaryPanel({ lead }: { lead: DealerVisibleLead }) {
   const check = lead.portal_vehicle_check;
   const reportHref = check?.report_url ? `/api/autotrader/vehicle-check-report?url=${encodeURIComponent(check.report_url)}` : "";
+  const summaryFlags = check?.flags
+    .filter(item => ["finance", "stolen", "write_off", "insurance", "mileage"].includes(item.key))
+    .slice(0, 5) ?? [];
   return <section className={`dealer-check-summary ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
     <header><span>Vehicle check</span><strong>{check?.status || "Vehicle check not yet available"}</strong></header>
+    {summaryFlags.length > 0 && <div className="dealer-summary-flags">{summaryFlags.map(item => <article className={item.state} key={item.key}>
+      <b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "?"}</b>
+      <div><strong>{summaryFlagLabel(item)}</strong><span>{summaryFlagDetail(item)}</span></div>
+    </article>)}</div>}
     <nav>{reportHref && <a href={reportHref} target="_blank" rel="noreferrer">View report</a>}</nav>
   </section>;
+}
+
+function summaryFlagLabel(item: { key: string; label: string }) {
+  if (item.key === "finance") return "Clear HPI";
+  if (item.key === "stolen") return "Not stolen";
+  if (item.key === "write_off") return "No write-off";
+  if (item.key === "mileage") return "Mileage OK";
+  return item.label;
+}
+
+function summaryFlagDetail(item: { key: string; detail: string }) {
+  if (item.key === "finance") return item.detail.replace(" recorded", "");
+  if (item.key === "write_off") return item.detail.replace("No insurance total loss recorded", "No record");
+  if (item.key === "mileage") return item.detail.replace("Mileage ", "");
+  return item.detail;
 }
 
 function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead; compact?: boolean }) {
@@ -450,8 +472,11 @@ function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead;
 function VehicleMotPanel({ lead }: { lead: DealerVisibleLead }) {
   const check = lead.portal_vehicle_check;
   return <section className="dealer-vehicle-check dealer-mot-panel">
-    <header><div><span>MOT data</span><h3>{check ? "MOT and mileage history" : "MOT data not yet available"}</h3></div></header>
-    {!check ? <p>MOT and mileage history will show here once the Auto Trader vehicle check has been stored.</p> : <VehicleHistoryPanel check={check} />}
+    <header><div><span>MOT data</span><h3>{check ? `MOT History${lead.reg ? ` - ${lead.reg}` : ""}` : "MOT data not yet available"}</h3></div></header>
+    {!check ? <p>MOT and mileage history will show here once the Auto Trader vehicle check has been stored.</p> : <>
+      <MotStats check={check} lead={lead} />
+      <VehicleHistoryPanel check={check} />
+    </>}
   </section>;
 }
 
@@ -459,11 +484,11 @@ function VehicleHistoryPanel({ check }: { check: NonNullable<DealerVisibleLead["
   const motHistory = check.mot_history ?? [];
   const mileageHistory = check.mileage_history ?? [];
   const hasMileageHistory = mileageHistory.length > 0;
-  const visibleMotHistory = motHistory.slice(0, 2);
+  const visibleMotHistory = motHistory.slice(0, 8);
   return <div className="dealer-history-grid">
     <section>
       <h4>MOT History</h4>
-      {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <><div className="dealer-mot-list">{visibleMotHistory.map((item, index) => <MotHistoryRow item={item} key={`${item.date}-${index}`} />)}</div>{motHistory.length > visibleMotHistory.length && <p className="dealer-history-note">{motHistory.length - visibleMotHistory.length} more MOT record(s) in the report.</p>}</>}
+      {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <><div className="dealer-mot-list">{visibleMotHistory.map((item, index) => <MotHistoryRow item={item} expanded={index === 0} key={`${item.date}-${index}`} />)}</div>{motHistory.length > visibleMotHistory.length && <p className="dealer-history-note">{motHistory.length - visibleMotHistory.length} more MOT record(s) in the report.</p>}</>}
     </section>
     <section className={hasMileageHistory ? "" : "dealer-mileage-empty"}>
       <h4>Mileage History</h4>
@@ -474,27 +499,52 @@ function VehicleHistoryPanel({ check }: { check: NonNullable<DealerVisibleLead["
   </div>;
 }
 
-function MotHistoryRow({ item }: { item: DealerMotHistoryItem }) {
+function MotHistoryRow({ item, expanded }: { item: DealerMotHistoryItem; expanded: boolean }) {
   const label = item.status === "pass" ? "Pass" : item.status === "fail" ? "Fail" : "Unknown";
   return <article className={item.status}>
-    <header><strong>{item.date || "Date not returned"}</strong><b>{label}</b></header>
-    <dl><Detail label="Mileage" value={item.mileage == null ? null : `${item.mileage.toLocaleString("en-GB")} miles`} /><Detail label="Expiry" value={item.expiry} /></dl>
-    {item.details.length > 0 && <ul>{item.details.map(detail => <li key={detail}>{detail}</li>)}</ul>}
+    <header><strong>{label}</strong><span>{item.details.length ? `${item.details.length} item${item.details.length === 1 ? "" : "s"}` : "No items"}</span><b>{item.date || "Date not returned"}</b><em>{item.mileage == null ? "Mileage not supplied" : `${item.mileage.toLocaleString("en-GB")} miles`}</em></header>
+    {expanded && <><dl><Detail label="Mileage" value={item.mileage == null ? null : `${item.mileage.toLocaleString("en-GB")} miles`} /><Detail label="Expiry" value={item.expiry} /></dl>
+    {item.details.length > 0 && <ul>{item.details.map(detail => <li key={detail}>{detail}</li>)}</ul>}</>}
   </article>;
 }
 
 function MileageGraph({ history }: { history: DealerMileageHistoryItem[] }) {
   const mileages = history.map(item => item.mileage);
-  const min = Math.min(...mileages);
   const max = Math.max(...mileages);
-  const range = Math.max(1, max - min);
+  const previousMileages = history.map((item, index) => index === 0 ? null : item.mileage - history[index - 1].mileage);
   return <div className="dealer-mileage-graph">
-    <div>{history.map((item, index) => {
-      const height = 24 + ((item.mileage - min) / range) * 66;
-      return <span style={{ height: `${height}px` }} title={`${item.source}: ${item.mileage.toLocaleString("en-GB")} miles`} key={`${item.date}-${index}`}><i>{item.mileage.toLocaleString("en-GB")}</i></span>;
-    })}</div>
-    <ol>{history.map((item, index) => <li key={`${item.source}-${item.date}-${index}`}><b>{item.date}</b><small>{item.source}</small></li>)}</ol>
+    {history.map((item, index) => {
+      const width = Math.max(18, (item.mileage / Math.max(1, max)) * 100);
+      const delta = previousMileages[index];
+      return <div className="dealer-mileage-row" title={`${item.source}: ${item.mileage.toLocaleString("en-GB")} miles`} key={`${item.date}-${index}`}>
+        <span>{item.date}</span>
+        <i><b style={{ width: `${width}%` }} /></i>
+        <strong>{item.mileage.toLocaleString("en-GB")}</strong>
+        <em>{delta == null ? "" : `+${delta.toLocaleString("en-GB")}`}</em>
+      </div>;
+    })}
   </div>;
+}
+
+function MotStats({ check, lead }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]>; lead: DealerVisibleLead }) {
+  const motHistory = check.mot_history ?? [];
+  const passCount = motHistory.filter(item => item.status === "pass").length;
+  const failCount = motHistory.filter(item => item.status === "fail").length;
+  const latestMileage = check.mileage_history?.at(-1)?.mileage ?? motHistory.find(item => item.mileage != null)?.mileage ?? check.seller_mileage ?? null;
+  const firstYear = Number(String(check.details.find(item => item.label === "First registered")?.value || lead.year || "").slice(0, 4));
+  const age = Number.isFinite(firstYear) && firstYear > 1900 ? new Date().getFullYear() - firstYear : null;
+  const avgMileage = latestMileage != null && age && age > 0 ? Math.round(latestMileage / age) : null;
+  const advisories = motHistory.reduce((total, item) => total + item.details.length, 0);
+  const passRate = motHistory.length ? Math.round((passCount / motHistory.length) * 100) : null;
+  const stats = [
+    ["MOT status", check.mot_expiry ? "Valid" : check.status || "Available", check.mot_expiry || "Expiry not supplied"],
+    ["Latest mileage", latestMileage == null ? "Not supplied" : `${latestMileage.toLocaleString("en-GB")} mi`, motHistory[0]?.date || "From stored check"],
+    ["Avg / year", avgMileage == null ? "Not supplied" : `${avgMileage.toLocaleString("en-GB")} mi`, avgMileage != null && avgMileage < 1500 ? "Low usage" : "Estimated usage"],
+    ["Pass rate", passRate == null ? "Not supplied" : `${passRate}%`, motHistory.length ? `${passCount} pass - ${failCount} fail` : "No MOT tests returned"],
+    ["Age", age == null ? "Not supplied" : `${age} yrs`, firstYear ? String(firstYear) : "First registered not supplied"],
+    ["Advisories", String(advisories), "all-time"],
+  ];
+  return <div className="dealer-mot-stats">{stats.map(([label, value, detail]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>)}</div>;
 }
 
 function Detail({ label, value }: { label: string; value: string | number | null | undefined }) {
