@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+/design-references/current/
+/design-references/failures/
+/design-references/report/
+/design-references/tmp/
 
 # next.js
 /.next/

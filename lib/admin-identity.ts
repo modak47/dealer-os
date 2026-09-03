@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { isVisualTestMode } from "@/lib/visual-test-mode";
 
 export interface AdminIdentity {
   name:string;
@@ -14,6 +15,7 @@ const clean=(value:unknown)=>typeof value==="string"?value.trim():"";
 const titleCase=(value:string)=>value.split(/[._\-\s]+/).filter(Boolean).map(part=>part.charAt(0).toUpperCase()+part.slice(1).toLowerCase()).join(" ");
 
 export async function getAdminIdentity():Promise<AdminIdentity|null>{
+  if(isVisualTestMode())return {name:"Visual Test User",firstName:"Visual",email:"visual-test@dealeros.local",role:"Development visual tester",initials:"VT"};
   const supabase=await createClient();
   if(!supabase)return null;
   const {data:{user}}=await supabase.auth.getUser();

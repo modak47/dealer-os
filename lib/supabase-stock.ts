@@ -5,8 +5,10 @@ import type { StockApiResponse, SupabaseStockBike } from "@/lib/stock-bike-types
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { bikes as mockBikes } from "@/lib/mock-data";
 import { normalizeStockImageUrls } from "@/lib/stock-images";
 import { legacyRegistrationSlug, publicStockSlug } from "@/lib/public-stock-slug";
+import { isVisualTestMode } from "@/lib/visual-test-mode";
 
 const PUBLIC_STOCK_STATUSES=["In Stock","ON FORECOURT","Available","Reserved"];
 const PUBLIC_DETAIL_FIELDS="id,dealer5_id,registration,make,model,variant,year,mileage,colour,engine_cc,price,status,advert_title,stock_number,category,body_style,fuel,transmission,description,service_history,vat_status,specifications,dealer5_data,image_urls,primary_image_url,mot_expiry,notes,created_at,plate,engine_number,number_of_gears,previous_owners,registration_date,display_status,show_on_website,is_test_record,reserve_enabled,reservation_amount,advert_sections,bhp,torque,co2,road_tax,top_speed,length_mm,width_mm,weight_kg,euro_emissions,hpi_category,workshop_status,date_in_stock,sold_date,mot_status,valeting_status,photo_status,location,updated_at,source_url,dealer5_updated_at,autotrader_vehicle_id,autotrader_taxonomy_data,autotrader_mot_data,autotrader_stock_id,autotrader_publish_status,autotrader_last_payload,autotrader_last_response,autotrader_last_synced_at,autotrader_publish_error";
@@ -50,6 +52,7 @@ export async function getSupabaseStockBikeByPublicIdentifier(identifier:string):
 }
 
 export async function getSupabaseStockBikes(options:{includeTest?:boolean}={}):Promise<StockApiResponse>{
+  if(isVisualTestMode())return {stock:visualStockFixtures(options.includeTest),configured:true};
   if(!isSupabaseConfigured)return {stock:[],configured:false,error:"Supabase is not configured."};
   const supabase=createClient(supabaseUrl,supabaseAnonKey,{auth:{persistSession:false,autoRefreshToken:false}});
   let query=supabase.from("stock_bikes").select("*").order("created_at",{ascending:false});
@@ -69,6 +72,78 @@ export async function getSupabasePublicStockBikes():Promise<StockApiResponse>{
   if(error){console.error("Unable to load public Supabase stock",{code:error.code,message:error.message});return {stock:[],configured:true,error:"Unable to load stock."}}
   if(fallback&&data.length)console.warn(`[Public stock] No explicit website stock found; serving ${data.length} legacy Dealer5 rows.`);
   return {stock:(data??[]).map(row=>normalizeSupabaseStockBike(row as unknown as SupabaseStockBike)),configured:true};
+}
+
+function visualStockFixtures(includeTest=false):SupabaseStockBike[]{
+  const now="2026-09-02T09:00:00.000Z";
+  const stock=mockBikes.map((bike,index):SupabaseStockBike=>({
+    id:`visual-${bike.id}`,
+    dealer5_id:null,
+    registration:bike.vrm,
+    vin:null,
+    make:bike.make,
+    model:index===0?"Z900 Performance With An Exceptionally Long Edition Name":bike.model,
+    variant:index===2?"TE Triple Black Adventure Pack With Factory Luggage":null,
+    year:bike.year,
+    mileage:Number(bike.mileage.replace(/[^0-9]/g,"")),
+    colour:bike.colour,
+    engine_cc:Number(bike.engine.replace(/[^0-9]/g,""))||null,
+    price:bike.price,
+    status:bike.status,
+    advert_title:null,
+    stock_number:`VIS-${String(index+1).padStart(3,"0")}`,
+    category:bike.category,
+    body_style:null,
+    fuel:"Petrol",
+    transmission:"Manual",
+    description:"Visual development fixture covering realistic stock card copy, wrapping, and image states.",
+    service_history:null,
+    vat_status:null,
+    specifications:{},
+    features:[],
+    pricing:{},
+    dealer5_data:{},
+    dealer5_updated_at:null,
+    source_url:null,
+    image_urls:index===3?[]:[bike.image],
+    primary_image_url:index===3?null:bike.image,
+    date_in_stock:null,
+    sold_date:bike.status==="Sold"?"2026-08-28":null,
+    mot_expiry:null,
+    mot_status:null,
+    workshop_status:bike.status==="Prep"?"Awaiting inspection":null,
+    valeting_status:null,
+    photo_status:index===3?"Images required":"Complete",
+    location:index===1?"Showroom bay with a long named location label":null,
+    notes:index===0?"Long notes fixture: customer finance query, image availability, V5 status, and preparation comments all need to wrap without breaking the card layout.":null,
+    created_at:new Date(Date.parse(now)-index*86400000).toISOString(),
+    updated_at:now,
+    plate:null,
+    engine_number:null,
+    number_of_gears:null,
+    previous_owners:null,
+    registration_date:null,
+    display_status:null,
+    show_on_website:true,
+    is_test_record:index===5,
+    reserve_enabled:true,
+    reservation_amount:9900,
+    advert_sections:{},
+    bhp:null,
+    torque:null,
+    co2:null,
+    road_tax:null,
+    top_speed:null,
+    length_mm:null,
+    width_mm:null,
+    weight_kg:null,
+    euro_emissions:null,
+    hpi_category:index===4?"Category N":null,
+    expected_arrival_date:index===3?"2026-09-08":null,
+    purchase_price:index===3?6400:null,
+    expected_gross_profit:index===3?1300:null,
+  }));
+  return includeTest?stock:stock.filter(bike=>!bike.is_test_record);
 }
 
 const cleanText=(value:unknown)=>typeof value==="string"?value.trim():typeof value==="number"?String(value):"";

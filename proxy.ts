@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
+import { isVisualTestRequest } from "@/lib/visual-test-mode";
 
 const protectedApiPaths=new Set(["/api/vrm-lookup","/api/hpi-test","/api/postcode-lookup","/api/market-intelligence","/api/website-pages"]);
 const protectedApiPrefixes=["/api/admin/shadow-mode","/api/opportunities","/api/retail-check","/api/retail-history","/api/scanner-status","/api/run-opportunity-scan","/api/makes","/api/models","/api/crm","/api/workflow","/api/stock-attachments"];
@@ -11,6 +12,7 @@ export async function proxy(request:NextRequest){
   const isAdmin=pathname.startsWith("/admin/")||pathname==="/market-intelligence"||pathname==="/workflow"||pathname==="/workshop"||pathname==="/valeting"||pathname==="/photos";
   const isProtectedApi=protectedApiPaths.has(pathname)||protectedApiPrefixes.some(prefix=>pathname===prefix||pathname.startsWith(`${prefix}/`))||pathname.startsWith("/api/stock/")||(pathname==="/api/stock"&&request.method!=="GET");
   if(!isLogin&&!isAdmin&&!isProtectedApi)return NextResponse.next();
+  if(isVisualTestRequest(request.headers))return NextResponse.next();
 
   if(!isSupabaseConfigured){
     if(isProtectedApi)return NextResponse.json({error:"DealerOS authentication is not configured."},{status:503});

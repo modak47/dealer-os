@@ -345,6 +345,25 @@ def gallery_sample_looks_live(values, sample_size=3):
     sample = urls[:sample_size]
     return all(image_url_loads(url) for url in sample)
 
+
+def clean_numeric(value):
+    try:
+        digits = "".join(
+            c for c in str(value or "").replace(",", "")
+            if c.isdigit() or c == "."
+        )
+        return float(digits) if digits else 0
+    except Exception:
+        return 0
+
+
+def is_incomplete_dealer5_stock(make, model, reg, mileage, price, image_urls):
+    has_identity = bool(str(reg or "").strip()) and bool(str(make or "").strip()) and bool(str(model or "").strip())
+    has_price = clean_numeric(price) > 0
+    has_mileage = clean_numeric(mileage) > 0
+    has_images = bool(image_urls)
+    return not has_identity or (not has_price and not has_mileage and not has_images)
+
 # =========================================
 # LOGGING
 # =========================================
@@ -515,10 +534,12 @@ def upsert_supabase_stock_bike(
         stored_real_images = [image_url(item) for item in real_dealer_images(stored_unique_images)]
         incoming_has_better_gallery = len(incoming_images) > len(stored_real_images)
         stored_gallery_looks_incomplete = len(stored_real_images) < MINIMUM_COMPLETE_GALLERY_IMAGES
+        stored_gallery_looks_dead = stored_real_images and not gallery_sample_looks_live(stored_real_images)
         if (
             stored_real_images
             and not incoming_has_better_gallery
             and not stored_gallery_looks_incomplete
+            and not stored_gallery_looks_dead
             and not FORCE_REFRESH_IMAGES
         ):
             clean_images = stored_real_images
@@ -531,6 +552,8 @@ def upsert_supabase_stock_bike(
                 reason = f"Dealer5 has better gallery ({len(incoming_images)} > {len(stored_real_images)})"
             elif stored_gallery_looks_incomplete:
                 reason = f"stored gallery incomplete ({len(stored_real_images)} < {MINIMUM_COMPLETE_GALLERY_IMAGES})"
+            elif stored_gallery_looks_dead:
+                reason = "stored Dealer5 image sample returns non-image/404 responses"
             else:
                 reason = "empty or non-real image array"
             log(f"{reg} replacing Supabase images from Dealer5 ({len(clean_images)} images; {reason})")
@@ -542,6 +565,7 @@ def upsert_supabase_stock_bike(
     specifications = detail_data.get("specifications", {})
     features = detail_data.get("features", [])
     description = detail_data.get("description", "")
+    quarantine_incomplete = is_incomplete_dealer5_stock(make, model, reg, mileage, price, clean_images or incoming_images)
 
     def detail_value(*wanted_labels):
         wanted = [
@@ -610,8 +634,17 @@ def upsert_supabase_stock_bike(
         "dealer5_data": detail_data,
         "dealer5_updated_at": utc_timestamp(),
         "notes": notes_text,
-        "updated_at": utc_timestamp()
+        "updated_at": utc_timestamp(),
+        "is_test_record": quarantine_incomplete,
+        "show_on_website": False
     }
+
+    if quarantine_incomplete:
+        payload["notes"] = (
+            f"{notes_text}\n\nDealer5 sync quarantine: incomplete stock data "
+            f"(identity, price/mileage or live images missing). Fix in Dealer5 to restore."
+        ).strip()
+        log(f"{reg} quarantined from normal stock view because Dealer5 data is incomplete")
 
     if clean_images is not None:
         payload["image_urls"] = clean_images
