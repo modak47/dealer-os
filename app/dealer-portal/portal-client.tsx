@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { directionsUrl, googleMapsUrl, leadLocationStatus, staticMapUrl } from "@/lib/location-ui";
 import { createClient } from "@/lib/supabase/client";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
@@ -314,7 +314,7 @@ function DealerAccountPanel({ dealer, onSaved }: { dealer: DealerPortalAccountWi
 }
 
 function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
-  const [cardTab, setCardTab] = useState<LeadCardTab>("overview");
+  const [detailTab, setDetailTab] = useState<LeadCardTab | null>(null);
   const [imageIndex, setImageIndex] = useState(0);
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const image = images[imageIndex] ?? images[0];
@@ -343,19 +343,41 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
           <div><i><LeadFactIcon type="received" /></i><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
         </div>
         <VehicleCheckSummaryPanel lead={lead} />
-        <div className="dealer-lead-actions"><button className="dealer-secondary-button" type="button" onClick={() => setCardTab("overview")}>View Details</button>{!unlocked && <button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button>}</div>
+        <div className="dealer-lead-actions"><button className="dealer-secondary-button" type="button" onClick={() => setDetailTab("overview")}>View Details</button>{!unlocked && <button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button>}</div>
       </div>
     </div>
-    <nav className="dealer-card-tabs" aria-label={`${title} lead details`}>{tabs.map(([tab, label]) => <button className={cardTab === tab ? "active" : ""} onClick={() => setCardTab(tab)} type="button" key={tab}>{label}</button>)}</nav>
-    <div className="dealer-card-tab-panel">
-      {cardTab === "overview" && <div className="dealer-overview-grid"><MotorcyclePreviewPanel lead={lead} /><DealerNotesPanel notes={notes} unlocked={unlocked} onAddNote={() => setCardTab("customer")} /></div>}
-      {cardTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
-      {cardTab === "check" && <VehicleCheckPanel lead={lead} />}
-      {cardTab === "mot" && <VehicleMotPanel lead={lead} />}
-      {cardTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
-    </div>
+    <nav className="dealer-card-tabs" aria-label={`${title} lead details`}>{tabs.map(([tab, label]) => <button className={detailTab === tab ? "active" : ""} onClick={() => setDetailTab(tab)} type="button" key={tab}>{label}</button>)}</nav>
+    {detailTab && <LeadDetailModal title={title} tab={detailTab} tabs={tabs} setTab={setDetailTab} onClose={() => setDetailTab(null)}>
+      {detailTab === "overview" && <div className="dealer-overview-grid"><MotorcyclePreviewPanel lead={lead} /><DealerNotesPanel notes={notes} unlocked={unlocked} onAddNote={() => setDetailTab("customer")} /></div>}
+      {detailTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
+      {detailTab === "check" && <VehicleCheckPanel lead={lead} />}
+      {detailTab === "mot" && <VehicleMotPanel lead={lead} />}
+      {detailTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
+    </LeadDetailModal>}
     {!unlocked && <div className="dealer-claim-row"><CustomerPanel lead={lead} unlocked={false} /></div>}
   </article>;
+}
+
+function LeadDetailModal({ title, tab, tabs, setTab, onClose, children }: { title: string; tab: LeadCardTab; tabs: [LeadCardTab, string][]; setTab: (tab: LeadCardTab) => void; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  return <div className="dealer-detail-modal" role="dialog" aria-modal="true" aria-label={`${title} details`}>
+    <button className="dealer-modal-backdrop" type="button" aria-label="Close lead details" onClick={onClose} />
+    <section className="dealer-detail-sheet">
+      <header>
+        <div><span>{title}</span><h3>{tabs.find(([current]) => current === tab)?.[1] ?? "Details"}</h3></div>
+        <button type="button" onClick={onClose}>Close</button>
+      </header>
+      <nav className="dealer-modal-tabs" aria-label={`${title} detail sections`}>{tabs.map(([current, label]) => <button className={tab === current ? "active" : ""} onClick={() => setTab(current)} type="button" key={current}>{label}</button>)}</nav>
+      <div className="dealer-modal-content">{children}</div>
+    </section>
+  </div>;
 }
 
 function MotorcyclePreviewPanel({ lead }: { lead: DealerVisibleLead }) {
