@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordDealerNotificationEvent } from "@/lib/dealer-notifications";
 import { cleanDealerLostReason } from "@/lib/dealer-portal-lifecycle";
 import { getDealerClaimForSession } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -53,6 +54,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       event_type: status === "lost" ? "dealer_claim_lost" : status === "returned_to_pool" ? "dealer_claim_returned" : "dealer_claim_status_updated",
       event_data: { claim_id: claim.id, status, lost_reason: lostReason, lost_reason_detail: lostReasonDetail },
     });
+    if (status === "returned_to_pool") {
+      await recordDealerNotificationEvent({
+        eventType: "lead_returned",
+        dealerAccountId: session.dealer.id,
+        dealerUserId: session.userId,
+        websiteLeadId: claim.website_lead_id,
+        claimId: claim.id,
+        payload: { claim_id: claim.id, status },
+        createdBy: session.userId,
+      });
+    }
     return NextResponse.json({ claim: data });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to update claim." }, { status: 400 });

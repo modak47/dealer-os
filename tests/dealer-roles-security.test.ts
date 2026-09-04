@@ -22,7 +22,7 @@ describe("dealer roles and account management security", () => {
     const route = source("app/api/dealer-portal/account/route.ts");
     assert.match(route, /isDealerPortalAdmin\(session\)/);
     assert.match(route, /status:\s*403/);
-    assert.match(route, /saveDealerPreferencePayloads\(session\.dealer\.id, body\)/);
+    assert.match(route, /saveDealerPreferencePayloads\(session\.dealer\.id, body, session\.userId\)/);
   });
 
   it("requires Dealer Admin for dealer-side user management routes", () => {

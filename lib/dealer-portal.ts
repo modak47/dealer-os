@@ -1,12 +1,17 @@
 import "server-only";
 
 import { getCurrentUserId } from "@/lib/current-user";
+import { changedFieldSummary, recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 export { dealerClaimedCustomerLeadFields, dealerLeadSelectClause, dealerLeadSourceFields, dealerSafeLeadFields, redactLeadForDealer, yesMotoInternalLeadFields } from "@/lib/dealer-portal-redaction";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText, safeNumber } from "@/lib/website-leads";
 import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaim, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPortalUserRole } from "@/types/dealer-portal";
 
 const preferenceArrayLimit = 30;
+const dealerSelfAccountAuditFields = ["trading_address", "main_contact", "telephone", "mobile_whatsapp", "main_email", "accounts_email", "website", "postcode"];
+const dealerStaffAccountAuditFields = ["trading_name", "limited_company_name", "company_registration_number", "vat_number", "registered_address", "trading_address", "main_contact", "telephone", "mobile_whatsapp", "main_email", "accounts_email", "website", "postcode", "account_status", "successful_purchase_fee", "attribution_period_days", "claim_expiry_hours", "update_deadline_hours"];
+const dealerBuyingPreferenceAuditFields = ["motorcycle_types", "makes_wanted", "makes_excluded", "models_wanted", "minimum_year", "maximum_age_years", "minimum_value", "maximum_value", "maximum_mileage", "minimum_engine_cc", "maximum_engine_cc", "accepts_non_running", "accepts_insurance_category", "accepts_outstanding_finance", "accepts_imported", "accepts_modified"];
+const dealerGeographyPreferenceAuditFields = ["england", "wales", "scotland", "northern_ireland", "republic_of_ireland", "maximum_radius_miles"];
 
 export async function getCurrentDealerPortalAccount() {
   const userId = await getCurrentUserId();
@@ -189,16 +194,44 @@ export async function withDealerPreferencesList(accounts: DealerPortalAccount[])
   }));
 }
 
-export async function saveDealerPreferencePayloads(dealerAccountId: string, body: Record<string, unknown>) {
+export async function saveDealerPreferencePayloads(dealerAccountId: string, body: Record<string, unknown>, actorUserId?: string | null) {
   const db = getSupabaseAdminClient();
-  const writes: PromiseLike<unknown>[] = [];
   if (body.buying_preferences && typeof body.buying_preferences === "object") {
-    writes.push(db.from("dealer_buying_preferences").upsert(cleanDealerBuyingPreferencesPayload(body.buying_preferences as Record<string, unknown>, dealerAccountId), { onConflict: "dealer_account_id" }).throwOnError());
+    const previous = await db.from("dealer_buying_preferences").select("*").eq("dealer_account_id", dealerAccountId).maybeSingle();
+    const payload = cleanDealerBuyingPreferencesPayload(body.buying_preferences as Record<string, unknown>, dealerAccountId);
+    await db.from("dealer_buying_preferences").upsert(payload, { onConflict: "dealer_account_id" }).throwOnError();
+    const changes = changedFieldSummary(previous.data as Record<string, unknown> | null, payload, dealerBuyingPreferenceAuditFields);
+    if (Object.keys(changes).length) {
+      await recordDealerPortalAuditEvent({
+        eventType: "dealer_buying_preferences_updated",
+        dealerAccountId,
+        dealerUserId: actorUserId ?? null,
+        eventData: { changed_fields: Object.keys(changes), changes },
+      });
+    }
   }
   if (body.geography_preferences && typeof body.geography_preferences === "object") {
-    writes.push(db.from("dealer_geography_preferences").upsert(cleanDealerGeographyPreferencesPayload(body.geography_preferences as Record<string, unknown>, dealerAccountId), { onConflict: "dealer_account_id" }).throwOnError());
+    const previous = await db.from("dealer_geography_preferences").select("*").eq("dealer_account_id", dealerAccountId).maybeSingle();
+    const payload = cleanDealerGeographyPreferencesPayload(body.geography_preferences as Record<string, unknown>, dealerAccountId);
+    await db.from("dealer_geography_preferences").upsert(payload, { onConflict: "dealer_account_id" }).throwOnError();
+    const changes = changedFieldSummary(previous.data as Record<string, unknown> | null, payload, dealerGeographyPreferenceAuditFields);
+    if (Object.keys(changes).length) {
+      await recordDealerPortalAuditEvent({
+        eventType: "dealer_geography_preferences_updated",
+        dealerAccountId,
+        dealerUserId: actorUserId ?? null,
+        eventData: { changed_fields: Object.keys(changes), changes },
+      });
+    }
   }
-  await Promise.all(writes);
+}
+
+export function dealerSelfAccountChangeSummary(previous: Record<string, unknown> | null | undefined, next: Record<string, unknown>) {
+  return changedFieldSummary(previous, next, dealerSelfAccountAuditFields);
+}
+
+export function dealerStaffAccountChangeSummary(previous: Record<string, unknown> | null | undefined, next: Record<string, unknown>) {
+  return changedFieldSummary(previous, next, dealerStaffAccountAuditFields);
 }
 
 export async function getDealerClaimForSession(claimId: string) {

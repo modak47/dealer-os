@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
+import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
+import { notifyDealerLeadAllocation } from "@/lib/dealer-notifications";
 import { dealerPreviouslyHandledClaim } from "@/lib/dealer-portal-lifecycle";
 import { allocationReasonPayload, allocationStatusForEligibility, evaluateDealerEligibility, excludedReasonPayload } from "@/lib/dealer-matching";
 import { withDealerPreferencesList } from "@/lib/dealer-portal";
@@ -142,6 +144,31 @@ export async function POST(request: Request) {
         previous_dealer_override_ids: [...overrideDealerIds],
       },
     });
+    if ((previousClaims.data ?? []).length) {
+      await recordDealerPortalAuditEvent({
+        eventType: "lead_rereleased_to_dealers",
+        websiteLeadId,
+        dealerUserId: userId,
+        eventData: {
+          allocation_method: method,
+          previous_claim_count: previousClaims.data?.length ?? 0,
+          available_count: availableDealers.length,
+        },
+      });
+    }
+    await Promise.all((inserted ?? []).map(allocation => recordDealerPortalAuditEvent({
+      eventType: allocation.allocation_status === "excluded" ? "dealer_allocation_excluded" : "dealer_allocation_created",
+      websiteLeadId,
+      dealerAccountId: allocation.dealer_account_id,
+      dealerUserId: userId,
+      eventData: {
+        allocation_id: allocation.id,
+        allocation_method: allocation.allocation_method,
+        allocation_status: allocation.allocation_status,
+        match_reasons_ref: "dealer_lead_allocations.match_reasons",
+        excluded_reasons_ref: allocation.allocation_status === "excluded" ? "dealer_lead_allocations.excluded_reasons" : null,
+      },
+    })));
     if (overrideDealerIds.size) {
       await db.from("dealer_portal_audit_events").insert({
         website_lead_id: websiteLeadId,
@@ -150,6 +177,14 @@ export async function POST(request: Request) {
         event_data: { dealer_account_ids: [...overrideDealerIds], allocation_method: method },
       });
     }
+    const dealerById = new Map(dealers.map(dealer => [dealer.id, dealer]));
+    await Promise.all((inserted ?? [])
+      .filter(allocation => allocation.allocation_status === "available")
+      .map(allocation => {
+        const dealer = dealerById.get(String(allocation.dealer_account_id));
+        return dealer ? notifyDealerLeadAllocation({ lead: lead as Parameters<typeof notifyDealerLeadAllocation>[0]["lead"], dealer, allocation, createdBy: userId }) : null;
+      })
+      .filter(Boolean));
     return NextResponse.json({
       allocations: inserted ?? [],
       status,

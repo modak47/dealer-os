@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
+import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { assertSingleDealerAccountForUser, cleanDealerPortalUserEmail, cleanDealerPortalUserRole, findAuthUserByEmail } from "@/lib/dealer-portal-users";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -45,11 +46,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       updated_by: staffUserId,
     }, { onConflict: "dealer_account_id,user_id" }).select("*").single();
     if (error) return NextResponse.json({ error: `Unable to link dealer login: ${error.message}` }, { status: 500 });
-    await db.from("dealer_portal_audit_events").insert({
-      dealer_account_id: id,
-      dealer_user_id: authUser.id,
-      event_type: invited ? "dealer_login_invited" : "dealer_login_linked",
-      event_data: { email, role, linked_by: staffUserId },
+    await recordDealerPortalAuditEvent({
+      eventType: invited ? "dealer_login_invited" : "dealer_login_linked",
+      dealerAccountId: id,
+      dealerUserId: authUser.id,
+      eventData: { email, role, linked_by: staffUserId },
     });
     return NextResponse.json({ portalUser: data, authUser: { id: authUser.id, email }, invited });
   } catch (error) {

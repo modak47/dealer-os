@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { leadLocationUpdate, lookupLeadLocation } from "@/lib/location";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAutomaticVehicleCheckForWebsiteLead } from "@/lib/website-lead-auto-check";
@@ -185,6 +186,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unable to save website lead." }, { status: 500 });
     }
     console.info("Website lead created from webhook.", { id: data.id, source: payload.website ?? "unknown" });
+    await recordDealerPortalAuditEvent({
+      eventType: "master_lead_created",
+      websiteLeadId: data.id,
+      eventData: { source: payload.website ?? null, created_at: payload.created_at },
+    });
     if (payload.reg) await createAutomaticVehicleCheckForWebsiteLead(data.id, payload);
     return NextResponse.json({ id: data.id }, { status: 201 });
   } catch (error) {

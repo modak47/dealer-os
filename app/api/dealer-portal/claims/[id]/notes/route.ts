@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { getDealerClaimForSession } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText } from "@/lib/website-leads";
@@ -27,6 +28,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       body: noteBody,
     }).select("*").single();
     if (error) return NextResponse.json({ error: `Unable to add note: ${error.message}` }, { status: 500 });
+    await recordDealerPortalAuditEvent({
+      eventType: noteType === "offer" ? "dealer_offer_recorded" : "dealer_activity_added",
+      websiteLeadId: claim.website_lead_id,
+      dealerAccountId: session.dealer.id,
+      dealerUserId: session.userId,
+      eventData: {
+        note_id: data.id,
+        claim_id: claim.id,
+        note_type: noteType,
+      },
+    });
     return NextResponse.json({ note: data }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to add note." }, { status: 400 });

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordClaimNotificationEvent } from "@/lib/dealer-notifications";
+import { recordDealerPortalAuditEventBestEffort } from "@/lib/dealer-portal-audit";
 import { getCurrentDealerPortalAccount } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import type { DealerLeadClaim } from "@/types/dealer-portal";
@@ -22,6 +24,28 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     p_dealer_user_id: session.userId,
   });
   if (error) return NextResponse.json({ error: `Unable to claim lead: ${error.message}` }, { status: 500 });
-  if (!data) return NextResponse.json({ error: "Sorry, this lead has just been claimed by another dealer." }, { status: 409 });
+  if (!data) {
+    await recordClaimNotificationEvent({
+      dealerAccountId: session.dealer.id,
+      dealerUserId: session.userId,
+      websiteLeadId: id,
+      result: "already_claimed",
+    });
+    return NextResponse.json({ error: "Sorry, this lead has just been claimed by another dealer." }, { status: 409 });
+  }
+  await recordClaimNotificationEvent({
+    dealerAccountId: session.dealer.id,
+    dealerUserId: session.userId,
+    websiteLeadId: id,
+    claimId: (data as DealerLeadClaim).id,
+    result: "claimed",
+  });
+  await recordDealerPortalAuditEventBestEffort({
+    eventType: "customer_details_unlocked",
+    websiteLeadId: id,
+    dealerAccountId: session.dealer.id,
+    dealerUserId: session.userId,
+    eventData: { claim_id: (data as DealerLeadClaim).id },
+  });
   return NextResponse.json({ claim: data as DealerLeadClaim });
 }

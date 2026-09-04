@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { cleanDealerAccountPayload, saveDealerPreferencePayloads, withDealerPreferences, withDealerPreferencesList } from "@/lib/dealer-portal";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
@@ -29,7 +30,13 @@ export async function POST(request: Request) {
       .select("*")
       .single();
     if (error) return NextResponse.json({ error: `Unable to create dealer portal account: ${error.message}` }, { status: 500 });
-    await saveDealerPreferencePayloads(data.id, body);
+    await recordDealerPortalAuditEvent({
+      eventType: "dealer_account_created",
+      dealerAccountId: data.id,
+      dealerUserId: userId,
+      eventData: { trading_name: data.trading_name, account_status: data.account_status },
+    });
+    await saveDealerPreferencePayloads(data.id, body, userId);
     return NextResponse.json({ account: await withDealerPreferences(data as DealerPortalAccount) as DealerPortalAccountWithPreferences }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to create dealer portal account." }, { status: 400 });

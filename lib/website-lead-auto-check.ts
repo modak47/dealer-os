@@ -1,5 +1,6 @@
 import "server-only";
 
+import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { lookupVehicleByVrm } from "@/lib/autotrader-vehicle-lookup";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { normaliseRegistration } from "@/lib/vrm-lookup";
@@ -18,7 +19,14 @@ type AutoCheckLead = {
 export async function createAutomaticVehicleCheckForWebsiteLead(leadId: number | string, lead: AutoCheckLead) {
   const registration = normaliseRegistration(lead.reg);
   if (!registration) return { skipped: true, reason: "missing_registration" };
-  if (lead.vehicle_check_status === "checked") return { skipped: true, reason: "already_checked" };
+  if (lead.vehicle_check_status === "checked") {
+    await recordDealerPortalAuditEvent({
+      eventType: "vehicle_check_skipped",
+      websiteLeadId: leadId,
+      eventData: { reason: "already_checked" },
+    });
+    return { skipped: true, reason: "already_checked" };
+  }
 
   const db = getSupabaseAdminClient();
   const now = new Date().toISOString();
@@ -41,10 +49,20 @@ export async function createAutomaticVehicleCheckForWebsiteLead(leadId: number |
       vehicle_check_error: null,
       updated_at: checkedAt,
     }).eq("id", leadId);
+    await recordDealerPortalAuditEvent({
+      eventType: "vehicle_check_completed",
+      websiteLeadId: leadId,
+      eventData: { autotrader_vehicle_id: lookup.vehicleId ?? null, checked_at: checkedAt },
+    });
     return { skipped: false, checked: true, autotrader_vehicle_id: lookup.vehicleId ?? null };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Automatic vehicle check failed.";
     await db.from("website_leads").update({ vehicle_check_status: "failed", vehicle_check_error: message, updated_at: new Date().toISOString() }).eq("id", leadId);
+    await recordDealerPortalAuditEvent({
+      eventType: "vehicle_check_failed",
+      websiteLeadId: leadId,
+      eventData: { reason: message },
+    });
     console.warn("Automatic website lead vehicle check failed.", { leadId, registration, message });
     return { skipped: false, error: message };
   }

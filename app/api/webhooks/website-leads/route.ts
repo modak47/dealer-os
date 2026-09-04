@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { leadLocationUpdate, lookupLeadLocation } from "@/lib/location";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAutomaticVehicleCheckForWebsiteLead } from "@/lib/website-lead-auto-check";
@@ -122,6 +123,16 @@ async function saveWebsiteLead(entry: unknown, supabase: ReturnType<typeof getSu
     console.error("Website leads webhook save failed.", { code: error.code, message: error.message, source: lead.lead_source });
     throw new Error("Unable to save website lead.");
   }
+
+  await recordDealerPortalAuditEvent({
+    eventType: "master_lead_created",
+    websiteLeadId: data.id,
+    eventData: {
+      lead_source: data.lead_source,
+      external_submission_id: data.external_submission_id,
+      created_at: data.created_at,
+    },
+  });
 
   if (lead.reg) await createAutomaticVehicleCheckForWebsiteLead(data.id, lead);
   return { lead: data, duplicate: false };

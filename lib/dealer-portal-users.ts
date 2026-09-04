@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getCurrentUserId } from "@/lib/current-user";
+import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText } from "@/lib/website-leads";
 import type { DealerPortalSession } from "@/lib/dealer-portal";
@@ -56,11 +57,11 @@ export async function inviteOrLinkDealerPortalUser(session: DealerPortalSession,
     created_by: currentUserId,
   }, { onConflict: "dealer_account_id,user_id" }).select("*").single();
   if (error) throw new Error(`Unable to link dealer login: ${error.message}`);
-  await db.from("dealer_portal_audit_events").insert({
-    dealer_account_id: session.dealer.id,
-    dealer_user_id: authUser.id,
-    event_type: invited ? "dealer_login_invited" : "dealer_login_linked",
-    event_data: { email, role, managed_by: session.userId },
+  await recordDealerPortalAuditEvent({
+    eventType: invited ? "dealer_login_invited" : "dealer_login_linked",
+    dealerAccountId: session.dealer.id,
+    dealerUserId: authUser.id,
+    eventData: { email, role, managed_by: session.userId },
   });
   return { portalUser: { ...(data as DealerPortalUser), role: cleanDealerPortalUserRole((data as DealerPortalUser).role), email }, invited };
 }
@@ -90,11 +91,24 @@ export async function updateDealerPortalUserForSession(session: DealerPortalSess
     .single();
   if (error) throw new Error(`Unable to update dealership user: ${error.message}`);
   const emailByUserId = await authEmailMap([current.user_id]);
-  await db.from("dealer_portal_audit_events").insert({
-    dealer_account_id: session.dealer.id,
-    dealer_user_id: current.user_id,
-    event_type: "dealer_login_updated",
-    event_data: { portal_user_id: current.id, updates, managed_by: session.userId },
+  const nextRole = "role" in updates ? cleanDealerPortalUserRole(updates.role) : current.role;
+  const nextActive = "active" in updates ? updates.active === true : current.active;
+  const eventType = current.role !== nextRole ? "dealer_login_role_changed"
+    : current.active !== nextActive && nextActive ? "dealer_login_activated"
+      : current.active !== nextActive ? "dealer_login_deactivated"
+        : "dealer_login_updated";
+  await recordDealerPortalAuditEvent({
+    eventType,
+    dealerAccountId: session.dealer.id,
+    dealerUserId: current.user_id,
+    eventData: {
+      portal_user_id: current.id,
+      previous_role: current.role,
+      new_role: nextRole,
+      previous_active: current.active,
+      new_active: nextActive,
+      managed_by: session.userId,
+    },
   });
   return { ...(data as DealerPortalUser), role: cleanDealerPortalUserRole((data as DealerPortalUser).role), email: emailByUserId.get(current.user_id) ?? null };
 }

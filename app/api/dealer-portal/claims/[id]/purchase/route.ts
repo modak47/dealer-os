@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { calculateFeeAmounts } from "@/lib/dealer-fees";
+import { notifySuccessfulPurchaseFeeCreated, recordDealerNotificationEvent } from "@/lib/dealer-notifications";
+import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { isInsideAttributionPeriod, requiresPurchasedLaterDecision } from "@/lib/dealer-portal-lifecycle";
 import { getDealerClaimForSession } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -124,9 +126,49 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         note: "Successful Purchase Fee created from dealer portal purchase report.",
         created_by: session.userId,
       }),
+      recordDealerPortalAuditEvent({
+        eventType: "successful_purchase_fee_created",
+        websiteLeadId: claim.website_lead_id,
+        dealerAccountId: session.dealer.id,
+        dealerUserId: session.userId,
+        eventData: {
+          claim_id: claim.id,
+          purchase_id: purchase.id,
+          fee_id: fee.id,
+          configured_fee_amount: feeAmount,
+        },
+      }),
     ]);
     const followUpError = claimUpdate.error || leadUpdate.error || noteInsert.error || auditInsert.error || ledgerInsert.error;
     if (followUpError) return NextResponse.json({ error: `Purchase and fee were recorded, but lifecycle history could not be completed: ${followUpError.message}` }, { status: 500 });
+    const notificationLead = await db.from("website_leads").select("id,make,model,year,mileage,location_town").eq("id", claim.website_lead_id).maybeSingle();
+    await Promise.all([
+      recordDealerNotificationEvent({
+        eventType: "purchase_reported",
+        dealerAccountId: session.dealer.id,
+        dealerUserId: session.userId,
+        websiteLeadId: claim.website_lead_id,
+        claimId: claim.id,
+        purchaseId: purchase.id,
+        payload: {
+          claim_id: claim.id,
+          purchase_id: purchase.id,
+          purchase_type: purchaseType,
+          attribution_expires_at: claim.attribution_expires_at,
+        },
+        createdBy: session.userId,
+      }),
+      notifySuccessfulPurchaseFeeCreated({
+        dealer: session.dealer,
+        lead: notificationLead.data ?? null,
+        purchaseId: purchase.id,
+        feeId: fee.id,
+        websiteLeadId: claim.website_lead_id,
+        claimId: claim.id,
+        feeAmount,
+        createdBy: session.userId,
+      }),
+    ]);
     return NextResponse.json({ purchase, fee }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to record purchase." }, { status: 400 });
