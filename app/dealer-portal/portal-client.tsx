@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { directionsUrl, googleMapsUrl, leadLocationStatus, staticMapUrl } from "@/lib/location-ui";
+import { directionsUrl, googleMapsUrl, staticMapUrl } from "@/lib/location-ui";
 import { createClient } from "@/lib/supabase/client";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
 import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaimStatus, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerVisibleLead } from "@/types/dealer-portal";
@@ -315,10 +315,11 @@ function DealerAccountPanel({ dealer, onSaved }: { dealer: DealerPortalAccountWi
 
 function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
   const [detailTab, setDetailTab] = useState<LeadCardTab | null>(null);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
   const [imageIndex, setImageIndex] = useState(0);
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const image = images[imageIndex] ?? images[0];
+  const previewImage = previewImageIndex == null ? null : images[previewImageIndex] ?? null;
   const unlocked = Boolean(lead.customer_unlocked);
   const claimId = lead.portal_claim_id ?? "";
   const active = unlocked && claimId && !terminalStatuses.has(String(lead.portal_claim_status));
@@ -333,9 +334,23 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   function moveImage(direction: -1 | 1) {
     setImageIndex(current => (current + direction + images.length) % images.length);
   }
+  function movePreviewImage(direction: -1 | 1) {
+    if (!images.length) return;
+    setPreviewImageIndex(current => ((current ?? imageIndex) + direction + images.length) % images.length);
+  }
+  useEffect(() => {
+    if (previewImageIndex == null) return;
+    function handlePhotoKeys(event: KeyboardEvent) {
+      if (event.key === "Escape") setPreviewImageIndex(null);
+      if (event.key === "ArrowLeft") movePreviewImage(-1);
+      if (event.key === "ArrowRight") movePreviewImage(1);
+    }
+    document.addEventListener("keydown", handlePhotoKeys);
+    return () => document.removeEventListener("keydown", handlePhotoKeys);
+  }, [previewImageIndex, images.length]);
   return <article className="dealer-lead-card">
     <div className="dealer-card-summary">
-      <div className="dealer-lead-image">{image ? <button className="dealer-image-open" type="button" onClick={() => setPreviewImage(image)} aria-label="Open motorcycle photo"><img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /></button> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
+      <div className="dealer-lead-image">{image ? <button className="dealer-image-open" type="button" onClick={() => setPreviewImageIndex(imageIndex)} aria-label="Open motorcycle photo"><img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /></button> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
       <div className="dealer-lead-body">
         <header className="dealer-lead-title"><div><span>{displayStatus}</span><div className="dealer-title-line"><h2>{title}</h2>{meta && <p>{meta}</p>}</div></div><aside className="dealer-title-side"><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></aside></header>
         <div className="dealer-lead-facts">
@@ -358,9 +373,10 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
       {detailTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
     </LeadDetailModal>}
     {previewImage && <div className="dealer-photo-modal" role="dialog" aria-modal="true" aria-label={`${title} photo`}>
-      <button className="dealer-modal-backdrop" type="button" aria-label="Close photo preview" onClick={() => setPreviewImage(null)} />
+      <button className="dealer-modal-backdrop" type="button" aria-label="Close photo preview" onClick={() => setPreviewImageIndex(null)} />
       <section>
-        <button type="button" onClick={() => setPreviewImage(null)}>Close</button>
+        <div className="dealer-photo-modal-head"><span>Photo {previewImageIndex == null ? 1 : previewImageIndex + 1} of {images.length}</span><button type="button" onClick={() => setPreviewImageIndex(null)}>Close</button></div>
+        {images.length > 1 && <><button className="dealer-photo-nav previous" type="button" onClick={() => movePreviewImage(-1)} aria-label="Previous enlarged photo">&lt;</button><button className="dealer-photo-nav next" type="button" onClick={() => movePreviewImage(1)} aria-label="Next enlarged photo">&gt;</button></>}
         <img src={previewImage} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} />
       </section>
     </div>}
@@ -440,7 +456,7 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
   const mapUrl = staticMapUrl(publicLocation);
   const hasLocation = Boolean(publicLocation.location_town || publicLocation.location_display_name || publicLocation.postcode || publicLocation.latitude != null);
   const dealerOrigin = dealer.postcode || dealer.trading_name || "YesMoto";
-  const lookupLabel = lead.latitude != null && lead.longitude != null ? leadLocationStatus(lead) : lead.portal_location_label ? "Approximate location only" : leadLocationStatus(lead);
+  const lookupLabel = lead.latitude != null && lead.longitude != null ? "Approximate location" : lead.portal_location_label ? "Approximate location" : "Location pending";
 
   return <section className="dealer-location-panel">
     <div className="dealer-map-preview">{mapUrl ? <iframe title="Approximate motorcycle location map" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /> : <span>{lookupLabel}</span>}</div>
@@ -450,7 +466,6 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
         <Detail label="Motorcycle" value={lead.portal_location_label || "Approximate location pending"} />
         <Detail label="Your dealership" value={dealer.postcode || "Dealer postcode not set"} />
         <Detail label="Distance" value={lead.portal_distance_label || "Distance not calculated"} />
-        <Detail label="Lookup" value={lookupLabel} />
       </dl>
       {hasLocation && <nav><a href={googleMapsUrl(publicLocation)} target="_blank" rel="noreferrer">View Map</a><a href={directionsUrl(dealerOrigin, publicLocation)} target="_blank" rel="noreferrer">Directions</a></nav>}
     </div>
@@ -512,20 +527,12 @@ function VehicleMotPanel({ lead }: { lead: DealerVisibleLead }) {
 function MotReportPanel({ check, lead }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]>; lead: DealerVisibleLead }) {
   const motHistory = check.mot_history ?? [];
   const mileageHistory = check.mileage_history ?? [];
-  const motNotes = motHistory.flatMap(item => item.details.map(detail => ({ date: item.date, status: item.status, detail })));
-  const leadMotNote = lead.mot && /advis|fail|worn|noisy|exhaust|chain|tyre|brake|corrosion/i.test(lead.mot)
-    ? [{ date: check.mot_expiry || "Current", status: "unknown" as const, detail: lead.mot }]
-    : [];
-  const visibleMotNotes = [...leadMotNote, ...motNotes].filter((note, index, notes) => notes.findIndex(item => item.detail.toLowerCase() === note.detail.toLowerCase()) === index);
+  const fallbackMotDetails = fallbackMotAdvisoryDetails(lead.mot);
   return <div className="dealer-mot-report">
     {mileageHistory.length > 0 && <MileageGraph history={mileageHistory} />}
-    {visibleMotNotes.length > 0 && <section className="dealer-mot-notes">
-      <h4>MOT notes</h4>
-      <div>{visibleMotNotes.slice(0, 6).map((note, index) => <p className={note.status} key={`${note.date}-${note.detail}-${index}`}><span>{formatMotDate(note.date)}</span><strong>{note.detail}</strong></p>)}</div>
-    </section>}
     <section className="dealer-mot-tests">
       <h4>MOT Tests ({motHistory.length})</h4>
-      {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <div className="dealer-mot-report-list">{motHistory.slice(0, 8).map((item, index) => <MotReportRow item={item} expanded={index === 0} key={`${item.date}-${index}`} />)}</div>}
+      {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <div className="dealer-mot-report-list">{motHistory.slice(0, 8).map((item, index) => <MotReportRow item={item} extraDetails={index === 0 ? fallbackMotDetails : []} expanded={index === 0} key={`${item.date}-${index}`} />)}</div>}
       <p className="dealer-history-note">Data sourced from the stored MOT history service.</p>
     </section>
   </div>;
@@ -582,14 +589,15 @@ function MileageGraph({ history }: { history: DealerMileageHistoryItem[] }) {
   </div>;
 }
 
-function MotReportRow({ item, expanded }: { item: DealerMotHistoryItem; expanded: boolean }) {
+function MotReportRow({ item, expanded, extraDetails = [] }: { item: DealerMotHistoryItem; expanded: boolean; extraDetails?: string[] }) {
   const label = item.status === "pass" ? "PASS" : item.status === "fail" ? "FAIL" : "UNKNOWN";
   const mileage = item.mileage == null ? "Mileage not supplied" : `${item.mileage.toLocaleString("en-GB")} MI`;
   const testDate = formatMotDate(item.date);
   const expiryDate = formatMotDate(item.expiry);
+  const details = [...item.details, ...extraDetails.filter(detail => !item.details.some(existing => existing.toLowerCase() === detail.toLowerCase()))];
   return <details className={`dealer-mot-report-test ${item.status}`} open={expanded}>
     <summary>
-      <span><b>{label}</b>{item.details.length > 0 && <em>{item.details.length} item{item.details.length === 1 ? "" : "s"}</em>}</span>
+      <span><b>{label}</b>{details.length > 0 && <em>{details.length} item{details.length === 1 ? "" : "s"}</em>}</span>
       <small>{testDate}</small>
       <small>{mileage}</small>
     </summary>
@@ -599,9 +607,19 @@ function MotReportRow({ item, expanded }: { item: DealerMotHistoryItem; expanded
         <Detail label="Valid until" value={expiryDate} />
         <Detail label="Mileage" value={item.mileage == null ? null : `${item.mileage.toLocaleString("en-GB")} MI (read)`} />
       </dl>
-      {item.details.length > 0 && <div><strong>Advisories</strong><ul>{item.details.map(detail => <li key={detail}>{detail}</li>)}</ul></div>}
+      {details.length > 0 && <div><strong>Advisories</strong><ul>{details.map(detail => <li key={detail}>{detail}</li>)}</ul></div>}
     </div>
   </details>;
+}
+
+function fallbackMotAdvisoryDetails(value: string | null | undefined) {
+  if (!value || !/(advis|fail|worn|noisy|exhaust|chain|tyre|brake|corrosion)/i.test(value)) return [];
+  const withoutMotPrefix = value
+    .replace(/^mot\s*[:\-]?\s*/i, "")
+    .replace(/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*/i, "")
+    .trim();
+  if (!withoutMotPrefix || /^\d{1,2}\s+\w+\s+\d{4}$/i.test(withoutMotPrefix)) return [];
+  return [withoutMotPrefix];
 }
 
 function formatMotDate(value: string | null | undefined) {
