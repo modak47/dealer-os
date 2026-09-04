@@ -468,7 +468,56 @@ function visualDealerPortalFixture() {
       { id: "visual-note-3", website_lead_id: 9004, claim_id: "visual-claim-lost", dealer_account_id: dealer.id, dealer_user_id: null, note_type: "status", body: "Seller would not move enough on price.", created_at: "2026-08-18T09:35:00.000Z" },
     ],
   } as DealerVisibleLead;
-  return { dealer, role: "dealer_admin", available: [lead], claimed: [claimedLead, purchasedLead, lostLead] };
+  const noPhotoWarningLead = {
+    ...lead,
+    id: 9005,
+    reg: "NC20VFR",
+    make: "Honda",
+    model: "VFR 800",
+    year: "2020",
+    engine: "782",
+    mileage: "18400",
+    price: "5250",
+    image1: null,
+    image2: null,
+    resolved_images: [],
+    portal_location_label: "Bristol",
+    portal_distance_miles: 118,
+    portal_distance_label: "118 miles from your dealership",
+    portal_vehicle_check: {
+      ...check,
+      status: "Needs review",
+      clear: false,
+      flags: [
+        flag("identity", "Identity check", false, "Vehicle identity data returned", "Identity needs review"),
+        flag("stolen", "Stolen", false, "No record", "Vehicle recorded stolen"),
+        flag("finance", "Finance", true, "No finance", "Outstanding finance recorded"),
+        flag("write_off", "Insurance write-off", false, "No record", "Insurance loss recorded"),
+        flag("mileage", "Mileage", false, "Consistent", "Mileage discrepancy recorded"),
+      ],
+    },
+  } as DealerVisibleLead;
+  const returnedLead = {
+    ...lostLead,
+    id: 9006,
+    reg: "TR19RDN",
+    make: "Triumph",
+    model: "Street Triple RS",
+    year: "2019",
+    engine: "765",
+    mileage: "9200",
+    price: "6100",
+    portal_claim_id: "visual-claim-returned",
+    portal_claim_status: "returned_to_pool",
+    portal_lost_reason: null,
+    portal_location_label: "Portsmouth",
+    portal_distance_miles: 56,
+    portal_distance_label: "56 miles from your dealership",
+    portal_notes: [
+      { id: "visual-note-4", website_lead_id: 9006, claim_id: "visual-claim-returned", dealer_account_id: dealer.id, dealer_user_id: null, note_type: "status", body: "Returned because collection timing did not work for the dealership.", created_at: "2026-08-19T15:05:00.000Z" },
+    ],
+  } as DealerVisibleLead;
+  return { dealer, role: "dealer_admin", available: [lead, noPhotoWarningLead], claimed: [claimedLead, purchasedLead, lostLead, returnedLead] };
 }
 
 export async function GET(request: Request) {
