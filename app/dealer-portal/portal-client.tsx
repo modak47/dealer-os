@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { directionsUrl, googleMapsUrl, staticMapUrl } from "@/lib/location-ui";
 import { dealerLostReasons } from "@/lib/dealer-portal-lifecycle";
 import { createClient } from "@/lib/supabase/client";
@@ -469,6 +469,7 @@ function DealerAccountPanel({ dealer, role, onSaved }: { dealer: DealerPortalAcc
 function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
   const [detailTab, setDetailTab] = useState<LeadCardTab | null>(null);
   const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
+  const [photoZoom, setPhotoZoom] = useState(1);
   const [imageIndex, setImageIndex] = useState(0);
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const image = images[imageIndex] ?? images[0];
@@ -486,9 +487,20 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   function moveImage(direction: -1 | 1) {
     setImageIndex(current => (current + direction + images.length) % images.length);
   }
-  function movePreviewImage(direction: -1 | 1) {
+  function openPreviewImage(index: number) {
+    setPhotoZoom(1);
+    setPreviewImageIndex(index);
+  }
+  const movePreviewImage = useCallback((direction: -1 | 1) => {
     if (!images.length) return;
+    setPhotoZoom(1);
     setPreviewImageIndex(current => ((current ?? imageIndex) + direction + images.length) % images.length);
+  }, [imageIndex, images.length]);
+  const updatePhotoZoom = useCallback((nextZoom: number) => {
+    setPhotoZoom(Math.min(3, Math.max(1, nextZoom)));
+  }, []);
+  function togglePhotoZoom() {
+    setPhotoZoom(current => current > 1 ? 1 : 2);
   }
   useEffect(() => {
     if (previewImageIndex == null) return;
@@ -496,13 +508,16 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
       if (event.key === "Escape") setPreviewImageIndex(null);
       if (event.key === "ArrowLeft") movePreviewImage(-1);
       if (event.key === "ArrowRight") movePreviewImage(1);
+      if (event.key === "+" || event.key === "=") updatePhotoZoom(photoZoom + .5);
+      if (event.key === "-") updatePhotoZoom(photoZoom - .5);
+      if (event.key === "0") setPhotoZoom(1);
     }
     document.addEventListener("keydown", handlePhotoKeys);
     return () => document.removeEventListener("keydown", handlePhotoKeys);
-  }, [previewImageIndex, images.length]);
+  }, [previewImageIndex, images.length, movePreviewImage, updatePhotoZoom, photoZoom]);
   return <article className="dealer-lead-card">
     <div className="dealer-card-summary">
-      <div className="dealer-lead-image">{image ? <button className="dealer-image-open" type="button" onClick={() => setPreviewImageIndex(imageIndex)} aria-label="Open motorcycle photo"><img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /></button> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
+      <div className="dealer-lead-image">{image ? <button className="dealer-image-open" type="button" onClick={() => openPreviewImage(imageIndex)} aria-label="Open motorcycle photo"><img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /></button> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
       <div className="dealer-lead-body">
         <header className="dealer-lead-title"><div><span>{displayStatus}</span><div className="dealer-title-line"><h2>{title}</h2>{meta && <p>{meta}</p>}</div></div><aside className="dealer-title-side"><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></aside></header>
         <div className="dealer-lead-facts">
@@ -527,9 +542,19 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
     {previewImage && <div className="dealer-photo-modal" role="dialog" aria-modal="true" aria-label={`${title} photo`}>
       <button className="dealer-modal-backdrop" type="button" aria-label="Close photo preview" onClick={() => setPreviewImageIndex(null)} />
       <section>
-        <div className="dealer-photo-modal-head"><span>Photo {previewImageIndex == null ? 1 : previewImageIndex + 1} of {images.length}</span><button type="button" onClick={() => setPreviewImageIndex(null)}>Close</button></div>
+        <div className="dealer-photo-modal-head">
+          <span>Photo {previewImageIndex == null ? 1 : previewImageIndex + 1} of {images.length}</span>
+          <div className="dealer-photo-tools" aria-label="Photo zoom controls">
+            <button type="button" onClick={() => updatePhotoZoom(photoZoom - .5)} disabled={photoZoom <= 1} aria-label="Zoom out">-</button>
+            <button type="button" onClick={() => setPhotoZoom(1)} disabled={photoZoom === 1}>Reset</button>
+            <button type="button" onClick={() => updatePhotoZoom(photoZoom + .5)} disabled={photoZoom >= 3} aria-label="Zoom in">+</button>
+          </div>
+          <button type="button" onClick={() => setPreviewImageIndex(null)}>Close</button>
+        </div>
         {images.length > 1 && <><button className="dealer-photo-nav previous" type="button" onClick={() => movePreviewImage(-1)} aria-label="Previous enlarged photo">&lt;</button><button className="dealer-photo-nav next" type="button" onClick={() => movePreviewImage(1)} aria-label="Next enlarged photo">&gt;</button></>}
-        <img src={previewImage} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} />
+        <button className={`dealer-photo-zoom ${photoZoom > 1 ? "zoomed" : ""}`} type="button" onClick={togglePhotoZoom} aria-label={photoZoom > 1 ? "Reset photo zoom" : "Zoom photo"}>
+          <img src={previewImage} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} style={{ transform: `scale(${photoZoom})` } as CSSProperties} />
+        </button>
       </section>
     </div>}
     {!unlocked && <div className="dealer-claim-row"><CustomerPanel lead={lead} unlocked={false} /></div>}
