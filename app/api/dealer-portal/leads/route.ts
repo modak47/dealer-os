@@ -497,6 +497,25 @@ function visualDealerPortalFixture() {
       ],
     },
   } as DealerVisibleLead;
+  const clearCommuterLead = {
+    ...lead,
+    id: 9007,
+    reg: "CB21XRA",
+    make: "Honda",
+    model: "CB650R",
+    year: "2021",
+    engine: "649",
+    mileage: "7200",
+    price: "5900",
+    image1: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=1100&q=80",
+    image2: null,
+    resolved_images: [
+      "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=1100&q=80",
+    ],
+    portal_location_label: "Guildford",
+    portal_distance_miles: 41,
+    portal_distance_label: "41 miles from your dealership",
+  } as DealerVisibleLead;
   const returnedLead = {
     ...lostLead,
     id: 9006,
@@ -517,7 +536,7 @@ function visualDealerPortalFixture() {
       { id: "visual-note-4", website_lead_id: 9006, claim_id: "visual-claim-returned", dealer_account_id: dealer.id, dealer_user_id: null, note_type: "status", body: "Returned because collection timing did not work for the dealership.", created_at: "2026-08-19T15:05:00.000Z" },
     ],
   } as DealerVisibleLead;
-  return { dealer, role: "dealer_admin", available: [lead, noPhotoWarningLead], claimed: [claimedLead, purchasedLead, lostLead, returnedLead] };
+  return { dealer, role: "dealer_admin", available: [lead, noPhotoWarningLead, clearCommuterLead], claimed: [claimedLead, purchasedLead, lostLead, returnedLead] };
 }
 
 export async function GET(request: Request) {

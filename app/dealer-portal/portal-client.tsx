@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent, type MouseEvent } from "react";
 import { directionsUrl, googleMapsUrl, staticMapUrl } from "@/lib/location-ui";
 import { dealerLostReasons } from "@/lib/dealer-portal-lifecycle";
 import { createClient } from "@/lib/supabase/client";
@@ -34,8 +35,11 @@ const statusActions: [DealerLeadClaimStatus, string][] = [
 
 export function DealerPortalClient() {
   const [data, setData] = useState<PortalData | null>(null);
-  const [activeTab, setActiveTab] = useState<PortalTab>("available");
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<PortalTab>(() => {
+    if (typeof window === "undefined") return "available";
+    const section = new URLSearchParams(window.location.search).get("section");
+    return isPortalTab(section) ? section : "available";
+  });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -59,20 +63,6 @@ export function DealerPortalClient() {
   const purchasedLeads = useMemo(() => data?.claimed.filter(lead => ["purchased", "purchased_later"].includes(String(lead.portal_claim_status))) ?? [], [data]);
   const lostLeads = useMemo(() => data?.claimed.filter(lead => ["lost", "returned_to_pool"].includes(String(lead.portal_claim_status))) ?? [], [data]);
   const leads = activeTab === "available" ? data?.available ?? [] : activeTab === "active" ? activeLeads : activeTab === "purchased" ? purchasedLeads : activeTab === "lost" ? lostLeads : [];
-
-  async function claim(lead: DealerVisibleLead) {
-    setBusyId(lead.id);
-    setError("");
-    setNotice("");
-    const response = await fetch(`/api/dealer-portal/leads/${lead.id}/claim`, { method: "POST" });
-    const payload = await response.json();
-    if (response.ok) {
-      setNotice("Lead claimed. Customer details are now unlocked.");
-      setActiveTab("active");
-      await load();
-    } else setError(payload.error || "Unable to claim lead.");
-    setBusyId(null);
-  }
 
   async function signOut() {
     await createClient().auth.signOut();
@@ -104,11 +94,15 @@ export function DealerPortalClient() {
         </section>
         {error && <div className="portal-message error">{error}</div>}{notice && <div className="portal-message">{notice}</div>}
         {activeTab === "account" ? <DealerAccountPanel dealer={data.dealer} role={data.role} onSaved={dealer => setData(current => current ? { ...current, dealer } : current)} /> : activeTab === "payments" ? <DealerPaymentsPanel /> : <>
-          {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
+          {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard lead={lead} section={activeTab} key={`${activeTab}-${lead.id}`} />)}</section>}
         </>}
       </section>
     </div>
   </section>;
+}
+
+function isPortalTab(value: string | null): value is PortalTab {
+  return value === "available" || value === "active" || value === "purchased" || value === "lost" || value === "payments" || value === "account";
 }
 
 function emptyTitle(tab: PortalTab) {
@@ -219,12 +213,6 @@ function paymentLeadTitle(lead: DealerAccountFee["lead"]) {
   return `#${lead.id} ${lead.reg || "No reg"} ${[lead.year, lead.make, lead.model].filter(Boolean).join(" ")}`.trim();
 }
 
-function LeadFactIcon({ type }: { type: "location" | "distance" | "received" }) {
-  if (type === "location") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11Z" /><circle cx="12" cy="10" r="2.5" /></svg>;
-  if (type === "distance") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16" /><path d="M7 19 10 5l4 14 3-10 2 10" /></svg>;
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></svg>;
-}
-
 function DealerSidebar({ dealer, activeTab, counts, onTab }: { dealer: DealerPortalAccountWithPreferences; activeTab: PortalTab; counts: { available: number; active: number; purchased: number; lost: number }; onTab: (tab: PortalTab) => void }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const items: { tab: PortalTab; label: string; count?: number; icon: string }[] = [
@@ -235,6 +223,12 @@ function DealerSidebar({ dealer, activeTab, counts, onTab }: { dealer: DealerPor
   ];
   function selectTab(tab: PortalTab) {
     setMoreOpen(false);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (tab === "available") url.searchParams.delete("section");
+      else url.searchParams.set("section", tab);
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    }
     onTab(tab);
   }
   const mobilePrimaryItems: { tab: PortalTab; label: string; count?: number; icon: string }[] = [
@@ -494,28 +488,171 @@ function DealerAccountPanel({ dealer, role, onSaved }: { dealer: DealerPortalAcc
   </form>;
 }
 
-function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
-  const [detailTab, setDetailTab] = useState<LeadCardTab | null>(null);
-  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
-  const [photoZoom, setPhotoZoom] = useState(1);
+function DealerLeadCard({ lead, section }: { lead: DealerVisibleLead; section: PortalTab }) {
+  const router = useRouter();
   const [imageIndex, setImageIndex] = useState(0);
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const image = images[imageIndex] ?? images[0];
-  const previewImage = previewImageIndex == null ? null : images[previewImageIndex] ?? null;
   const unlocked = Boolean(lead.customer_unlocked);
-  const claimId = lead.portal_claim_id ?? "";
-  const active = unlocked && claimId && !terminalStatuses.has(String(lead.portal_claim_status));
-  const canReportPurchasedLater = unlocked && claimId && lead.portal_claim_status === "lost";
   const notes = lead.portal_notes ?? [];
   const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
   const askingPrice = safeNumber(lead.price);
   const displayStatus = statusLabel(lead.portal_claim_status || lead.status || "available").replace(/^Dealer Pool Available$/i, "Available");
-  const meta = [lead.reg, formatMileage(lead.mileage), displayEngine(lead.engine)].filter(Boolean).join(" - ");
-  const tabs: [LeadCardTab, string][] = [["overview", "Overview"], ["check", "Vehicle"], ["mot", "History"], ["location", "Location"], ...(unlocked ? [["customer", "Customer / Work Lead"] as [LeadCardTab, string]] : [])];
+  const href = `/dealer-portal/leads/${lead.id}?from=${section}`;
   const cardMode = unlocked ? String(lead.portal_claim_status || "claimed").replace(/_/g, "-") : "available";
   const latestNote = notes[0] ?? null;
   const latestOffer = notes.find(note => note.note_type === "offer") ?? null;
+  const check = lead.portal_vehicle_check;
+  const checkNeedsReview = check?.clear === false || check?.flags.some(item => item.state === "warning");
+  const outcomeDate = lead.portal_claim_status === "lost" ? lead.portal_notes?.find(note => note.note_type === "status")?.created_at : latestNote?.created_at;
+  const cardDetails = unlocked ? compactClaimedDetails(lead, latestNote, latestOffer, outcomeDate) : [
+    ["Mileage", formatMileage(lead.mileage) || "Mileage pending"],
+    ["Location", lead.portal_location_label || "Location pending"],
+    ["Asking", askingPrice === null ? lead.price || "Price not supplied" : `${formatGbp(askingPrice)} asking`],
+  ];
   function moveImage(direction: -1 | 1) {
+    setImageIndex(current => (current + direction + images.length) % images.length);
+  }
+  function openLead() {
+    router.push(href);
+  }
+  return <article className={`dealer-lead-card dealer-lead-card-${cardMode}`} role="link" tabIndex={0} onClick={openLead} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openLead(); } }}>
+    <DealerPhotoGallery images={images} image={image} imageIndex={imageIndex} title={title} make={lead.make} model={lead.model} onMove={moveImage} onSelect={setImageIndex} onOpen={openLead} />
+    <div className="dealer-lead-body">
+      <header className="dealer-lead-title"><span>{displayStatus}</span><h2>{title}</h2><p>{lead.reg || "Registration pending"}</p></header>
+      <dl className="dealer-card-facts">{cardDetails.map(([label, value]) => <Detail label={label} value={value} key={label} />)}</dl>
+      {!unlocked && <p className={`dealer-card-check ${checkNeedsReview ? "warning" : "clear"}`}>{checkNeedsReview ? "Vehicle check needs review" : "Vehicle check clear"}</p>}
+    </div>
+  </article>;
+}
+
+function compactClaimedDetails(lead: DealerVisibleLead, latestNote: NonNullable<DealerVisibleLead["portal_notes"]>[number] | null, latestOffer: NonNullable<DealerVisibleLead["portal_notes"]>[number] | null, outcomeDate: string | null | undefined) {
+  if (["purchased", "purchased_later"].includes(String(lead.portal_claim_status))) return [
+    ["Reg", lead.reg || "Reg pending"],
+    ["Purchased", formatLeadDate(outcomeDate || lead.updated_at || lead.created_at)],
+    ["Status", statusLabel(lead.portal_claim_status || "purchased")],
+    ["Fee", "See account"],
+  ];
+  if (["lost", "returned_to_pool"].includes(String(lead.portal_claim_status))) return [
+    ["Reg", lead.reg || "Reg pending"],
+    ["Outcome", statusLabel(lead.portal_claim_status || "lost")],
+    ["Reason", lead.portal_lost_reason || "Not supplied"],
+    ["Date", formatLeadDate(outcomeDate || lead.updated_at || lead.created_at)],
+  ];
+  return [
+    ["Customer", customerName(lead)],
+    ["Workflow", statusLabel(lead.portal_claim_status || "claimed")],
+    ["Latest offer", latestOffer?.body || "No offer recorded"],
+    ["Last activity", latestNote ? formatLeadDate(latestNote.created_at) : "No activity yet"],
+  ];
+}
+
+export function LeadWorkspaceClient({ leadId }: { leadId: string }) {
+  const [data, setData] = useState<PortalData | null>(null);
+  const [tab, setTab] = useState<LeadCardTab>(() => {
+    if (typeof window === "undefined") return "overview";
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    return isLeadWorkspaceTab(requestedTab) ? requestedTab : "overview";
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(true);
+  const from = typeof window === "undefined" ? "available" : new URLSearchParams(window.location.search).get("from");
+  const backSection = isLeadListTab(from) ? from : "available";
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    const response = await fetch("/api/dealer-portal/leads", { cache: "no-store" });
+    const payload = await response.json();
+    if (response.ok) setData(payload);
+    else setError(payload.error || "Unable to load this lead.");
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    function restoreTabFromUrl() {
+      const requestedTab = new URLSearchParams(window.location.search).get("tab");
+      setTab(isLeadWorkspaceTab(requestedTab) ? requestedTab : "overview");
+    }
+    window.addEventListener("popstate", restoreTabFromUrl);
+    return () => window.removeEventListener("popstate", restoreTabFromUrl);
+  }, []);
+
+  const lead = useMemo(() => {
+    const id = Number(leadId);
+    if (!data || !Number.isFinite(id)) return null;
+    return [...data.available, ...data.claimed].find(item => item.id === id) ?? null;
+  }, [data, leadId]);
+
+  async function claimLead() {
+    if (!lead) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const response = await fetch(`/api/dealer-portal/leads/${lead.id}/claim`, { method: "POST" });
+    const payload = await response.json();
+    if (response.ok) {
+      setNotice("Lead claimed. Customer details are now unlocked.");
+      setWorkspaceTab("customer");
+      await load();
+    } else setError(payload.error || "Unable to claim lead.");
+    setBusy(false);
+  }
+
+  function setWorkspaceTab(nextTab: LeadCardTab) {
+    setTab(nextTab);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (nextTab === "overview") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", nextTab);
+    window.history.replaceState({}, "", url);
+  }
+
+  if (loading) return <section className={`${styles.scope} dealer-portal-v3`}><div className="dealer-lead-workspace"><div className="portal-empty"><h2>Loading lead...</h2></div></div></section>;
+  if (!data) return <section className={`${styles.scope} dealer-portal-v3`}><div className="dealer-lead-workspace"><div className="portal-empty"><h2>Dealer access unavailable</h2><p>Sign in with a linked dealer login, or ask YesMoto to set up your dealer account.</p><Link className="dealer-claim-button" href="/dealer-login">Go to Dealer Login</Link></div></div></section>;
+  if (!lead) return <section className={`${styles.scope} dealer-portal-v3`}><div className="dealer-lead-workspace"><a className="dealer-workspace-back" href={`/dealer-portal${backSection === "available" ? "" : `?section=${backSection}`}`}>Back to Opportunities</a><div className="portal-empty"><h2>Lead not available</h2><p>This opportunity is not currently available to your dealership, or it has moved out of your authorised portal records.</p></div></div></section>;
+
+  return <LeadWorkspace dealer={data.dealer} lead={lead} tab={tab} from={backSection} busy={busy} notice={notice} error={error} setTab={setWorkspaceTab} onClaim={() => void claimLead()} onChanged={load} />;
+}
+
+function isLeadListTab(value: string | null): value is Exclude<PortalTab, "payments" | "account"> {
+  return value === "available" || value === "active" || value === "purchased" || value === "lost";
+}
+
+function isLeadWorkspaceTab(value: string | null): value is LeadCardTab {
+  return value === "overview" || value === "location" || value === "check" || value === "mot" || value === "customer";
+}
+
+function LeadWorkspace({ dealer, lead, tab, from, busy, notice, error, setTab, onClaim, onChanged }: { dealer: DealerPortalAccountWithPreferences; lead: DealerVisibleLead; tab: LeadCardTab; from: Exclude<PortalTab, "payments" | "account">; busy: boolean; notice: string; error: string; setTab: (tab: LeadCardTab) => void; onClaim: () => void; onChanged: () => Promise<void> }) {
+  const [imageIndex, setImageIndex] = useState(0);
+  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
+  const [photoZoom, setPhotoZoom] = useState(1);
+  const images = lead.resolved_images ?? combineLeadImages(lead);
+  const image = images[imageIndex] ?? images[0];
+  const previewImage = previewImageIndex == null ? null : images[previewImageIndex] ?? null;
+  const title = [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending";
+  const meta = [lead.reg, formatMileage(lead.mileage), displayEngine(lead.engine)].filter(Boolean).join(" - ");
+  const locationSummary = [lead.portal_location_label, lead.portal_distance_label?.replace(" from your dealership", " away")].filter(Boolean).join(" - ");
+  const unlocked = Boolean(lead.customer_unlocked);
+  const claimId = lead.portal_claim_id ?? "";
+  const active = unlocked && claimId && !terminalStatuses.has(String(lead.portal_claim_status));
+  const canReportPurchasedLater = unlocked && claimId && lead.portal_claim_status === "lost";
+  const latestNote = lead.portal_notes?.[0] ?? null;
+  const latestOffer = lead.portal_notes?.find(note => note.note_type === "offer") ?? null;
+  const askingPrice = safeNumber(lead.price);
+  const displayStatus = statusLabel(lead.portal_claim_status || lead.status || "available").replace(/^Dealer Pool Available$/i, "Available");
+  const tabs: [LeadCardTab, string][] = [["overview", "Overview"], ["check", "Vehicle Check"], ["mot", "MOT & Mileage"], ["location", "Location"], ...(unlocked ? [["customer", "Customer / Work Lead"] as [LeadCardTab, string]] : [])];
+  const activeTab = tab === "customer" && !unlocked ? "overview" : tab;
+
+  function moveImage(direction: -1 | 1) {
+    if (!images.length) return;
     setImageIndex(current => (current + direction + images.length) % images.length);
   }
   function openPreviewImage(index: number) {
@@ -546,31 +683,38 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
     document.addEventListener("keydown", handlePhotoKeys);
     return () => document.removeEventListener("keydown", handlePhotoKeys);
   }, [previewImageIndex, images.length, movePreviewImage, updatePhotoZoom, photoZoom]);
-  return <article className={`dealer-lead-card dealer-lead-card-${cardMode}`}>
-    <div className="dealer-card-summary">
-      <DealerPhotoGallery images={images} image={image} imageIndex={imageIndex} title={title} make={lead.make} model={lead.model} onMove={moveImage} onSelect={setImageIndex} onOpen={openPreviewImage} />
-      <div className="dealer-lead-body">
-        <header className="dealer-lead-title"><div><span>{displayStatus}</span><div className="dealer-title-line"><h2>{title}</h2>{meta && <p>{meta}</p>}</div></div><aside className="dealer-title-side"><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></aside></header>
-        <div className="dealer-lead-facts">
-          <div><i><LeadFactIcon type="location" /></i><span>Location</span><b>{lead.portal_location_label || "Location pending"}</b></div>
-          <div><i><LeadFactIcon type="distance" /></i><span>Distance</span><b>{lead.portal_distance_label?.replace(" from your dealership", " away") || "Distance not calculated"}</b></div>
-          <div><i><LeadFactIcon type="received" /></i><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
+
+  return <section className={`${styles.scope} dealer-portal-v3`}>
+    <main className="dealer-lead-workspace">
+      <a className="dealer-workspace-back" href={`/dealer-portal${from === "available" ? "" : `?section=${from}`}`}>Back to Opportunities</a>
+      {error && <div className="portal-message error">{error}</div>}{notice && <div className="portal-message">{notice}</div>}
+      <header className="dealer-workspace-hero">
+        <DealerPhotoGallery images={images} image={image} imageIndex={imageIndex} title={title} make={lead.make} model={lead.model} onMove={moveImage} onSelect={setImageIndex} onOpen={openPreviewImage} />
+        <div className="dealer-workspace-title">
+          <span>{displayStatus}</span>
+          <h1>{title}</h1>
+          {meta && <p>{meta}</p>}
+          {unlocked && locationSummary && <p>{locationSummary}</p>}
         </div>
-        {unlocked && <LeadWorkSnapshot lead={lead} latestNote={latestNote} latestOffer={latestOffer} />}
-        <VehicleCheckSummaryPanel lead={lead} />
-        <div className="dealer-lead-controls dealer-lead-controls-compact">
-          {!unlocked && <p>Customer details unlock only after a successful claim.</p>}
-          <div className="dealer-lead-actions"><button className="dealer-secondary-button" type="button" onClick={() => setDetailTab("overview")}>View Details</button>{unlocked && <button className="dealer-secondary-button dealer-work-button" type="button" onClick={() => setDetailTab("customer")}>Work Lead</button>}{!unlocked && <button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button>}</div>
-        </div>
-      </div>
-    </div>
-    {detailTab && <LeadDetailModal title={title} meta={meta} status={displayStatus} askingPrice={askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)} tab={detailTab} tabs={tabs} setTab={setDetailTab} onClose={() => setDetailTab(null)}>
-      {detailTab === "overview" && <div className={`dealer-overview-grid ${notes.length ? "has-notes" : "no-notes"}`}><MotorcyclePreviewPanel lead={lead} /><DealerNotesPanel notes={notes} unlocked={unlocked} onAddNote={() => setDetailTab("customer")} /></div>}
-      {detailTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
-      {detailTab === "check" && <VehicleCheckPanel lead={lead} />}
-      {detailTab === "mot" && <VehicleMotPanel lead={lead} />}
-      {detailTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
-    </LeadDetailModal>}
+        <aside className="dealer-workspace-price">
+          <span>Customer asking</span>
+          <strong>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong>
+          {!unlocked && <button className="dealer-claim-button" type="button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button>}
+          {unlocked && <b>{statusLabel(lead.portal_claim_status || "claimed")}</b>}
+        </aside>
+      </header>
+      <LeadWorkspaceMetrics lead={lead} unlocked={unlocked} latestNote={latestNote} latestOffer={latestOffer} />
+      <nav className="dealer-workspace-tabs" aria-label={`${title} detail sections`}>
+        {tabs.map(([value, label]) => <button className={activeTab === value ? "active" : ""} type="button" onClick={() => setTab(value)} key={value}>{label}</button>)}
+      </nav>
+      <section className="dealer-workspace-content">
+        {activeTab === "overview" && <MotorcyclePreviewPanel lead={lead} />}
+        {activeTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
+        {activeTab === "check" && <VehicleCheckPanel lead={lead} />}
+        {activeTab === "mot" && <VehicleMotPanel lead={lead} />}
+        {activeTab === "customer" && <><section className="dealer-customer-work-grid"><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}</section><section className="dealer-timeline"><h3>Activity Timeline</h3>{lead.portal_notes?.length ? lead.portal_notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section></>}
+      </section>
+    </main>
     {previewImage && <div className="dealer-v3-photo-modal" role="dialog" aria-modal="true" aria-label={`${title} photo`}>
       <button className="dealer-v3-modal-backdrop" type="button" aria-label="Close photo preview" onClick={() => setPreviewImageIndex(null)} />
       <section>
@@ -589,54 +733,52 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
         </button>
       </section>
     </div>}
-  </article>;
-}
-
-function DealerPhotoGallery({ images, image, imageIndex, title, make, model, onMove, onSelect, onOpen }: { images: string[]; image: string | undefined; imageIndex: number; title: string; make: string | null | undefined; model: string | null | undefined; onMove: (direction: -1 | 1) => void; onSelect: (index: number) => void; onOpen: (index: number) => void }) {
-  return <div className={`dealer-lead-image ${image ? "" : "no-photo"}`}>
-    {image ? <button className="dealer-image-open" type="button" onClick={() => onOpen(imageIndex)} aria-label={`Open ${title} photo`}>
-      <img src={image} alt={`${make ?? "Motorcycle"} ${model ?? ""}`} />
-    </button> : <span><i aria-hidden="true">+</i><b>No photos supplied</b></span>}
-    {images.length > 1 && <>
-      <button className="dealer-image-nav previous" type="button" onClick={() => onMove(-1)} aria-label="Previous motorcycle photo">&lt;</button>
-      <button className="dealer-image-nav next" type="button" onClick={() => onMove(1)} aria-label="Next motorcycle photo">&gt;</button>
-      <div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>
-        {images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => onSelect(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}
-      </div>
-      <b>{imageIndex + 1} / {images.length} photos</b>
-    </>}
-  </div>;
-}
-
-function LeadWorkSnapshot({ lead, latestNote, latestOffer }: { lead: DealerVisibleLead; latestNote: NonNullable<DealerVisibleLead["portal_notes"]>[number] | null; latestOffer: NonNullable<DealerVisibleLead["portal_notes"]>[number] | null }) {
-  return <section className="dealer-work-snapshot">
-    <div><span>Customer</span><strong>{customerName(lead)}</strong></div>
-    <div><span>Workflow</span><strong>{statusLabel(lead.portal_claim_status || "claimed")}</strong></div>
-    <div><span>Latest activity</span><strong>{latestNote ? `${statusLabel(latestNote.note_type)} - ${formatLeadDate(latestNote.created_at)}` : "No activity yet"}</strong></div>
-    <div><span>Latest offer</span><strong>{latestOffer?.body || "No offer recorded"}</strong></div>
   </section>;
 }
 
-function LeadDetailModal({ title, meta, status, askingPrice, tab, tabs, setTab, onClose, children }: { title: string; meta: string; status: string; askingPrice: string; tab: LeadCardTab; tabs: [LeadCardTab, string][]; setTab: (tab: LeadCardTab) => void; onClose: () => void; children: ReactNode }) {
-  useEffect(() => {
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+function LeadWorkspaceMetrics({ lead, unlocked, latestNote, latestOffer }: { lead: DealerVisibleLead; unlocked: boolean; latestNote: NonNullable<DealerVisibleLead["portal_notes"]>[number] | null; latestOffer: NonNullable<DealerVisibleLead["portal_notes"]>[number] | null }) {
+  const check = lead.portal_vehicle_check;
+  const motLabel = check?.mot_expiry || lead.mot || "Not supplied";
+  const checkLabel = check?.clear === false ? "Needs review" : check?.clear === true ? "Clear" : check?.status || "Not available";
+  const rows = unlocked ? [
+    ["Customer", customerName(lead)],
+    ["Status", statusLabel(lead.portal_claim_status || "claimed")],
+    ["Latest offer", latestOffer?.body || "No offer recorded"],
+    ["Last activity", latestNote ? formatLeadDate(latestNote.created_at) : "No activity yet"],
+  ] : [
+    ["Location / distance", [lead.portal_location_label, lead.portal_distance_label?.replace(" from your dealership", " away")].filter(Boolean).join(" - ") || "Location pending"],
+    ["MOT", motLabel],
+    ["Vehicle check", checkLabel],
+  ];
+  return <section className="dealer-workspace-metrics">{rows.map(([label, value]) => <Detail label={label} value={value} key={label} />)}</section>;
+}
 
-  return <div className="dealer-v3-detail-modal" role="dialog" aria-modal="true" aria-label={`${title} details`}>
-    <button className="dealer-v3-modal-backdrop" type="button" aria-label="Close lead details" onClick={onClose} />
-    <section className={`dealer-v3-detail-sheet dealer-detail-${tab}`}>
-      <header>
-        <div className="dealer-modal-title"><span>{status}</span><h3>{title}</h3>{meta && <p>{meta}</p>}</div>
-        <aside><span>Customer asking</span><strong>{askingPrice}</strong></aside>
-        <button type="button" onClick={onClose}>Close</button>
-      </header>
-      <nav className="dealer-v3-modal-tabs" aria-label={`${title} detail sections`}>{tabs.map(([current, label]) => <button className={tab === current ? "active" : ""} onClick={() => setTab(current)} type="button" key={current}>{label}</button>)}</nav>
-      <div className="dealer-v3-modal-content">{children}</div>
-    </section>
+function DealerPhotoGallery({ images, image, imageIndex, title, make, model, onMove, onSelect, onOpen }: { images: string[]; image: string | undefined; imageIndex: number; title: string; make: string | null | undefined; model: string | null | undefined; onMove: (direction: -1 | 1) => void; onSelect: (index: number) => void; onOpen?: (index: number) => void }) {
+  function movePhoto(event: MouseEvent<HTMLButtonElement>, direction: -1 | 1) {
+    event.stopPropagation();
+    onMove(direction);
+  }
+  function selectPhoto(event: MouseEvent<HTMLButtonElement>, index: number) {
+    event.stopPropagation();
+    onSelect(index);
+  }
+  function openPhoto(event: MouseEvent<HTMLButtonElement>) {
+    if (!onOpen) return;
+    event.stopPropagation();
+    onOpen(imageIndex);
+  }
+  return <div className={`dealer-lead-image ${image ? "" : "no-photo"}`}>
+    {image ? <button className="dealer-image-open" type="button" onClick={openPhoto} aria-label={onOpen ? `Open ${title} photo` : `Open ${title}`}>
+      <img src={image} alt={`${make ?? "Motorcycle"} ${model ?? ""}`} />
+    </button> : <span><i aria-hidden="true">+</i><b>No photos supplied</b></span>}
+    {images.length > 1 && <>
+      <button className="dealer-image-nav previous" type="button" onClick={event => movePhoto(event, -1)} aria-label="Previous motorcycle photo">&lt;</button>
+      <button className="dealer-image-nav next" type="button" onClick={event => movePhoto(event, 1)} aria-label="Next motorcycle photo">&gt;</button>
+      <div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>
+        {images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={event => selectPhoto(event, index)} aria-label={`Show photo ${index + 1}`} key={index} />)}
+      </div>
+      <b>{imageIndex + 1} / {images.length} photos</b>
+    </>}
   </div>;
 }
 
@@ -662,16 +804,6 @@ function MotorcyclePreviewPanel({ lead }: { lead: DealerVisibleLead }) {
   </section>;
 }
 
-function DealerNotesPanel({ notes, unlocked, onAddNote }: { notes: NonNullable<DealerVisibleLead["portal_notes"]>; unlocked: boolean; onAddNote: () => void }) {
-  const recent = notes.slice(0, 2);
-  const hasNotes = recent.length > 0;
-  return <section className={`dealer-notes-panel ${hasNotes ? "has-notes" : "empty"}`}>
-    <h3>Notes</h3>
-    {hasNotes ? <div>{recent.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>)}</div> : <p>No notes added yet</p>}
-    {(hasNotes || unlocked) && <footer>{hasNotes && <small>{unlocked ? "Add notes after contacting the customer." : "Add notes after claiming this lead."}</small>}{unlocked && <button type="button" onClick={onAddNote}>{hasNotes ? "Add Note" : "Add first note"} <span>+</span></button>}</footer>}
-  </section>;
-}
-
 function CustomerPanel({ lead, unlocked }: { lead: DealerVisibleLead; unlocked: boolean }) {
   return <section className={`dealer-customer-panel ${unlocked ? "unlocked" : ""}`}>
     <h3>{unlocked ? "Customer Details" : "Customer Details Locked"}</h3>
@@ -691,10 +823,23 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
   const mapUrl = staticMapUrl(publicLocation);
   const hasLocation = Boolean(publicLocation.location_town || publicLocation.location_display_name || publicLocation.postcode || publicLocation.latitude != null);
   const dealerOrigin = dealer.postcode || dealer.trading_name || "YesMoto";
-  const lookupLabel = lead.latitude != null && lead.longitude != null ? "Approximate location" : lead.portal_location_label ? "Approximate location" : "Location pending";
+  const forceFallback = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("map") === "fallback";
+  const [mapState, setMapState] = useState<"loading" | "loaded" | "failed">(!mapUrl || forceFallback ? "failed" : "loading");
+
+  useEffect(() => {
+    if (!mapUrl || forceFallback) return;
+    const timer = window.setTimeout(() => setMapState(current => current === "loaded" ? current : "failed"), 4000);
+    return () => window.clearTimeout(timer);
+  }, [forceFallback, mapUrl]);
 
   return <section className="dealer-location-panel">
-    <div className="dealer-map-preview">{mapUrl ? <iframe title="Approximate motorcycle location map" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /> : <span>{lookupLabel}</span>}</div>
+    <div className={`dealer-map-preview ${mapState === "loaded" ? "loaded" : "fallback"}`}>
+      {mapUrl && !forceFallback && <iframe title="Approximate motorcycle location map" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" onLoad={() => setMapState("loaded")} onError={() => setMapState("failed")} />}
+      {mapState !== "loaded" && <div className="dealer-map-fallback">
+        <strong>Map unavailable</strong>
+        <p>Approximate location shown using the information provided.</p>
+      </div>}
+    </div>
     <div>
       <h3>Location</h3>
       <dl>
@@ -705,37 +850,6 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
       {hasLocation && <nav><a href={googleMapsUrl(publicLocation)} target="_blank" rel="noreferrer">View Map</a><a href={directionsUrl(dealerOrigin, publicLocation)} target="_blank" rel="noreferrer">Directions</a></nav>}
     </div>
   </section>;
-}
-
-function VehicleCheckSummaryPanel({ lead }: { lead: DealerVisibleLead }) {
-  const check = lead.portal_vehicle_check;
-  const reportHref = check?.report_url ? `/api/autotrader/vehicle-check-report?url=${encodeURIComponent(check.report_url)}` : "";
-  const summaryFlags = check?.flags
-    .filter(item => ["finance", "stolen", "write_off", "insurance", "mileage"].includes(item.key))
-    .slice(0, 5) ?? [];
-  return <section className={`dealer-check-summary dealer-card-check-summary ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
-    <header><span>Vehicle check</span><strong>{check?.status || "Vehicle check not yet available"}</strong></header>
-    {summaryFlags.length > 0 && <div className="dealer-summary-flags">{summaryFlags.map(item => <article className={item.state} key={item.key}>
-      <b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "?"}</b>
-      <div><strong>{summaryFlagLabel(item)}</strong><span>{summaryFlagDetail(item)}</span></div>
-    </article>)}</div>}
-    <nav>{reportHref && <a href={reportHref} target="_blank" rel="noreferrer">View report</a>}</nav>
-  </section>;
-}
-
-function summaryFlagLabel(item: { key: string; label: string }) {
-  if (item.key === "finance") return "Clear HPI";
-  if (item.key === "stolen") return "Not stolen";
-  if (item.key === "write_off") return "No write-off";
-  if (item.key === "mileage") return "Mileage OK";
-  return item.label;
-}
-
-function summaryFlagDetail(item: { key: string; detail: string }) {
-  if (item.key === "finance") return item.detail.replace(" recorded", "");
-  if (item.key === "write_off") return item.detail.replace("No insurance total loss recorded", "No record");
-  if (item.key === "mileage") return item.detail.replace("Mileage ", "");
-  return item.detail;
 }
 
 function VehicleCheckPanel({ lead, compact = false }: { lead: DealerVisibleLead; compact?: boolean }) {
