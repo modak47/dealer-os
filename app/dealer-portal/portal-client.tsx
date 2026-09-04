@@ -343,10 +343,12 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
           <div><i><LeadFactIcon type="received" /></i><span>Received</span><b>{formatLeadDate(lead.date || lead.created_at)}</b></div>
         </div>
         <VehicleCheckSummaryPanel lead={lead} />
-        <div className="dealer-lead-actions"><button className="dealer-secondary-button" type="button" onClick={() => setDetailTab("overview")}>View Details</button>{!unlocked && <button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button>}</div>
+        <div className="dealer-lead-controls dealer-lead-controls-compact">
+          <nav className="dealer-card-tabs" aria-label={`${title} lead details`}>{tabs.map(([tab, label]) => <button className={detailTab === tab ? "active" : ""} onClick={() => setDetailTab(tab)} type="button" key={tab}>{label}</button>)}</nav>
+          <div className="dealer-lead-actions"><button className="dealer-secondary-button" type="button" onClick={() => setDetailTab("overview")}>View Details</button>{!unlocked && <button className="dealer-claim-button" disabled={busy} onClick={onClaim}>{busy ? "Claiming..." : "Claim Lead"}</button>}</div>
+        </div>
       </div>
     </div>
-    <nav className="dealer-card-tabs" aria-label={`${title} lead details`}>{tabs.map(([tab, label]) => <button className={detailTab === tab ? "active" : ""} onClick={() => setDetailTab(tab)} type="button" key={tab}>{label}</button>)}</nav>
     {detailTab && <LeadDetailModal title={title} tab={detailTab} tabs={tabs} setTab={setDetailTab} onClose={() => setDetailTab(null)}>
       {detailTab === "overview" && <div className="dealer-overview-grid"><MotorcyclePreviewPanel lead={lead} /><DealerNotesPanel notes={notes} unlocked={unlocked} onAddNote={() => setDetailTab("customer")} /></div>}
       {detailTab === "location" && <LocationPanel dealer={dealer} lead={lead} unlocked={unlocked} />}
@@ -502,8 +504,13 @@ function VehicleMotPanel({ lead }: { lead: DealerVisibleLead }) {
 function MotReportPanel({ check }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]> }) {
   const motHistory = check.mot_history ?? [];
   const mileageHistory = check.mileage_history ?? [];
+  const motNotes = motHistory.flatMap(item => item.details.map(detail => ({ date: item.date, status: item.status, detail })));
   return <div className="dealer-mot-report">
     {mileageHistory.length > 0 && <MileageGraph history={mileageHistory} />}
+    {motNotes.length > 0 && <section className="dealer-mot-notes">
+      <h4>MOT notes</h4>
+      <div>{motNotes.slice(0, 6).map((note, index) => <p className={note.status} key={`${note.date}-${note.detail}-${index}`}><span>{formatMotDate(note.date)}</span><strong>{note.detail}</strong></p>)}</div>
+    </section>}
     <section className="dealer-mot-tests">
       <h4>MOT Tests ({motHistory.length})</h4>
       {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <div className="dealer-mot-report-list">{motHistory.slice(0, 8).map((item, index) => <MotReportRow item={item} expanded={index === 0} key={`${item.date}-${index}`} />)}</div>}
