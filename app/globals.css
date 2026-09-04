@@ -627,11 +627,27 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-form-grid label,.dealer-account-card>label{display:grid;gap:6px}
 .dealer-form-grid .full{grid-column:1/-1}
 .dealer-form-grid input,.dealer-form-grid textarea,.dealer-account-card>label input{min-height:40px;padding:9px;border:1px solid #35463c;border-radius:4px;background:#080d0a;color:#fff;font-weight:800}
+.dealer-form-grid input:disabled,.dealer-form-grid textarea:disabled,.dealer-account-card input:disabled{opacity:.72;cursor:not-allowed}
 .dealer-form-grid textarea{min-height:86px;resize:vertical}
 .dealer-checklist{display:grid;gap:8px}
 .dealer-checklist label{display:flex;align-items:center;gap:9px;min-height:38px;padding:8px 10px;border:1px solid #2b3d32;border-radius:5px;background:#111a15;color:#eef4f0;font-weight:900}
 .dealer-checklist input{width:16px;height:16px;accent-color:#00e51d}
 .dealer-checklist span{color:#eef4f0!important;font-size:12px!important;text-transform:none!important}
+.dealer-staff-controlled-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px;border:1px solid #26362d;border-radius:6px;background:#0d1721}
+.dealer-staff-controlled-fields>div{display:grid;gap:4px}
+.dealer-staff-controlled-fields dt{color:#91a198;font-size:9px;font-weight:950;text-transform:uppercase}
+.dealer-staff-controlled-fields dd{color:#dce8e0;font-size:12px;font-weight:850;overflow-wrap:anywhere}
+.dealer-user-management{grid-column:1/-1}
+.dealer-user-invite{display:grid;grid-template-columns:1fr minmax(150px,220px) auto;gap:10px;align-items:end}
+.dealer-user-invite label{display:grid;gap:6px}
+.dealer-user-invite select,.dealer-user-list select{min-height:40px;padding:9px;border:1px solid #35463c;border-radius:4px;background:#080d0a;color:#fff;font-weight:800}
+.dealer-user-invite button,.dealer-user-list button{min-height:40px;padding:9px 13px;border:1px solid #00e51d;border-radius:5px;background:#0f2a16;color:#00e51d;font-weight:950;cursor:pointer}
+.dealer-user-invite button:disabled,.dealer-user-list button:disabled{opacity:.55;cursor:not-allowed}
+.dealer-user-list{display:grid;gap:8px}
+.dealer-user-list article{display:grid;grid-template-columns:1fr minmax(150px,200px) auto;gap:10px;align-items:center;padding:10px;border:1px solid #26362d;border-radius:6px;background:#0d1721}
+.dealer-user-list article div{display:grid;gap:3px}
+.dealer-user-list strong{font-size:13px;color:#fff;overflow-wrap:anywhere}
+.dealer-user-list span{color:#91a198;font-size:11px;font-weight:900}
 .dealer-account-modal{width:min(1280px,100%)}
 .dealer-account-admin-grid{grid-template-columns:1fr 1fr!important}
 .dealer-modal-section{display:grid;gap:12px;padding:14px;border:1px solid #2b3d32;border-radius:7px;background:#0b100e}
@@ -646,7 +662,7 @@ body>header .header-row{width:min(1800px,calc(100% - 96px))}@media(max-width:110
 .dealer-modal-checks input{width:16px;height:16px;accent-color:#00e51d}
 .dealer-modal-checks span{color:#eef4f0!important;font-size:12px!important;text-transform:none!important}
 @media(max-width:1050px){.dealer-account-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.dealer-account-grid,.dealer-account-admin-grid,.dealer-modal-grid{grid-template-columns:1fr!important}}
-@media(max-width:760px){.dealer-portal .dealer-tabs{grid-template-columns:1fr 1fr!important}.dealer-account-panel>header{display:grid}.dealer-account-summary,.dealer-form-grid,.dealer-modal-checks{grid-template-columns:1fr}}
+@media(max-width:760px){.dealer-portal .dealer-tabs{grid-template-columns:1fr 1fr!important}.dealer-account-panel>header{display:grid}.dealer-account-summary,.dealer-form-grid,.dealer-modal-checks,.dealer-staff-controlled-fields,.dealer-user-invite,.dealer-user-list article{grid-template-columns:1fr}}
 
 /* Tabbed internal dealer editor. */
 .dealer-account-modal{width:min(1500px,calc(100vw - 48px));max-height:88vh;overflow:hidden;background:#0e171d!important;border-color:#263844!important}

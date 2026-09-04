@@ -4,7 +4,7 @@ import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supaba
 import { isVisualTestRequest } from "@/lib/visual-test-mode";
 
 const protectedApiPaths=new Set(["/api/vrm-lookup","/api/hpi-test","/api/postcode-lookup","/api/market-intelligence","/api/website-pages"]);
-const protectedApiPrefixes=["/api/admin/shadow-mode","/api/opportunities","/api/retail-check","/api/retail-history","/api/scanner-status","/api/run-opportunity-scan","/api/makes","/api/models","/api/crm","/api/workflow","/api/stock-attachments"];
+const protectedApiPrefixes=["/api/admin/shadow-mode","/api/dealer-portal/admin","/api/opportunities","/api/retail-check","/api/retail-history","/api/scanner-status","/api/run-opportunity-scan","/api/makes","/api/models","/api/crm","/api/workflow","/api/stock-attachments"];
 
 export async function proxy(request:NextRequest){
   const pathname=request.nextUrl.pathname;
@@ -35,4 +35,4 @@ export async function proxy(request:NextRequest){
   return response;
 }
 
-export const config={matcher:["/admin/:path*","/market-intelligence","/workflow","/workshop","/valeting","/photos","/api/admin/shadow-mode/:path*","/api/vrm-lookup","/api/hpi-test","/api/postcode-lookup","/api/market-intelligence","/api/website-pages","/api/workflow/:path*","/api/stock-attachments/:path*","/api/opportunities/:path*","/api/retail-check/:path*","/api/retail-history/:path*","/api/scanner-status/:path*","/api/run-opportunity-scan","/api/makes/:path*","/api/models/:path*","/api/stock/:path*","/api/crm/:path*"]};
+export const config={matcher:["/admin/:path*","/market-intelligence","/workflow","/workshop","/valeting","/photos","/api/admin/shadow-mode/:path*","/api/dealer-portal/admin/:path*","/api/vrm-lookup","/api/hpi-test","/api/postcode-lookup","/api/market-intelligence","/api/website-pages","/api/workflow/:path*","/api/stock-attachments/:path*","/api/opportunities/:path*","/api/retail-check/:path*","/api/retail-history/:path*","/api/scanner-status/:path*","/api/run-opportunity-scan","/api/makes/:path*","/api/models/:path*","/api/stock/:path*","/api/crm/:path*"]};

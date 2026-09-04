@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cleanDealerSelfAccountPayload, getCurrentDealerPortalAccount, saveDealerPreferencePayloads, withDealerPreferences } from "@/lib/dealer-portal";
+import { cleanDealerSelfAccountPayload, getCurrentDealerPortalAccount, isDealerPortalAdmin, saveDealerPreferencePayloads, withDealerPreferences } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import type { DealerPortalAccount, DealerPortalAccountWithPreferences } from "@/types/dealer-portal";
 
@@ -9,6 +9,7 @@ export async function PATCH(request: Request) {
   try {
     const session = await getCurrentDealerPortalAccount();
     if (!session) return NextResponse.json({ error: "Dealer portal access is not available for this user." }, { status: 401 });
+    if (!isDealerPortalAdmin(session)) return NextResponse.json({ error: "Dealer Admin access is required to update account settings." }, { status: 403 });
     const body = await request.json() as Record<string, unknown>;
     const accountPayload = cleanDealerSelfAccountPayload(body);
     const { data, error } = await getSupabaseAdminClient()

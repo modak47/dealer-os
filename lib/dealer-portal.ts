@@ -1,9 +1,10 @@
 import "server-only";
 
 import { getCurrentUserId } from "@/lib/current-user";
+export { dealerClaimedCustomerLeadFields, dealerLeadSelectClause, dealerLeadSourceFields, dealerSafeLeadFields, redactLeadForDealer, yesMotoInternalLeadFields } from "@/lib/dealer-portal-redaction";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText, safeNumber } from "@/lib/website-leads";
-import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaim, DealerPortalAccount, DealerPortalAccountWithPreferences } from "@/types/dealer-portal";
+import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaim, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPortalUserRole } from "@/types/dealer-portal";
 
 const preferenceArrayLimit = 30;
 
@@ -20,7 +21,17 @@ export async function getCurrentDealerPortalAccount() {
   if (error || !relatedDealer) return null;
   const dealer = relatedDealer as unknown as DealerPortalAccount;
   if (dealer.account_status !== "active") return null;
-  return { userId, role: String(data?.role ?? "dealer_user"), dealer: await withDealerPreferences(dealer) };
+  return { userId, role: normaliseDealerRole(data?.role), dealer: await withDealerPreferences(dealer) };
+}
+
+export type DealerPortalSession = NonNullable<Awaited<ReturnType<typeof getCurrentDealerPortalAccount>>>;
+
+export function normaliseDealerRole(value: unknown): DealerPortalUserRole {
+  return value === "dealer_admin" ? "dealer_admin" : "dealer_user";
+}
+
+export function isDealerPortalAdmin(session: DealerPortalSession | null): session is DealerPortalSession {
+  return session?.role === "dealer_admin";
 }
 
 export function cleanDealerAccountPayload(body: Record<string, unknown>, userId: string | null, creating: boolean) {
@@ -188,27 +199,6 @@ export async function saveDealerPreferencePayloads(dealerAccountId: string, body
     writes.push(db.from("dealer_geography_preferences").upsert(cleanDealerGeographyPreferencesPayload(body.geography_preferences as Record<string, unknown>, dealerAccountId), { onConflict: "dealer_account_id" }).throwOnError());
   }
   await Promise.all(writes);
-}
-
-export function redactLeadForDealer<T extends Record<string, unknown>>(lead: T, unlocked: boolean): T {
-  if (unlocked) return lead;
-  return {
-    ...lead,
-    fname: null,
-    lname: null,
-    email: null,
-    phone: null,
-    postcode: lead.location_town ? null : lead.postcode,
-    normalised_postcode: null,
-    location_display_name: null,
-    latitude: null,
-    longitude: null,
-    internal_notes: null,
-    valuation_notes: null,
-    similar_bikes: null,
-    auto_trader_search: null,
-    estimated_margin: null,
-  };
 }
 
 export async function getDealerClaimForSession(claimId: string) {

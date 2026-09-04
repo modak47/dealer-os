@@ -5,10 +5,11 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { directionsUrl, googleMapsUrl, staticMapUrl } from "@/lib/location-ui";
 import { createClient } from "@/lib/supabase/client";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
-import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaimStatus, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerVisibleLead } from "@/types/dealer-portal";
+import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaimStatus, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPortalUserRole, DealerPortalUserSummary, DealerVisibleLead } from "@/types/dealer-portal";
 
 type PortalData = {
   dealer: DealerPortalAccountWithPreferences;
+  role: DealerPortalUserRole;
   available: DealerVisibleLead[];
   claimed: DealerVisibleLead[];
 };
@@ -98,7 +99,7 @@ export function DealerPortalClient() {
           <button className="dealer-sign-out" onClick={() => void signOut()}>Sign out</button>
         </section>
         {error && <div className="portal-message error">{error}</div>}{notice && <div className="portal-message">{notice}</div>}
-        {activeTab === "account" ? <DealerAccountPanel dealer={data.dealer} onSaved={dealer => setData(current => current ? { ...current, dealer } : current)} /> : <>
+        {activeTab === "account" ? <DealerAccountPanel dealer={data.dealer} role={data.role} onSaved={dealer => setData(current => current ? { ...current, dealer } : current)} /> : <>
           {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
         </>}
       </section>
@@ -204,9 +205,14 @@ function accountGeographyDefaults(dealer: DealerPortalAccountWithPreferences): D
   };
 }
 
-function DealerAccountPanel({ dealer, onSaved }: { dealer: DealerPortalAccountWithPreferences; onSaved: (dealer: DealerPortalAccountWithPreferences) => void }) {
+function DealerAccountPanel({ dealer, role, onSaved }: { dealer: DealerPortalAccountWithPreferences; role: DealerPortalUserRole; onSaved: (dealer: DealerPortalAccountWithPreferences) => void }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [users, setUsers] = useState<DealerPortalUserSummary[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [userRole, setUserRole] = useState<DealerPortalUserRole>("dealer_user");
+  const canManageAccount = role === "dealer_admin";
   const [form, setForm] = useState(() => ({
     trading_address: dealer.trading_address ?? "",
     main_contact: dealer.main_contact ?? "",
@@ -220,8 +226,26 @@ function DealerAccountPanel({ dealer, onSaved }: { dealer: DealerPortalAccountWi
   const [buying, setBuying] = useState(() => accountBuyingDefaults(dealer));
   const [geography, setGeography] = useState(() => accountGeographyDefaults(dealer));
 
+  useEffect(() => {
+    if (!canManageAccount) return;
+    void loadUsers();
+  }, [canManageAccount]);
+
+  async function loadUsers() {
+    setUsersLoading(true);
+    const response = await fetch("/api/dealer-portal/users", { cache: "no-store" });
+    const payload = await response.json();
+    if (response.ok) setUsers(payload.users ?? []);
+    else setMessage(payload.error || "Unable to load dealership users.");
+    setUsersLoading(false);
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canManageAccount) {
+      setMessage("Dealer Admin access is required to update account settings.");
+      return;
+    }
     setSaving(true);
     setMessage("");
     const response = await fetch("/api/dealer-portal/account", {
@@ -237,6 +261,42 @@ function DealerAccountPanel({ dealer, onSaved }: { dealer: DealerPortalAccountWi
     setSaving(false);
   }
 
+  async function inviteUser() {
+    if (!canManageAccount) return;
+    setSaving(true);
+    setMessage("");
+    const response = await fetch("/api/dealer-portal/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: userEmail, role: userRole }),
+    });
+    const payload = await response.json();
+    if (response.ok) {
+      setUserEmail("");
+      setUserRole("dealer_user");
+      setMessage(payload.invited ? "Dealer user invited." : "Dealer user linked.");
+      await loadUsers();
+    } else setMessage(payload.error || "Unable to invite dealership user.");
+    setSaving(false);
+  }
+
+  async function updateUser(id: string, updates: Partial<Pick<DealerPortalUserSummary, "role" | "active">>) {
+    if (!canManageAccount) return;
+    setSaving(true);
+    setMessage("");
+    const response = await fetch(`/api/dealer-portal/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    const payload = await response.json();
+    if (response.ok) {
+      setMessage("Dealer user updated.");
+      await loadUsers();
+    } else setMessage(payload.error || "Unable to update dealership user.");
+    setSaving(false);
+  }
+
   function setFormField(key: keyof typeof form, value: string) {
     setForm(current => ({ ...current, [key]: value }));
   }
@@ -248,10 +308,12 @@ function DealerAccountPanel({ dealer, onSaved }: { dealer: DealerPortalAccountWi
   }
 
   return <form className="dealer-account-panel" onSubmit={save}>
-    <header><div><span>Dealer Account</span><h2>{dealer.trading_name}</h2><p>Keep your buying profile current so YesMoto can release the right opportunities.</p></div><button disabled={saving}>{saving ? "Saving..." : "Save Account"}</button></header>
+    <header><div><span>Dealer Account</span><h2>{dealer.trading_name}</h2><p>{canManageAccount ? "Keep your buying profile current so YesMoto can release the right opportunities." : "Your account and buying profile are read-only. Ask your Dealer Admin to update dealership settings."}</p></div>{canManageAccount && <button disabled={saving}>{saving ? "Saving..." : "Save Account"}</button>}</header>
     {message && <p className={message.includes("Unable") ? "dealer-work-error" : "dealer-work-success"}>{message}</p>}
     <section className="dealer-account-summary">
       <Detail label="Company" value={dealer.limited_company_name || dealer.trading_name} />
+      <Detail label="Company reg" value={dealer.company_registration_number} />
+      <Detail label="VAT number" value={dealer.vat_number} />
       <Detail label="Purchase fee" value={formatGbp(dealer.successful_purchase_fee)} />
       <Detail label="Attribution period" value={`${dealer.attribution_period_days} days`} />
       <Detail label="Status" value={statusLabel(dealer.account_status)} />
@@ -261,55 +323,74 @@ function DealerAccountPanel({ dealer, onSaved }: { dealer: DealerPortalAccountWi
     <section className="dealer-account-grid">
       <div className="dealer-account-card">
         <h3>Company Details</h3>
+        <dl className="dealer-staff-controlled-fields">
+          <Detail label="Trading name" value={dealer.trading_name} />
+          <Detail label="Legal company" value={dealer.limited_company_name} />
+          <Detail label="Registered address" value={dealer.registered_address} />
+          <Detail label="Auto Trader ref" value={dealer.autotrader_dealer_ref} />
+        </dl>
         <div className="dealer-form-grid">
-          <Input label="Main contact" value={form.main_contact} set={value => setFormField("main_contact", value)} />
-          <Input label="Main email" value={form.main_email} set={value => setFormField("main_email", value)} type="email" />
-          <Input label="Telephone" value={form.telephone} set={value => setFormField("telephone", value)} />
-          <Input label="WhatsApp/mobile" value={form.mobile_whatsapp} set={value => setFormField("mobile_whatsapp", value)} />
-          <Input label="Accounts email" value={form.accounts_email} set={value => setFormField("accounts_email", value)} type="email" />
-          <Input label="Website" value={form.website} set={value => setFormField("website", value)} />
-          <Input label="Postcode" value={form.postcode} set={value => setFormField("postcode", value)} />
-          <label className="full"><span>Trading address</span><textarea value={form.trading_address} onChange={event => setFormField("trading_address", event.target.value)} /></label>
+          <Input label="Main contact" value={form.main_contact} set={value => setFormField("main_contact", value)} disabled={!canManageAccount} />
+          <Input label="Main email" value={form.main_email} set={value => setFormField("main_email", value)} type="email" disabled={!canManageAccount} />
+          <Input label="Telephone" value={form.telephone} set={value => setFormField("telephone", value)} disabled={!canManageAccount} />
+          <Input label="WhatsApp/mobile" value={form.mobile_whatsapp} set={value => setFormField("mobile_whatsapp", value)} disabled={!canManageAccount} />
+          <Input label="Accounts email" value={form.accounts_email} set={value => setFormField("accounts_email", value)} type="email" disabled={!canManageAccount} />
+          <Input label="Website" value={form.website} set={value => setFormField("website", value)} disabled={!canManageAccount} />
+          <Input label="Postcode" value={form.postcode} set={value => setFormField("postcode", value)} disabled={!canManageAccount} />
+          <label className="full"><span>Trading address</span><textarea value={form.trading_address} disabled={!canManageAccount} onChange={event => setFormField("trading_address", event.target.value)} /></label>
         </div>
       </div>
       <div className="dealer-account-card">
         <h3>Buying Preferences</h3>
         <div className="dealer-form-grid">
-          <TextListInput label="Types" value={buying.motorcycle_types} set={value => setBuyingField("motorcycle_types", value)} placeholder="Roadster, adventure, scooter" />
-          <TextListInput label="Makes wanted" value={buying.makes_wanted} set={value => setBuyingField("makes_wanted", value)} placeholder="Honda, Yamaha, KTM" />
-          <TextListInput label="Makes excluded" value={buying.makes_excluded} set={value => setBuyingField("makes_excluded", value)} />
-          <TextListInput label="Models wanted" value={buying.models_wanted} set={value => setBuyingField("models_wanted", value)} />
-          <NumberPreference label="Minimum year" value={buying.minimum_year} set={value => setBuyingField("minimum_year", value)} />
-          <NumberPreference label="Maximum age years" value={buying.maximum_age_years} set={value => setBuyingField("maximum_age_years", value)} />
-          <NumberPreference label="Minimum value" value={buying.minimum_value} set={value => setBuyingField("minimum_value", value)} />
-          <NumberPreference label="Maximum value" value={buying.maximum_value} set={value => setBuyingField("maximum_value", value)} />
-          <NumberPreference label="Maximum mileage" value={buying.maximum_mileage} set={value => setBuyingField("maximum_mileage", value)} />
-          <NumberPreference label="Minimum engine cc" value={buying.minimum_engine_cc} set={value => setBuyingField("minimum_engine_cc", value)} />
-          <NumberPreference label="Maximum engine cc" value={buying.maximum_engine_cc} set={value => setBuyingField("maximum_engine_cc", value)} />
+          <TextListInput label="Types" value={buying.motorcycle_types} set={value => setBuyingField("motorcycle_types", value)} placeholder="Roadster, adventure, scooter" disabled={!canManageAccount} />
+          <TextListInput label="Makes wanted" value={buying.makes_wanted} set={value => setBuyingField("makes_wanted", value)} placeholder="Honda, Yamaha, KTM" disabled={!canManageAccount} />
+          <TextListInput label="Makes excluded" value={buying.makes_excluded} set={value => setBuyingField("makes_excluded", value)} disabled={!canManageAccount} />
+          <TextListInput label="Models wanted" value={buying.models_wanted} set={value => setBuyingField("models_wanted", value)} disabled={!canManageAccount} />
+          <NumberPreference label="Minimum year" value={buying.minimum_year} set={value => setBuyingField("minimum_year", value)} disabled={!canManageAccount} />
+          <NumberPreference label="Maximum age years" value={buying.maximum_age_years} set={value => setBuyingField("maximum_age_years", value)} disabled={!canManageAccount} />
+          <NumberPreference label="Minimum value" value={buying.minimum_value} set={value => setBuyingField("minimum_value", value)} disabled={!canManageAccount} />
+          <NumberPreference label="Maximum value" value={buying.maximum_value} set={value => setBuyingField("maximum_value", value)} disabled={!canManageAccount} />
+          <NumberPreference label="Maximum mileage" value={buying.maximum_mileage} set={value => setBuyingField("maximum_mileage", value)} disabled={!canManageAccount} />
+          <NumberPreference label="Minimum engine cc" value={buying.minimum_engine_cc} set={value => setBuyingField("minimum_engine_cc", value)} disabled={!canManageAccount} />
+          <NumberPreference label="Maximum engine cc" value={buying.maximum_engine_cc} set={value => setBuyingField("maximum_engine_cc", value)} disabled={!canManageAccount} />
         </div>
       </div>
       <div className="dealer-account-card">
         <h3>History Rules</h3>
         <div className="dealer-checklist">
-          <Checkbox label="Accept non-running bikes" checked={buying.accepts_non_running} set={value => setBuyingField("accepts_non_running", value)} />
-          <Checkbox label="Accept insurance category bikes" checked={buying.accepts_insurance_category} set={value => setBuyingField("accepts_insurance_category", value)} />
-          <Checkbox label="Accept outstanding finance marker" checked={buying.accepts_outstanding_finance} set={value => setBuyingField("accepts_outstanding_finance", value)} />
-          <Checkbox label="Accept imported bikes" checked={buying.accepts_imported} set={value => setBuyingField("accepts_imported", value)} />
-          <Checkbox label="Accept modified bikes" checked={buying.accepts_modified} set={value => setBuyingField("accepts_modified", value)} />
+          <Checkbox label="Accept non-running bikes" checked={buying.accepts_non_running} set={value => setBuyingField("accepts_non_running", value)} disabled={!canManageAccount} />
+          <Checkbox label="Accept insurance category bikes" checked={buying.accepts_insurance_category} set={value => setBuyingField("accepts_insurance_category", value)} disabled={!canManageAccount} />
+          <Checkbox label="Accept outstanding finance marker" checked={buying.accepts_outstanding_finance} set={value => setBuyingField("accepts_outstanding_finance", value)} disabled={!canManageAccount} />
+          <Checkbox label="Accept imported bikes" checked={buying.accepts_imported} set={value => setBuyingField("accepts_imported", value)} disabled={!canManageAccount} />
+          <Checkbox label="Accept modified bikes" checked={buying.accepts_modified} set={value => setBuyingField("accepts_modified", value)} disabled={!canManageAccount} />
         </div>
       </div>
       <div className="dealer-account-card">
         <h3>Geography</h3>
         <div className="dealer-checklist geography">
-          <Checkbox label="England" checked={geography.england} set={value => setGeographyField("england", value)} />
-          <Checkbox label="Wales" checked={geography.wales} set={value => setGeographyField("wales", value)} />
-          <Checkbox label="Scotland" checked={geography.scotland} set={value => setGeographyField("scotland", value)} />
-          <Checkbox label="Northern Ireland" checked={geography.northern_ireland} set={value => setGeographyField("northern_ireland", value)} />
-          <Checkbox label="Republic of Ireland" checked={geography.republic_of_ireland} set={value => setGeographyField("republic_of_ireland", value)} />
+          <Checkbox label="England" checked={geography.england} set={value => setGeographyField("england", value)} disabled={!canManageAccount} />
+          <Checkbox label="Wales" checked={geography.wales} set={value => setGeographyField("wales", value)} disabled={!canManageAccount} />
+          <Checkbox label="Scotland" checked={geography.scotland} set={value => setGeographyField("scotland", value)} disabled={!canManageAccount} />
+          <Checkbox label="Northern Ireland" checked={geography.northern_ireland} set={value => setGeographyField("northern_ireland", value)} disabled={!canManageAccount} />
+          <Checkbox label="Republic of Ireland" checked={geography.republic_of_ireland} set={value => setGeographyField("republic_of_ireland", value)} disabled={!canManageAccount} />
         </div>
-        <NumberPreference label="Buying radius miles" value={geography.maximum_radius_miles} set={value => setGeographyField("maximum_radius_miles", value)} />
+        <NumberPreference label="Buying radius miles" value={geography.maximum_radius_miles} set={value => setGeographyField("maximum_radius_miles", value)} disabled={!canManageAccount} />
       </div>
     </section>
+    {canManageAccount && <section className="dealer-account-card dealer-user-management">
+      <h3>Dealership Users</h3>
+      <div className="dealer-user-invite">
+        <Input label="Email" value={userEmail} set={setUserEmail} type="email" required />
+        <label><span>Role</span><select value={userRole} onChange={event => setUserRole(event.target.value === "dealer_admin" ? "dealer_admin" : "dealer_user")}><option value="dealer_user">Dealer User</option><option value="dealer_admin">Dealer Admin</option></select></label>
+        <button type="button" disabled={saving || !userEmail.trim()} onClick={() => void inviteUser()}>{saving ? "Saving..." : "Invite User"}</button>
+      </div>
+      {usersLoading ? <p>Loading users...</p> : <div className="dealer-user-list">{users.map(user => <article key={user.id}>
+        <div><strong>{user.email || "Email not available"}</strong><span>{user.active ? "Active" : "Inactive"} - {user.role === "dealer_admin" ? "Dealer Admin" : "Dealer User"}</span></div>
+        <select value={user.role} disabled={saving} onChange={event => void updateUser(user.id, { role: event.target.value === "dealer_admin" ? "dealer_admin" : "dealer_user" })}><option value="dealer_user">Dealer User</option><option value="dealer_admin">Dealer Admin</option></select>
+        <button type="button" disabled={saving || !user.active} onClick={() => void updateUser(user.id, { active: false })}>Deactivate</button>
+      </article>)}</div>}
+    </section>}
   </form>;
 }
 
@@ -330,7 +411,6 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   const displayStatus = statusLabel(lead.portal_claim_status || lead.status || "available").replace(/^Dealer Pool Available$/i, "Available");
   const meta = [lead.reg, formatMileage(lead.mileage), displayEngine(lead.engine)].filter(Boolean).join(" - ");
   const tabs: [LeadCardTab, string][] = [["overview", "Overview"], ["location", "Location"], ["check", "Vehicle check"], ["mot", "MOT data"], ...(unlocked ? [["customer", "Customer"] as [LeadCardTab, string]] : [])];
-  useEffect(() => setImageIndex(0), [lead.id, images.length]);
   function moveImage(direction: -1 | 1) {
     setImageIndex(current => (current + direction + images.length) % images.length);
   }
@@ -795,18 +875,18 @@ function PurchasedLaterPanel({ claimId, lead, onChanged }: { claimId: string; le
   </section>;
 }
 
-function Input({ label, value, set, type = "text", required = false }: { label: string; value: string; set: (value: string) => void; type?: string; required?: boolean }) {
-  return <label><span>{label}</span><input type={type} value={value} required={required} min={type === "number" ? "0" : undefined} onChange={event => set(event.target.value)} /></label>;
+function Input({ label, value, set, type = "text", required = false, disabled = false }: { label: string; value: string; set: (value: string) => void; type?: string; required?: boolean; disabled?: boolean }) {
+  return <label><span>{label}</span><input type={type} value={value} required={required} disabled={disabled} min={type === "number" ? "0" : undefined} onChange={event => set(event.target.value)} /></label>;
 }
 
-function TextListInput({ label, value, set, placeholder = "" }: { label: string; value: string[]; set: (value: string[]) => void; placeholder?: string }) {
-  return <label><span>{label}</span><input value={arrayText(value)} placeholder={placeholder} onChange={event => set(splitArrayText(event.target.value))} /></label>;
+function TextListInput({ label, value, set, placeholder = "", disabled = false }: { label: string; value: string[]; set: (value: string[]) => void; placeholder?: string; disabled?: boolean }) {
+  return <label><span>{label}</span><input value={arrayText(value)} placeholder={placeholder} disabled={disabled} onChange={event => set(splitArrayText(event.target.value))} /></label>;
 }
 
-function NumberPreference({ label, value, set }: { label: string; value: number | null; set: (value: number | null) => void }) {
-  return <label><span>{label}</span><input type="number" min="0" value={value ?? ""} onChange={event => set(event.target.value === "" ? null : Number(event.target.value))} /></label>;
+function NumberPreference({ label, value, set, disabled = false }: { label: string; value: number | null; set: (value: number | null) => void; disabled?: boolean }) {
+  return <label><span>{label}</span><input type="number" min="0" value={value ?? ""} disabled={disabled} onChange={event => set(event.target.value === "" ? null : Number(event.target.value))} /></label>;
 }
 
-function Checkbox({ label, checked, set }: { label: string; checked: boolean; set: (value: boolean) => void }) {
-  return <label><input type="checkbox" checked={checked} onChange={event => set(event.target.checked)} /><span>{label}</span></label>;
+function Checkbox({ label, checked, set, disabled = false }: { label: string; checked: boolean; set: (value: boolean) => void; disabled?: boolean }) {
+  return <label><input type="checkbox" checked={checked} disabled={disabled} onChange={event => set(event.target.checked)} /><span>{label}</span></label>;
 }
