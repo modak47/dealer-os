@@ -315,6 +315,7 @@ function DealerAccountPanel({ dealer, onSaved }: { dealer: DealerPortalAccountWi
 
 function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: DealerPortalAccount; lead: DealerVisibleLead; busy: boolean; onClaim: () => void; onChanged: () => Promise<void> }) {
   const [detailTab, setDetailTab] = useState<LeadCardTab | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [imageIndex, setImageIndex] = useState(0);
   const images = lead.resolved_images ?? combineLeadImages(lead);
   const image = images[imageIndex] ?? images[0];
@@ -334,7 +335,7 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
   }
   return <article className="dealer-lead-card">
     <div className="dealer-card-summary">
-      <div className="dealer-lead-image">{image ? <img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
+      <div className="dealer-lead-image">{image ? <button className="dealer-image-open" type="button" onClick={() => setPreviewImage(image)} aria-label="Open motorcycle photo"><img src={image} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} /></button> : <span>No photos</span>}{images.length > 1 && <><button className="dealer-image-nav previous" type="button" onClick={() => moveImage(-1)} aria-label="Previous motorcycle photo">&lt;</button><button className="dealer-image-nav next" type="button" onClick={() => moveImage(1)} aria-label="Next motorcycle photo">&gt;</button><div className="dealer-image-dots" aria-label={`${imageIndex + 1} of ${images.length} photos`}>{images.map((_, index) => <button className={index === imageIndex ? "active" : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={index} />)}</div><b>{imageIndex + 1} / {images.length} photos</b></>}</div>
       <div className="dealer-lead-body">
         <header className="dealer-lead-title"><div><span>{displayStatus}</span><div className="dealer-title-line"><h2>{title}</h2>{meta && <p>{meta}</p>}</div></div><aside className="dealer-title-side"><strong><span>Customer asking price</span>{askingPrice === null ? lead.price || "Not supplied" : formatGbp(askingPrice)}</strong></aside></header>
         <div className="dealer-lead-facts">
@@ -356,6 +357,13 @@ function DealerLeadCard({ dealer, lead, busy, onClaim, onChanged }: { dealer: De
       {detailTab === "mot" && <VehicleMotPanel lead={lead} />}
       {detailTab === "customer" && <><CustomerPanel lead={lead} unlocked />{active && <DealerWorkPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{canReportPurchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}{unlocked && <section className="dealer-timeline"><h3>Activity Timeline</h3>{notes.length ? notes.map(note => <article key={note.id}><span>{note.note_type} - {formatLeadDate(note.created_at)}</span><p>{note.body}</p></article>) : <p>No activity recorded yet.</p>}</section>}</>}
     </LeadDetailModal>}
+    {previewImage && <div className="dealer-photo-modal" role="dialog" aria-modal="true" aria-label={`${title} photo`}>
+      <button className="dealer-modal-backdrop" type="button" aria-label="Close photo preview" onClick={() => setPreviewImage(null)} />
+      <section>
+        <button type="button" onClick={() => setPreviewImage(null)}>Close</button>
+        <img src={previewImage} alt={`${lead.make ?? "Motorcycle"} ${lead.model ?? ""}`} />
+      </section>
+    </div>}
     {!unlocked && <div className="dealer-claim-row"><CustomerPanel lead={lead} unlocked={false} /></div>}
   </article>;
 }
@@ -371,7 +379,7 @@ function LeadDetailModal({ title, tab, tabs, setTab, onClose, children }: { titl
 
   return <div className="dealer-detail-modal" role="dialog" aria-modal="true" aria-label={`${title} details`}>
     <button className="dealer-modal-backdrop" type="button" aria-label="Close lead details" onClick={onClose} />
-    <section className="dealer-detail-sheet">
+    <section className={`dealer-detail-sheet dealer-detail-${tab}`}>
       <header>
         <div><span>{title}</span><h3>{tabs.find(([current]) => current === tab)?.[1] ?? "Details"}</h3></div>
         <button type="button" onClick={onClose}>Close</button>
@@ -455,7 +463,7 @@ function VehicleCheckSummaryPanel({ lead }: { lead: DealerVisibleLead }) {
   const summaryFlags = check?.flags
     .filter(item => ["finance", "stolen", "write_off", "insurance", "mileage"].includes(item.key))
     .slice(0, 5) ?? [];
-  return <section className={`dealer-check-summary ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
+  return <section className={`dealer-check-summary dealer-card-check-summary ${check?.clear === false ? "warning" : check?.clear === true ? "clear" : ""}`}>
     <header><span>Vehicle check</span><strong>{check?.status || "Vehicle check not yet available"}</strong></header>
     {summaryFlags.length > 0 && <div className="dealer-summary-flags">{summaryFlags.map(item => <article className={item.state} key={item.key}>
       <b>{item.state === "warning" ? "!" : item.state === "clear" ? "OK" : "?"}</b>
@@ -497,19 +505,23 @@ function VehicleMotPanel({ lead }: { lead: DealerVisibleLead }) {
   const check = lead.portal_vehicle_check;
   return <section className="dealer-vehicle-check dealer-mot-panel">
     <header><div><span>MOT data</span><h3>{check ? `MOT History${lead.reg ? ` - ${lead.reg}` : ""}` : "MOT data not yet available"}</h3></div></header>
-    {!check ? <p>MOT and mileage history will show here once the Auto Trader vehicle check has been stored.</p> : <MotReportPanel check={check} />}
+    {!check ? <p>MOT and mileage history will show here once the Auto Trader vehicle check has been stored.</p> : <MotReportPanel check={check} lead={lead} />}
   </section>;
 }
 
-function MotReportPanel({ check }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]> }) {
+function MotReportPanel({ check, lead }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]>; lead: DealerVisibleLead }) {
   const motHistory = check.mot_history ?? [];
   const mileageHistory = check.mileage_history ?? [];
   const motNotes = motHistory.flatMap(item => item.details.map(detail => ({ date: item.date, status: item.status, detail })));
+  const leadMotNote = lead.mot && /advis|fail|worn|noisy|exhaust|chain|tyre|brake|corrosion/i.test(lead.mot)
+    ? [{ date: check.mot_expiry || "Current", status: "unknown" as const, detail: lead.mot }]
+    : [];
+  const visibleMotNotes = [...leadMotNote, ...motNotes].filter((note, index, notes) => notes.findIndex(item => item.detail.toLowerCase() === note.detail.toLowerCase()) === index);
   return <div className="dealer-mot-report">
     {mileageHistory.length > 0 && <MileageGraph history={mileageHistory} />}
-    {motNotes.length > 0 && <section className="dealer-mot-notes">
+    {visibleMotNotes.length > 0 && <section className="dealer-mot-notes">
       <h4>MOT notes</h4>
-      <div>{motNotes.slice(0, 6).map((note, index) => <p className={note.status} key={`${note.date}-${note.detail}-${index}`}><span>{formatMotDate(note.date)}</span><strong>{note.detail}</strong></p>)}</div>
+      <div>{visibleMotNotes.slice(0, 6).map((note, index) => <p className={note.status} key={`${note.date}-${note.detail}-${index}`}><span>{formatMotDate(note.date)}</span><strong>{note.detail}</strong></p>)}</div>
     </section>}
     <section className="dealer-mot-tests">
       <h4>MOT Tests ({motHistory.length})</h4>
