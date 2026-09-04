@@ -2172,6 +2172,7 @@
 
 :global(.dealer-portal-v3 .dealer-lead-workspace) {
   display: grid;
+  align-content: start;
   gap: 16px;
   width: 100%;
   max-width: 1480px;
@@ -2179,6 +2180,46 @@
   margin: 0 auto;
   padding: 28px;
   overflow-x: clip;
+}
+
+:global(.dealer-portal-v3 .dealer-workspace-loading) {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  min-height: 60vh;
+  padding: 28px;
+  color: #edf7ff;
+}
+
+:global(.dealer-portal-v3 .dealer-workspace-loading span) {
+  width: 48px;
+  height: 48px;
+  border: 8px solid #142536;
+  border-top-color: var(--portal-green);
+  border-right-color: rgba(31, 223, 73, .5);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 7px #08131d, 0 0 18px rgba(31, 223, 73, .14);
+  animation: dealer-wheel-spin .85s linear infinite;
+}
+
+:global(.dealer-portal-v3 .dealer-workspace-loading p) {
+  margin: 0;
+  color: var(--portal-muted);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+@keyframes dealer-wheel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global(.dealer-portal-v3 .dealer-workspace-loading span) {
+    animation: none;
+  }
 }
 
 :global(.dealer-portal-v3 .dealer-workspace-back) {
@@ -2197,7 +2238,7 @@
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr) auto;
   gap: 18px;
-  align-items: center;
+  align-items: start;
   width: 100%;
   max-width: 100%;
   height: auto;
@@ -2208,8 +2249,18 @@
 }
 
 :global(.dealer-portal-v3 .dealer-workspace-hero .dealer-lead-image) {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+  align-self: start;
   border: 1px solid var(--portal-line-soft);
   border-radius: 8px;
+}
+
+:global(.dealer-portal-v3 .dealer-workspace-hero .dealer-lead-image > span),
+:global(.dealer-portal-v3 .dealer-workspace-hero .dealer-image-open),
+:global(.dealer-portal-v3 .dealer-workspace-hero .dealer-image-open img) {
+  min-height: 0;
 }
 
 :global(.dealer-portal-v3 .dealer-workspace-hero .dealer-image-open) {
@@ -2245,6 +2296,7 @@
   display: grid;
   gap: 10px;
   justify-items: end;
+  align-self: center;
   min-width: 190px;
 }
 
@@ -2304,6 +2356,8 @@
 }
 
 :global(.dealer-portal-v3 .dealer-workspace-tabs button) {
+  box-sizing: border-box;
+  flex: 0 0 auto;
   min-height: 36px;
   padding: 8px 12px;
   border: 1px solid #354d62;
@@ -2312,6 +2366,7 @@
   color: #c8d6df;
   font-size: 12px;
   font-weight: 900;
+  line-height: 1;
 }
 
 :global(.dealer-portal-v3 .dealer-workspace-tabs button.active) {

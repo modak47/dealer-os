@@ -612,10 +612,10 @@ export function LeadWorkspaceClient({ leadId }: { leadId: string }) {
     const url = new URL(window.location.href);
     if (nextTab === "overview") url.searchParams.delete("tab");
     else url.searchParams.set("tab", nextTab);
-    window.history.replaceState({}, "", url);
+    window.history.pushState({}, "", url);
   }
 
-  if (loading) return <section className={`${styles.scope} dealer-portal-v3`}><div className="dealer-lead-workspace"><div className="portal-empty"><h2>Loading lead...</h2></div></div></section>;
+  if (loading) return <section className={`${styles.scope} dealer-portal-v3`}><div className="dealer-workspace-loading" role="status" aria-live="polite"><span aria-hidden="true" /><p>Loading opportunity...</p></div></section>;
   if (!data) return <section className={`${styles.scope} dealer-portal-v3`}><div className="dealer-lead-workspace"><div className="portal-empty"><h2>Dealer access unavailable</h2><p>Sign in with a linked dealer login, or ask YesMoto to set up your dealer account.</p><Link className="dealer-claim-button" href="/dealer-login">Go to Dealer Login</Link></div></div></section>;
   if (!lead) return <section className={`${styles.scope} dealer-portal-v3`}><div className="dealer-lead-workspace"><a className="dealer-workspace-back" href={`/dealer-portal${backSection === "available" ? "" : `?section=${backSection}`}`}>Back to Opportunities</a><div className="portal-empty"><h2>Lead not available</h2><p>This opportunity is not currently available to your dealership, or it has moved out of your authorised portal records.</p></div></div></section>;
 
@@ -823,19 +823,15 @@ function LocationPanel({ dealer, lead, unlocked }: { dealer: DealerPortalAccount
   const mapUrl = staticMapUrl(publicLocation);
   const hasLocation = Boolean(publicLocation.location_town || publicLocation.location_display_name || publicLocation.postcode || publicLocation.latitude != null);
   const dealerOrigin = dealer.postcode || dealer.trading_name || "YesMoto";
-  const forceFallback = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("map") === "fallback";
-  const [mapState, setMapState] = useState<"loading" | "loaded" | "failed">(!mapUrl || forceFallback ? "failed" : "loading");
+  const forceFallback = process.env.NODE_ENV !== "production" && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("map") === "fallback";
+  const [failedMapUrl, setFailedMapUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!mapUrl || forceFallback) return;
-    const timer = window.setTimeout(() => setMapState(current => current === "loaded" ? current : "failed"), 4000);
-    return () => window.clearTimeout(timer);
-  }, [forceFallback, mapUrl]);
+  const showFallback = forceFallback || !mapUrl || failedMapUrl === mapUrl;
 
   return <section className="dealer-location-panel">
-    <div className={`dealer-map-preview ${mapState === "loaded" ? "loaded" : "fallback"}`}>
-      {mapUrl && !forceFallback && <iframe title="Approximate motorcycle location map" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" onLoad={() => setMapState("loaded")} onError={() => setMapState("failed")} />}
-      {mapState !== "loaded" && <div className="dealer-map-fallback">
+    <div className={`dealer-map-preview ${showFallback ? "fallback" : "loaded"}`}>
+      {mapUrl && !showFallback && <iframe title="Approximate motorcycle location map" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" onError={() => setFailedMapUrl(mapUrl)} />}
+      {showFallback && <div className="dealer-map-fallback">
         <strong>Map unavailable</strong>
         <p>Approximate location shown using the information provided.</p>
       </div>}
