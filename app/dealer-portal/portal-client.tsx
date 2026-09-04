@@ -495,11 +495,21 @@ function VehicleMotPanel({ lead }: { lead: DealerVisibleLead }) {
   const check = lead.portal_vehicle_check;
   return <section className="dealer-vehicle-check dealer-mot-panel">
     <header><div><span>MOT data</span><h3>{check ? `MOT History${lead.reg ? ` - ${lead.reg}` : ""}` : "MOT data not yet available"}</h3></div></header>
-    {!check ? <p>MOT and mileage history will show here once the Auto Trader vehicle check has been stored.</p> : <>
-      <MotStats check={check} lead={lead} />
-      <VehicleHistoryPanel check={check} />
-    </>}
+    {!check ? <p>MOT and mileage history will show here once the Auto Trader vehicle check has been stored.</p> : <MotReportPanel check={check} />}
   </section>;
+}
+
+function MotReportPanel({ check }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]> }) {
+  const motHistory = check.mot_history ?? [];
+  const mileageHistory = check.mileage_history ?? [];
+  return <div className="dealer-mot-report">
+    {mileageHistory.length > 0 && <MileageGraph history={mileageHistory} />}
+    <section className="dealer-mot-tests">
+      <h4>MOT Tests ({motHistory.length})</h4>
+      {!motHistory.length ? <p>Historic MOT records are not available from the stored vehicle check yet.</p> : <div className="dealer-mot-report-list">{motHistory.slice(0, 8).map((item, index) => <MotReportRow item={item} expanded={index === 0} key={`${item.date}-${index}`} />)}</div>}
+      <p className="dealer-history-note">Data sourced from the stored MOT history service.</p>
+    </section>
+  </div>;
 }
 
 function VehicleHistoryPanel({ check }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]> }) {
@@ -531,21 +541,70 @@ function MotHistoryRow({ item, expanded }: { item: DealerMotHistoryItem; expande
 }
 
 function MileageGraph({ history }: { history: DealerMileageHistoryItem[] }) {
-  const mileages = history.map(item => item.mileage);
+  const orderedHistory = [...history].sort((a, b) => motDateTime(b.date) - motDateTime(a.date) || b.mileage - a.mileage);
+  const mileages = orderedHistory.map(item => item.mileage);
   const max = Math.max(...mileages);
-  const previousMileages = history.map((item, index) => index === 0 ? null : item.mileage - history[index - 1].mileage);
-  return <div className="dealer-mileage-graph">
-    {history.map((item, index) => {
+  const deltas = orderedHistory.map((item, index) => {
+    const previousReading = orderedHistory[index + 1]?.mileage;
+    return previousReading == null ? null : item.mileage - previousReading;
+  });
+  return <div className="dealer-mileage-report">
+    {orderedHistory.map((item, index) => {
       const width = Math.max(18, (item.mileage / Math.max(1, max)) * 100);
-      const delta = previousMileages[index];
-      return <div className="dealer-mileage-row" title={`${item.source}: ${item.mileage.toLocaleString("en-GB")} miles`} key={`${item.date}-${index}`}>
-        <span>{item.date}</span>
+      const delta = deltas[index];
+      const year = String(item.date || "").slice(0, 4) || item.source;
+      return <div className="dealer-mileage-report-row" title={`${item.source}: ${item.mileage.toLocaleString("en-GB")} miles`} key={`${item.date}-${index}`}>
+        <span>{year}</span>
         <i><b style={{ width: `${width}%` }} /></i>
         <strong>{item.mileage.toLocaleString("en-GB")}</strong>
         <em>{delta == null ? "" : `+${delta.toLocaleString("en-GB")}`}</em>
       </div>;
     })}
   </div>;
+}
+
+function MotReportRow({ item, expanded }: { item: DealerMotHistoryItem; expanded: boolean }) {
+  const label = item.status === "pass" ? "PASS" : item.status === "fail" ? "FAIL" : "UNKNOWN";
+  const mileage = item.mileage == null ? "Mileage not supplied" : `${item.mileage.toLocaleString("en-GB")} MI`;
+  const testDate = formatMotDate(item.date);
+  const expiryDate = formatMotDate(item.expiry);
+  return <details className={`dealer-mot-report-test ${item.status}`} open={expanded}>
+    <summary>
+      <span><b>{label}</b>{item.details.length > 0 && <em>{item.details.length} item{item.details.length === 1 ? "" : "s"}</em>}</span>
+      <small>{testDate}</small>
+      <small>{mileage}</small>
+    </summary>
+    <div className="dealer-mot-report-detail">
+      <dl>
+        <Detail label="Test date" value={testDate} />
+        <Detail label="Valid until" value={expiryDate} />
+        <Detail label="Mileage" value={item.mileage == null ? null : `${item.mileage.toLocaleString("en-GB")} MI (read)`} />
+      </dl>
+      {item.details.length > 0 && <div><strong>Advisories</strong><ul>{item.details.map(detail => <li key={detail}>{detail}</li>)}</ul></div>}
+    </div>
+  </details>;
+}
+
+function formatMotDate(value: string | null | undefined) {
+  if (!value) return "Date not returned";
+  const parsed = parseMotDate(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function motDateTime(value: string | null | undefined) {
+  if (!value) return 0;
+  const parsed = parseMotDate(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function parseMotDate(value: string) {
+  const trimmed = value.trim();
+  const ukDate = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (ukDate) {
+    const year = Number(ukDate[3]) < 100 ? 2000 + Number(ukDate[3]) : Number(ukDate[3]);
+    return new Date(year, Number(ukDate[2]) - 1, Number(ukDate[1]));
+  }
+  return new Date(trimmed);
 }
 
 function MotStats({ check, lead }: { check: NonNullable<DealerVisibleLead["portal_vehicle_check"]>; lead: DealerVisibleLead }) {
