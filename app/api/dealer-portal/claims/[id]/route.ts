@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cleanDealerLostReason } from "@/lib/dealer-portal-lifecycle";
 import { getDealerClaimForSession } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText } from "@/lib/website-leads";
@@ -21,8 +22,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const body = await request.json() as Record<string, unknown>;
     const status = cleanText(body.status, 60) as DealerLeadClaimStatus | null;
     if (!status || !statuses.has(status)) return NextResponse.json({ error: "Status is not available for dealer update." }, { status: 400 });
-    const lostReason = status === "lost" ? cleanText(body.lost_reason, 300) : null;
-    if (status === "lost" && !lostReason) return NextResponse.json({ error: "Select a lost reason." }, { status: 400 });
+    const lostReason = status === "lost" ? cleanDealerLostReason(cleanText(body.lost_reason, 300)) : null;
+    const lostReasonDetail = status === "lost" && lostReason === "Other" ? cleanText(body.lost_reason_detail, 1000) : null;
+    if (status === "lost" && !lostReason) return NextResponse.json({ error: "Select a valid lost reason." }, { status: 400 });
+    if (status === "lost" && lostReason === "Other" && !lostReasonDetail) return NextResponse.json({ error: "Add a short explanation for Other." }, { status: 400 });
     const now = new Date().toISOString();
     const updates = {
       status,
@@ -41,14 +44,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       dealer_account_id: session.dealer.id,
       dealer_user_id: session.userId,
       note_type: "status",
-      body: status === "lost" ? `Status changed to ${status}: ${lostReason}` : `Status changed to ${status}`,
+      body: status === "lost" ? `Status changed to ${status}: ${lostReason}${lostReasonDetail ? ` - ${lostReasonDetail}` : ""}` : `Status changed to ${status}`,
     });
     await db.from("dealer_portal_audit_events").insert({
       website_lead_id: claim.website_lead_id,
       dealer_account_id: session.dealer.id,
       dealer_user_id: session.userId,
-      event_type: "dealer_claim_status_updated",
-      event_data: { claim_id: claim.id, status, lost_reason: lostReason },
+      event_type: status === "lost" ? "dealer_claim_lost" : status === "returned_to_pool" ? "dealer_claim_returned" : "dealer_claim_status_updated",
+      event_data: { claim_id: claim.id, status, lost_reason: lostReason, lost_reason_detail: lostReasonDetail },
     });
     return NextResponse.json({ claim: data });
   } catch (error) {

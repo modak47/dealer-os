@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { directionsUrl, googleMapsUrl, staticMapUrl } from "@/lib/location-ui";
+import { dealerLostReasons } from "@/lib/dealer-portal-lifecycle";
 import { createClient } from "@/lib/supabase/client";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
-import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaimStatus, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPortalUserRole, DealerPortalUserSummary, DealerVisibleLead } from "@/types/dealer-portal";
+import type { DealerBuyingPreferences, DealerFeeLedgerEntry, DealerGeographyPreferences, DealerLeadClaimStatus, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPortalUserRole, DealerPortalUserSummary, DealerPurchase, DealerPurchaseFee, DealerVisibleLead } from "@/types/dealer-portal";
 
 type PortalData = {
   dealer: DealerPortalAccountWithPreferences;
@@ -14,11 +15,13 @@ type PortalData = {
   claimed: DealerVisibleLead[];
 };
 
-type PortalTab = "available" | "active" | "purchased" | "lost" | "account";
+type PortalTab = "available" | "active" | "purchased" | "lost" | "payments" | "account";
 type LeadCardTab = "overview" | "location" | "check" | "mot" | "customer";
+type DealerAccountFee = DealerPurchaseFee & { purchase?: Pick<DealerPurchase, "purchase_type" | "purchase_price" | "purchase_date" | "reported_at"> | null; lead?: { id: number; reg?: string | null; make?: string | null; model?: string | null; year?: string | null; mileage?: string | null } | null };
+type DealerPaymentsPayload = { fees: DealerAccountFee[]; ledger: DealerFeeLedgerEntry[] };
 
 const terminalStatuses = new Set(["purchased", "purchased_later", "lost", "returned_to_pool"]);
-const lostReasons = ["Couldn't agree price", "Customer stopped responding", "Customer sold elsewhere", "Condition not as described", "Mileage", "Vehicle history", "Outstanding finance", "Too far away", "Specification unsuitable", "Customer decided not to sell", "Other"];
+const lostReasons = dealerLostReasons;
 const statusActions: [DealerLeadClaimStatus, string][] = [
   ["attempting_contact", "Attempting Contact"],
   ["contacted", "Contacted"],
@@ -99,7 +102,7 @@ export function DealerPortalClient() {
           <button className="dealer-sign-out" onClick={() => void signOut()}>Sign out</button>
         </section>
         {error && <div className="portal-message error">{error}</div>}{notice && <div className="portal-message">{notice}</div>}
-        {activeTab === "account" ? <DealerAccountPanel dealer={data.dealer} role={data.role} onSaved={dealer => setData(current => current ? { ...current, dealer } : current)} /> : <>
+        {activeTab === "account" ? <DealerAccountPanel dealer={data.dealer} role={data.role} onSaved={dealer => setData(current => current ? { ...current, dealer } : current)} /> : activeTab === "payments" ? <DealerPaymentsPanel /> : <>
           {!leads.length ? <div className="portal-empty"><h2>{emptyTitle(activeTab)}</h2><p>{emptyCopy(activeTab)}</p></div> : <section className="dealer-lead-grid">{leads.map(lead => <DealerLeadCard dealer={data.dealer} lead={lead} busy={busyId === lead.id} onClaim={() => void claim(lead)} onChanged={load} key={`${activeTab}-${lead.id}`} />)}</section>}
         </>}
       </section>
@@ -111,6 +114,7 @@ function emptyTitle(tab: PortalTab) {
   if (tab === "available") return "No available motorcycles right now";
   if (tab === "purchased") return "No purchases reported yet";
   if (tab === "lost") return "No lost or returned leads yet";
+  if (tab === "payments") return "No Successful Purchase Fees yet";
   return "No active motorcycles yet";
 }
 
@@ -118,6 +122,7 @@ function emptyCopy(tab: PortalTab) {
   if (tab === "available") return "New suitable opportunities will appear here when YesMoto releases them.";
   if (tab === "purchased") return "Purchased motorcycles will appear here after you report them.";
   if (tab === "lost") return "Leads you mark as lost or returned will stay here for your records.";
+  if (tab === "payments") return "Successful Purchase Fees and manual account history will appear here.";
   return "Claim a lead to unlock customer details and work the opportunity.";
 }
 
@@ -144,6 +149,73 @@ function displayEngine(value: string | number | null | undefined) {
   return /\bcc\b/i.test(text) ? text : `${text}cc`;
 }
 
+function DealerPaymentsPanel() {
+  const [payload, setPayload] = useState<DealerPaymentsPayload>({ fees: [], ledger: [] });
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    async function loadPayments() {
+      setLoading(true);
+      const response = await fetch("/api/dealer-portal/payments", { cache: "no-store" });
+      const data = await response.json();
+      if (!active) return;
+      if (response.ok) setPayload({ fees: data.fees ?? [], ledger: data.ledger ?? [] });
+      else setMessage(data.error || "Unable to load payment history.");
+      setLoading(false);
+    }
+    void loadPayments();
+    return () => { active = false; };
+  }, []);
+
+  const totals = payload.fees.reduce((sum, fee) => ({
+    fees: sum.fees + Number(fee.fee_amount ?? 0),
+    credits: sum.credits + Number(fee.credit_amount ?? 0),
+    adjustments: sum.adjustments + Number(fee.adjustment_amount ?? 0),
+    paid: sum.paid + Number(fee.paid_amount ?? 0),
+    outstanding: sum.outstanding + Number(fee.outstanding_amount ?? 0),
+  }), { fees: 0, credits: 0, adjustments: 0, paid: 0, outstanding: 0 });
+
+  return <section className="dealer-payments-panel">
+    <header><div><span>Account</span><h2>Successful Purchase Fees</h2><p>Read-only account history for purchases reported through the YesMoto dealer portal.</p></div></header>
+    {message && <p className="dealer-work-error">{message}</p>}
+    <section className="dealer-payment-summary">
+      <Detail label="Fees" value={formatGbp(totals.fees)} />
+      <Detail label="Adjustments" value={formatGbp(totals.adjustments)} />
+      <Detail label="Credits" value={formatGbp(totals.credits)} />
+      <Detail label="Paid" value={formatGbp(totals.paid)} />
+      <Detail label="Outstanding" value={formatGbp(totals.outstanding)} />
+    </section>
+    {loading ? <div className="portal-empty"><h2>Loading account history...</h2></div> : !payload.fees.length ? <div className="portal-empty"><h2>No Successful Purchase Fees yet</h2><p>Fees appear only after a motorcycle is reported as purchased.</p></div> : <section className="dealer-payment-grid">
+      <div className="dealer-payment-card-list">
+        <h3>Transactions</h3>
+        {payload.fees.map(fee => <article className="dealer-payment-card" key={fee.id}>
+          <header><div><b>{paymentLeadTitle(fee.lead)}</b><span>{statusLabel(fee.status)} · {formatLeadDate(fee.created_at)}</span></div><strong>{formatGbp(fee.outstanding_amount)} outstanding</strong></header>
+          <dl>
+            <Detail label="Successful Purchase Fee" value={formatGbp(fee.fee_amount)} />
+            <Detail label="Effective charge" value={formatGbp(Number(fee.fee_amount ?? 0) + Number(fee.adjustment_amount ?? 0) - Number(fee.credit_amount ?? 0))} />
+            <Detail label="Paid" value={formatGbp(fee.paid_amount)} />
+            <Detail label="Invoice" value={fee.invoice_reference || "Not invoiced yet"} />
+            <Detail label="Purchase date" value={fee.purchase?.purchase_date ?? null} />
+            <Detail label="Purchase price" value={fee.purchase ? formatGbp(fee.purchase.purchase_price) : null} />
+          </dl>
+          {fee.notes && <p>{fee.notes}</p>}
+        </article>)}
+      </div>
+      <div className="dealer-payment-ledger">
+        <h3>Ledger History</h3>
+        {!payload.ledger.length ? <p>No ledger entries yet.</p> : payload.ledger.map(entry => <article key={entry.id}><b>{statusLabel(entry.entry_type)}</b><span>{formatGbp(entry.amount)} · {formatLeadDate(entry.created_at)}</span>{entry.note && <p>{entry.note}</p>}</article>)}
+      </div>
+    </section>}
+  </section>;
+}
+
+function paymentLeadTitle(lead: DealerAccountFee["lead"]) {
+  if (!lead) return "Motorcycle purchase";
+  return `#${lead.id} ${lead.reg || "No reg"} ${[lead.year, lead.make, lead.model].filter(Boolean).join(" ")}`.trim();
+}
+
 function LeadFactIcon({ type }: { type: "location" | "distance" | "received" }) {
   if (type === "location") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11Z" /><circle cx="12" cy="10" r="2.5" /></svg>;
   if (type === "distance") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16" /><path d="M7 19 10 5l4 14 3-10 2 10" /></svg>;
@@ -163,7 +235,7 @@ function DealerSidebar({ dealer, activeTab, counts, onTab }: { dealer: DealerPor
       <button type="button" onClick={() => onTab("available")}><i>D</i><span>Dashboard</span></button>
       {items.map(item => <button className={activeTab === item.tab ? "active" : ""} type="button" onClick={() => onTab(item.tab)} key={item.tab}><i>{item.icon}</i><span>{item.label}</span><b>{item.count}</b></button>)}
       <hr />
-      <button type="button" aria-disabled="true"><i>F</i><span>Payments</span></button>
+      <button className={activeTab === "payments" ? "active" : ""} type="button" onClick={() => onTab("payments")}><i>F</i><span>Payments</span></button>
       <button className={activeTab === "account" ? "active" : ""} type="button" onClick={() => onTab("account")}><i>S</i><span>Profile & Settings</span></button>
       <button type="button" aria-disabled="true"><i>?</i><span>Support</span></button>
     </nav>
@@ -754,7 +826,8 @@ function DealerWorkPanel({ claimId, lead, onChanged }: { claimId: string; lead: 
   const [message, setMessage] = useState("");
   const [noteType, setNoteType] = useState("note");
   const [noteBody, setNoteBody] = useState("");
-  const [lostReason, setLostReason] = useState(lostReasons[0]);
+  const [lostReason, setLostReason] = useState<string>(lostReasons[0]);
+  const [lostReasonDetail, setLostReasonDetail] = useState("");
   const [purchase, setPurchase] = useState(() => ({
     purchase_price: String(safeNumber(lead.price) ?? ""),
     purchase_date: new Date().toISOString().slice(0, 10),
@@ -826,7 +899,7 @@ function DealerWorkPanel({ claimId, lead, onChanged }: { claimId: string; lead: 
       <textarea value={noteBody} onChange={event => setNoteBody(event.target.value)} placeholder="Add activity note, offer, call outcome or next step" required />
       <button disabled={Boolean(busy)}>{busy === "note" ? "Adding..." : "Add Note"}</button>
     </form>
-    <details className="dealer-outcome-panel"><summary>Lost / Return</summary><div><select value={lostReason} onChange={event => setLostReason(event.target.value)}>{lostReasons.map(reason => <option key={reason}>{reason}</option>)}</select><button type="button" disabled={Boolean(busy)} onClick={() => void updateStatus("lost", { lost_reason: lostReason })}>Mark Lost</button><button type="button" disabled={Boolean(busy)} onClick={() => void updateStatus("returned_to_pool")}>Return to Pool</button></div></details>
+    <details className="dealer-outcome-panel"><summary>Lost / Return</summary><div><select value={lostReason} onChange={event => setLostReason(event.target.value)}>{lostReasons.map(reason => <option key={reason}>{reason}</option>)}</select>{lostReason === "Other" && <input value={lostReasonDetail} onChange={event => setLostReasonDetail(event.target.value)} placeholder="Brief reason" />}<button type="button" disabled={Boolean(busy)} onClick={() => void updateStatus("lost", { lost_reason: lostReason, lost_reason_detail: lostReasonDetail })}>Mark Lost</button><button type="button" disabled={Boolean(busy)} onClick={() => void updateStatus("returned_to_pool")}>Return to Pool</button></div></details>
     <details className="dealer-outcome-panel"><summary>Report Purchase</summary><form onSubmit={reportPurchase}><Input label="Purchase price" value={purchase.purchase_price} set={value => setPurchase(current => ({ ...current, purchase_price: value }))} type="number" required /><Input label="Purchase date" value={purchase.purchase_date} set={value => setPurchase(current => ({ ...current, purchase_date: value }))} type="date" required /><Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" /><Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" /><label className="full"><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} /></label><button disabled={Boolean(busy)}>{busy === "purchase" ? "Reporting..." : "Mark as Purchased"}</button></form></details>
   </section>;
 }
@@ -867,9 +940,9 @@ function PurchasedLaterPanel({ claimId, lead, onChanged }: { claimId: string; le
     <form className="dealer-later-purchase-form" onSubmit={reportPurchase}>
       <Input label="Purchase price" value={purchase.purchase_price} set={value => setPurchase(current => ({ ...current, purchase_price: value }))} type="number" required />
       <Input label="Purchase date" value={purchase.purchase_date} set={value => setPurchase(current => ({ ...current, purchase_date: value }))} type="date" required />
-      <Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" />
-      <Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" />
-      <label className="full"><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} placeholder="Briefly explain what happened after the lead was marked lost." /></label>
+      <Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" required />
+      <Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" required />
+      <label className="full"><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} placeholder="Briefly explain what happened after the lead was marked lost." required /></label>
       <button disabled={busy}>{busy ? "Reporting..." : "Report Purchased Later"}</button>
     </form>
   </section>;

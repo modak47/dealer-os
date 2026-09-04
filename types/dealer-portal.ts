@@ -158,11 +158,37 @@ export type DealerPurchaseFee = {
   status: "pending_invoice" | "invoiced" | "paid" | "credited" | "void";
   credit_amount: number;
   adjustment_amount: number;
+  invoice_reference: string | null;
+  invoiced_amount: number;
+  paid_amount: number;
+  outstanding_amount: number;
   invoiced_at: string | null;
+  invoiced_by: string | null;
   paid_at: string | null;
+  paid_by: string | null;
+  credited_at: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type DealerFeeLedgerEntry = {
+  id: number;
+  fee_id: string;
+  purchase_id: string | null;
+  website_lead_id: number | null;
+  dealer_account_id: string;
+  entry_type: "fee_created" | "marked_invoiced" | "payment_recorded" | "credit_applied" | "adjustment_applied" | "voided";
+  amount: number;
+  previous_status: DealerPurchaseFee["status"] | null;
+  new_status: DealerPurchaseFee["status"] | null;
+  previous_amounts: Record<string, unknown>;
+  new_amounts: Record<string, unknown>;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
 };
 
 export type DealerVehicleCheckFlag = {

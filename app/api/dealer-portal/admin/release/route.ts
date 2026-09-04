@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
+import { dealerPreviouslyHandledClaim } from "@/lib/dealer-portal-lifecycle";
 import { allocationReasonPayload, allocationStatusForEligibility, evaluateDealerEligibility, excludedReasonPayload } from "@/lib/dealer-matching";
 import { withDealerPreferencesList } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText } from "@/lib/website-leads";
-import type { DealerPortalAccount } from "@/types/dealer-portal";
+import type { DealerLeadClaimStatus, DealerPortalAccount } from "@/types/dealer-portal";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,10 @@ function leadId(value: unknown) {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
 export async function POST(request: Request) {
   try {
     if (!await requireStaffUser()) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
@@ -43,7 +48,9 @@ export async function POST(request: Request) {
     if (!websiteLeadId) return NextResponse.json({ error: "Select a valid website lead." }, { status: 400 });
     const method = cleanText(body.allocation_method, 40) || "matching_pool";
     if (!["direct", "dealer_group", "matching_pool"].includes(method)) return NextResponse.json({ error: "Allocation method is invalid." }, { status: 400 });
-    const requestedDealerIds = Array.isArray(body.dealer_account_ids) ? body.dealer_account_ids.filter((value): value is string => typeof value === "string" && value.trim().length > 0) : [];
+    const requestedDealerIds = stringArray(body.dealer_account_ids);
+    const requestedOverrideIds = new Set(stringArray(body.previous_dealer_override_ids));
+    const allowSelectedPreviousDealerReclaim = body.allow_previous_dealer_reclaim === true || body.allow_previous_dealer_reclaim === "true";
     const db = getSupabaseAdminClient();
     const { data: lead, error: leadError } = await db.from("website_leads").select(releaseLeadSelect).eq("id", websiteLeadId).maybeSingle();
     if (leadError) return NextResponse.json({ error: "Unable to load website lead." }, { status: 500 });
@@ -53,12 +60,34 @@ export async function POST(request: Request) {
     if (dealerResult.error) return NextResponse.json({ error: "Unable to load dealer portal accounts." }, { status: 500 });
     const dealers = await withDealerPreferencesList((dealerResult.data ?? []) as DealerPortalAccount[]);
     if (!dealers.length) return NextResponse.json({ error: "No active dealer portal accounts are available for this release." }, { status: 400 });
+    const previousClaims = await db.from("dealer_lead_claims")
+      .select("id,dealer_account_id,status")
+      .eq("website_lead_id", websiteLeadId)
+      .in("status", ["lost", "returned_to_pool"]);
+    if (previousClaims.error) return NextResponse.json({ error: "Unable to load previous dealer claim history." }, { status: 500 });
+    const previousDealerIds = new Set((previousClaims.data ?? [])
+      .filter(claim => dealerPreviouslyHandledClaim({ status: claim.status as DealerLeadClaimStatus }))
+      .map(claim => String(claim.dealer_account_id)));
+    const selectedPreviousDealerIds = requestedDealerIds.filter(id => previousDealerIds.has(id));
+    const overrideDealerIds = new Set([
+      ...[...requestedOverrideIds].filter(id => previousDealerIds.has(id)),
+      ...(allowSelectedPreviousDealerReclaim ? selectedPreviousDealerIds : []),
+    ]);
+    if (selectedPreviousDealerIds.some(id => !overrideDealerIds.has(id))) {
+      return NextResponse.json({
+        error: "This release includes a dealer that previously Lost or Returned this lead. Staff must explicitly allow previous-dealer reclaim to continue.",
+        previous_dealer_ids: selectedPreviousDealerIds,
+      }, { status: 409 });
+    }
+    if (method === "matching_pool" && allowSelectedPreviousDealerReclaim && !requestedOverrideIds.size) {
+      return NextResponse.json({ error: "Select the previous dealer to override before allowing reclaim from the matching pool." }, { status: 400 });
+    }
     const manualOverride = method === "direct" || method === "dealer_group" || requestedDealerIds.length > 0;
     const matchingLead = lead as unknown as Parameters<typeof evaluateDealerEligibility>[1];
     const evaluatedDealers = dealers.map(dealer => ({ dealer, eligibility: evaluateDealerEligibility(dealer, matchingLead) }));
     const availableDealers = method === "matching_pool" && !requestedDealerIds.length
-      ? evaluatedDealers.filter(item => item.eligibility.eligible)
-      : evaluatedDealers;
+      ? evaluatedDealers.filter(item => item.eligibility.eligible && (!previousDealerIds.has(item.dealer.id) || overrideDealerIds.has(item.dealer.id)))
+      : evaluatedDealers.filter(item => !previousDealerIds.has(item.dealer.id) || overrideDealerIds.has(item.dealer.id));
     if (!manualOverride && !availableDealers.length) {
       return NextResponse.json({
         error: "No eligible dealer portal accounts are available for this matching pool release.",
@@ -73,17 +102,25 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     await db.from("dealer_lead_allocations").update({ allocation_status: "withdrawn", updated_at: now, updated_by: userId }).eq("website_lead_id", websiteLeadId).eq("allocation_status", "available");
     const allocations = evaluatedDealers.map(({ dealer, eligibility }) => ({
+      previousDealer: previousDealerIds.has(dealer.id),
+      reclaimOverride: overrideDealerIds.has(dealer.id),
+      dealer,
+      eligibility,
+    })).map(({ dealer, eligibility, previousDealer, reclaimOverride }) => ({
       website_lead_id: websiteLeadId,
       dealer_account_id: dealer.id,
       allocation_method: method,
-      allocation_status: allocationStatusForEligibility(eligibility, manualOverride),
+      allocation_status: previousDealer && !reclaimOverride ? "excluded" : allocationStatusForEligibility(eligibility, manualOverride),
       match_score: null,
       match_reasons: {
         allocation_method: method,
         selected_by_admin: manualOverride,
+        previous_dealer_reclaim_override: reclaimOverride,
         ...allocationReasonPayload(eligibility, manualOverride),
       },
-      excluded_reasons: eligibility.eligible ? {} : excludedReasonPayload(eligibility),
+      excluded_reasons: previousDealer && !reclaimOverride
+        ? { previous_dealer: "Dealer previously Lost or Returned this lead." }
+        : eligibility.eligible ? {} : excludedReasonPayload(eligibility),
       created_by: userId,
       updated_by: userId,
     }));
@@ -96,8 +133,23 @@ export async function POST(request: Request) {
       website_lead_id: websiteLeadId,
       dealer_user_id: userId,
       event_type: "lead_released_to_dealers",
-      event_data: { allocation_method: method, dealer_count: dealers.length, available_count: availableDealers.length, excluded_count: evaluatedDealers.length - availableDealers.length },
+      event_data: {
+        allocation_method: method,
+        dealer_count: dealers.length,
+        available_count: availableDealers.length,
+        excluded_count: evaluatedDealers.length - availableDealers.length,
+        previous_dealer_excluded_ids: [...previousDealerIds].filter(id => !overrideDealerIds.has(id)),
+        previous_dealer_override_ids: [...overrideDealerIds],
+      },
     });
+    if (overrideDealerIds.size) {
+      await db.from("dealer_portal_audit_events").insert({
+        website_lead_id: websiteLeadId,
+        dealer_user_id: userId,
+        event_type: "previous_dealer_reclaim_override_recorded",
+        event_data: { dealer_account_ids: [...overrideDealerIds], allocation_method: method },
+      });
+    }
     return NextResponse.json({
       allocations: inserted ?? [],
       status,

@@ -226,7 +226,7 @@ describe("dealer matching release route integration", () => {
   });
 
   it("filters open matching pool to eligible dealers before release succeeds", () => {
-    assert.match(routeSource, /method === "matching_pool" && !requestedDealerIds\.length[\s\S]*?evaluatedDealers\.filter\(item => item\.eligibility\.eligible\)/);
+    assert.match(routeSource, /method === "matching_pool" && !requestedDealerIds\.length[\s\S]*?evaluatedDealers\.filter\(item => item\.eligibility\.eligible &&/);
   });
 
   it("does not populate percentage match scores for V1", () => {

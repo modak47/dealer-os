@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Children, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
-import type { DealerBuyingPreferences, DealerGeographyPreferences, DealerLeadClaim, DealerLeadNote, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPurchase, DealerPurchaseFee } from "@/types/dealer-portal";
+import type { DealerBuyingPreferences, DealerFeeLedgerEntry, DealerGeographyPreferences, DealerLeadClaim, DealerLeadNote, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPurchase, DealerPurchaseFee } from "@/types/dealer-portal";
 import type { WebsiteLead } from "@/types/website-lead";
 
 type RelatedDealer = { id: string; trading_name: string; successful_purchase_fee?: number | null } | null;
@@ -11,8 +11,9 @@ type RelatedLead = { id: number; reg?: string | null; make?: string | null; mode
 type AdminClaim = DealerLeadClaim & { dealer?: RelatedDealer; lead?: RelatedLead };
 type AdminNote = DealerLeadNote & { dealer?: RelatedDealer; lead?: RelatedLead };
 type AdminPurchase = DealerPurchase & { dealer?: RelatedDealer; lead?: RelatedLead };
-type AdminFee = DealerPurchaseFee & { dealer?: RelatedDealer; lead?: RelatedLead };
-type AdminOverview = { claims: AdminClaim[]; notes: AdminNote[]; purchases: AdminPurchase[]; fees: AdminFee[] };
+type AdminFee = DealerPurchaseFee & { dealer?: RelatedDealer; lead?: RelatedLead; purchase?: Pick<DealerPurchase, "id" | "purchase_type" | "purchase_price" | "purchase_date" | "reported_at"> | null };
+type AdminLedger = DealerFeeLedgerEntry & { dealer?: RelatedDealer; lead?: RelatedLead };
+type AdminOverview = { claims: AdminClaim[]; notes: AdminNote[]; purchases: AdminPurchase[]; fees: AdminFee[]; ledger: AdminLedger[] };
 type BackfillResult = { id?: number; reg?: string | null; error?: string; skipped?: boolean; reason?: string };
 type BackfillPayload = { processed?: number; checked?: number; failed?: number; skipped?: number; results?: BackfillResult[]; error?: string };
 type AdminTab = "daily" | "dealers" | "oversight";
@@ -86,13 +87,14 @@ function splitArrayText(value: string) {
 export default function DealerPortalAdminPage() {
   const [accounts, setAccounts] = useState<DealerPortalAccountWithPreferences[]>([]);
   const [leads, setLeads] = useState<WebsiteLead[]>([]);
-  const [overview, setOverview] = useState<AdminOverview>({ claims: [], notes: [], purchases: [], fees: [] });
+  const [overview, setOverview] = useState<AdminOverview>({ claims: [], notes: [], purchases: [], fees: [], ledger: [] });
   const [editing, setEditing] = useState<Partial<DealerPortalAccountWithPreferences> | null>(null);
   const [access, setAccess] = useState(emptyAccess);
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [releaseQuery, setReleaseQuery] = useState("");
   const [selectedDealers, setSelectedDealers] = useState<string[]>([]);
   const [method, setMethod] = useState<"matching_pool" | "direct" | "dealer_group">("matching_pool");
+  const [allowPreviousDealerReclaim, setAllowPreviousDealerReclaim] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
@@ -115,7 +117,7 @@ export default function DealerPortalAdminPage() {
     else setError(accountPayload.error || "Unable to load dealer portal accounts.");
     if (leadResponse.ok) setLeads(leadPayload.leads ?? []);
     else setError(leadPayload.error || "Unable to load website leads.");
-    if (overviewResponse.ok) setOverview({ claims: overviewPayload.claims ?? [], notes: overviewPayload.notes ?? [], purchases: overviewPayload.purchases ?? [], fees: overviewPayload.fees ?? [] });
+    if (overviewResponse.ok) setOverview({ claims: overviewPayload.claims ?? [], notes: overviewPayload.notes ?? [], purchases: overviewPayload.purchases ?? [], fees: overviewPayload.fees ?? [], ledger: overviewPayload.ledger ?? [] });
     else setError(overviewPayload.error || "Unable to load dealer portal overview.");
     setLoading(false);
   }
@@ -136,8 +138,8 @@ export default function DealerPortalAdminPage() {
     }).slice(0, 18);
   }, [releaseQuery, releaseableLeads]);
   const selectedLeads = useMemo(() => releaseableLeads.filter(lead => selectedLeadIds.includes(String(lead.id))), [releaseableLeads, selectedLeadIds]);
-  const pendingFees = useMemo(() => overview.fees.filter(fee => fee.status === "pending_invoice"), [overview.fees]);
-  const pendingFeeTotal = useMemo(() => pendingFees.reduce((total, fee) => total + (Number(fee.fee_amount) || 0), 0), [pendingFees]);
+  const pendingFees = useMemo(() => overview.fees.filter(fee => fee.status !== "paid" && fee.status !== "void"), [overview.fees]);
+  const pendingFeeTotal = useMemo(() => pendingFees.reduce((total, fee) => total + (Number(fee.outstanding_amount ?? fee.fee_amount) || 0), 0), [pendingFees]);
   const kpis = [
     ["Active Dealers", activeAccounts.length],
     ["Portal Leads", portalLeads.length],
@@ -222,6 +224,7 @@ export default function DealerPortalAdminPage() {
           website_lead_id: websiteLeadId,
           allocation_method: method,
           dealer_account_ids: method === "matching_pool" ? [] : selectedDealers,
+          allow_previous_dealer_reclaim: method !== "matching_pool" && allowPreviousDealerReclaim,
         }),
       });
       const payload = await response.json();
@@ -232,6 +235,7 @@ export default function DealerPortalAdminPage() {
       setNotice(`${selectedLeadIds.length} lead(s) released to ${allocationCount} dealer portal allocation(s).`);
       setSelectedLeadIds([]);
       setSelectedDealers([]);
+      setAllowPreviousDealerReclaim(false);
       await load();
     } else {
       setError(`Released with ${failures.length} failure(s). ${failures.join(" ")}`);
@@ -292,6 +296,7 @@ export default function DealerPortalAdminPage() {
             <div className="dealer-release-selected"><span>Selected</span><b>{selectedLeads.length ? `${selectedLeads.length} lead(s): ${selectedLeads.slice(0, 3).map(lead => `#${lead.id} ${lead.reg || "No reg"}`).join(", ")}${selectedLeads.length > 3 ? "..." : ""}` : "No leads selected"}</b>{selectedLeads.length > 0 && <button type="button" onClick={() => setSelectedLeadIds([])}>Clear selection</button>}</div>
             <label><span>Distribution</span><select value={method} onChange={event => setMethod(event.target.value as typeof method)}><option value="matching_pool">Open matching pool</option><option value="direct">Specific dealer</option><option value="dealer_group">Dealer group</option></select></label>
             {method !== "matching_pool" && <div className="dealer-picker">{activeAccounts.map(account => <label key={account.id}><input type="checkbox" checked={selectedDealers.includes(account.id)} onChange={() => toggleDealer(account.id)} />{account.trading_name}</label>)}</div>}
+            {method !== "matching_pool" && <label className="dealer-reclaim-override"><input type="checkbox" checked={allowPreviousDealerReclaim} onChange={event => setAllowPreviousDealerReclaim(event.target.checked)} /><span>Allow selected previous dealer to reclaim if they had Lost or Returned this lead</span></label>}
             <div className="website-actions dealer-release-actions"><button className="dealer-release-submit" disabled={saving || !selectedLeadIds.length || (method !== "matching_pool" && !selectedDealers.length)}>{saving ? "Releasing..." : selectedLeadIds.length > 1 ? `Release ${selectedLeadIds.length} Leads` : "Release to Portal"}</button><Link href="/dealer-login" target="_blank">Open Dealer Login</Link></div>
           </div>
         </form>
@@ -313,7 +318,8 @@ export default function DealerPortalAdminPage() {
             <OverviewPanel title="Recent Claims" empty="No dealer claims yet.">{overview.claims.slice(0, 12).map(claim => <OverviewItem key={claim.id} title={`${claim.dealer?.trading_name || "Dealer"} claimed ${leadTitle(claim.lead)}`} meta={`${statusLabel(claim.status)} - ${formatLeadDate(claim.claimed_at)}`} href={`/website-leads/${claim.website_lead_id}`} />)}</OverviewPanel>
             <OverviewPanel title="Activity Notes" empty="No dealer activity yet.">{overview.notes.slice(0, 12).map(note => <OverviewItem key={note.id} title={`${note.dealer?.trading_name || "Dealer"} - ${note.note_type}`} meta={`${leadTitle(note.lead)} - ${formatLeadDate(note.created_at)}`} body={note.body} href={`/website-leads/${note.website_lead_id}`} />)}</OverviewPanel>
             <OverviewPanel title="Reported Purchases" empty="No dealer purchases reported yet.">{overview.purchases.slice(0, 12).map(purchase => <OverviewItem key={purchase.id} title={`${purchase.dealer?.trading_name || "Dealer"} - ${leadTitle(purchase.lead)}`} meta={`${money(purchase.purchase_price)} - ${formatLeadDate(purchase.reported_at)}`} body={purchase.purchase_type.replaceAll("_", " ")} href={`/website-leads/${purchase.website_lead_id}`} />)}</OverviewPanel>
-            <OverviewPanel title="Purchase Fees" empty="No purchase fees yet.">{overview.fees.slice(0, 12).map(fee => <OverviewItem key={fee.id} title={`${fee.dealer?.trading_name || "Dealer"} - ${money(fee.fee_amount)}`} meta={`${statusLabel(fee.status)} - ${leadTitle(fee.lead)}`} body={fee.notes || undefined} href={`/website-leads/${fee.website_lead_id}`} />)}</OverviewPanel>
+            <OverviewPanel title="Successful Purchase Fees" empty="No purchase fees yet.">{overview.fees.slice(0, 12).map(fee => <FeeAdminItem fee={fee} onChanged={load} key={fee.id} />)}</OverviewPanel>
+            <OverviewPanel title="Fee Ledger" empty="No fee ledger entries yet.">{overview.ledger.slice(0, 12).map(entry => <OverviewItem key={entry.id} title={`${entry.dealer?.trading_name || "Dealer"} - ${statusLabel(entry.entry_type)}`} meta={`${money(entry.amount)} - ${formatLeadDate(entry.created_at)}`} body={entry.note || undefined} href={`/website-leads/${entry.website_lead_id}`} />)}</OverviewPanel>
           </div>
         </section>
       </section>}
@@ -403,6 +409,52 @@ function OverviewPanel({ title, empty, children }: { title: string; empty: strin
 
 function OverviewItem({ title, meta, body, href }: { title: string; meta: string; body?: string; href: string }) {
   return <article><div><b>{title}</b><span>{meta}</span>{body && <p>{body}</p>}</div><Link href={href}>Open</Link></article>;
+}
+
+function FeeAdminItem({ fee, onChanged }: { fee: AdminFee; onChanged: () => Promise<void> }) {
+  const [amount, setAmount] = useState("");
+  const [invoiceReference, setInvoiceReference] = useState(fee.invoice_reference ?? "");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState("");
+  const [message, setMessage] = useState("");
+  const effective = Number(fee.fee_amount ?? 0) + Number(fee.adjustment_amount ?? 0) - Number(fee.credit_amount ?? 0);
+  async function mutate(action: string, includeAmount = false) {
+    setBusy(action);
+    setMessage("");
+    const response = await fetch(`/api/dealer-portal/admin/fees/${fee.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, amount: includeAmount ? amount : undefined, invoice_reference: invoiceReference, note }),
+    });
+    const payload = await response.json();
+    if (!response.ok) setMessage(payload.error || "Unable to update Successful Purchase Fee.");
+    else {
+      setAmount("");
+      setNote("");
+      setMessage("Fee updated.");
+      await onChanged();
+    }
+    setBusy("");
+  }
+  return <article className="dealer-fee-admin-item">
+    <div className="dealer-fee-admin-main">
+      <b>{fee.dealer?.trading_name || "Dealer"} - {leadTitle(fee.lead)}</b>
+      <span>{statusLabel(fee.status)} - Effective {money(effective)} - Paid {money(fee.paid_amount)} - Outstanding {money(fee.outstanding_amount)}</span>
+      <p>Base {money(fee.fee_amount)} · Adjustments {money(fee.adjustment_amount)} · Credits {money(fee.credit_amount)}{fee.invoice_reference ? ` · Invoice ${fee.invoice_reference}` : ""}</p>
+      {message && <p className={message.includes("Unable") || message.includes("unsupported") ? "error" : "success"}>{message}</p>}
+    </div>
+    <div className="dealer-fee-admin-controls">
+      <input value={invoiceReference} onChange={event => setInvoiceReference(event.target.value)} placeholder="Invoice ref" aria-label="Invoice reference" />
+      <input value={amount} onChange={event => setAmount(event.target.value)} placeholder="Amount" type="number" min="0" step="0.01" aria-label="Amount" />
+      <input value={note} onChange={event => setNote(event.target.value)} placeholder="Staff note" aria-label="Staff note" />
+      <button type="button" disabled={Boolean(busy)} onClick={() => void mutate("mark_invoiced")}>{busy === "mark_invoiced" ? "Saving..." : "Invoice"}</button>
+      <button type="button" disabled={Boolean(busy)} onClick={() => void mutate("record_payment", true)}>{busy === "record_payment" ? "Saving..." : "Payment"}</button>
+      <button type="button" disabled={Boolean(busy)} onClick={() => void mutate("apply_credit", true)}>{busy === "apply_credit" ? "Saving..." : "Credit"}</button>
+      <button type="button" disabled={Boolean(busy)} onClick={() => void mutate("apply_adjustment", true)}>{busy === "apply_adjustment" ? "Saving..." : "Adjustment"}</button>
+      <button type="button" disabled={Boolean(busy)} onClick={() => void mutate("void")}>{busy === "void" ? "Saving..." : "Void"}</button>
+    </div>
+    <Link href={`/website-leads/${fee.website_lead_id}`}>Open</Link>
+  </article>;
 }
 
 function leadTitle(lead: RelatedLead | undefined) {
