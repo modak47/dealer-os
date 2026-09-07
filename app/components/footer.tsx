@@ -2,6 +2,7 @@ import Link from "next/link";
 import { dealership } from "@/config/dealership";
 import { dealerAddress, getDealerSettings } from "@/lib/dealer-settings";
 import { DealerLogo } from "./dealer-logo";
+import { FooterVisibility } from "./footer-visibility";
 
 export async function Footer() {
   const settings = await getDealerSettings();
@@ -11,7 +12,7 @@ export async function Footer() {
   const phoneHref = `tel:${phone.replace(/\D/g, "")}`;
   const whatsappHref = `https://wa.me/${whatsapp.replace(/^0/, "44").replace(/\D/g, "")}`;
 
-  return <footer>
+  return <FooterVisibility><footer>
     <div className="wide footer-grid">
       <div><DealerLogo /><p>Quality used motorcycles, professionally prepared in Brighton and delivered nationwide.</p><div className="social-links">{Object.entries(dealership.socialLinks).map(([name, href]) => <a href={href} key={name} aria-label={name}>{name.slice(0, 1).toUpperCase()}</a>)}</div></div>
       <div><h3>Motorcycles</h3><Link href="/stock">Used bikes</Link><Link href="/finance">Finance</Link><Link href="/part-exchange">Part exchange</Link><Link href="/sell-my-bike">Sell your bike</Link></div>
@@ -20,7 +21,7 @@ export async function Footer() {
     </div>
     <div className="wide copyright">© 2026 {settings.legal_name || settings.trading_name} <span>{settings.website}</span><span>Privacy · Cookies · Terms</span></div>
     <a className="floating-whatsapp" href={whatsappHref} target="_blank" rel="noreferrer" aria-label="Contact YesMoto on WhatsApp" title="Contact us on WhatsApp"><WhatsAppIcon /></a>
-  </footer>;
+  </footer></FooterVisibility>;
 }
 
 function WhatsAppIcon() {

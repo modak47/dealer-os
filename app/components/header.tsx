@@ -33,7 +33,7 @@ export function Header(){
     return()=>{document.removeEventListener("pointerdown",onPointerDown);document.removeEventListener("keydown",onKeyDown)};
   },[moreOpen]);
 
-  if(pathname?.startsWith("/dealer-portal"))return null;
+  if(pathname?.startsWith("/dealer-portal")||pathname==="/dealer-login-v4-preview")return null;
 
   return <>
     <div className="topbar">GET THE TRUE VALUE FOR YOUR BIKE <i/> <Link href="/sell-my-bike">SELL MY BIKE TODAY</Link></div>
