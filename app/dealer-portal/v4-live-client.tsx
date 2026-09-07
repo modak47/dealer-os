@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { directionsUrl, googleMapsUrl, staticMapUrl } from "@/lib/location-ui";
 import { dealerLostReasons } from "@/lib/dealer-portal-lifecycle";
 import { createClient } from "@/lib/supabase/client";
@@ -227,9 +228,23 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
     if (tab === "overview") url.searchParams.delete("tab");
     else url.searchParams.set("tab", tab);
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-    requestAnimationFrame(() => {
-      tabsRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
-    });
+    const positionTabs = () => {
+      const tabs = tabsRef.current;
+      if (!tabs) return;
+      const topbar = document.querySelector<HTMLElement>("[data-dealer-topbar='true']");
+      const topbarHeight = topbar?.getBoundingClientRect().height ?? 0;
+      let absoluteTop = 0;
+      let element: HTMLElement | null = tabs;
+      while (element) {
+        absoluteTop += element.offsetTop;
+        element = element.offsetParent as HTMLElement | null;
+      }
+      const desiredTop = absoluteTop - topbarHeight - 8;
+      window.scrollTo({ top: Math.max(0, desiredTop), behavior: "auto" });
+    };
+    positionTabs();
+    requestAnimationFrame(() => requestAnimationFrame(positionTabs));
+    window.setTimeout(positionTabs, 80);
   }
 
   if (loading) return <V4Loading label="Loading opportunity..." />;
@@ -260,7 +275,7 @@ function Dashboard({ data, active, purchased, lost }: { data: PortalData; active
     </Panel>
     <section className={styles.lowerGrid}>
       <Panel title="Recent activity" link="Latest lead activity">
-        {recentNotes.length ? <div className={styles.compactRows}>{recentNotes.map(({ note, lead }) => <Link href={leadHref(lead, "active", "customer")} className={`${styles.compactRow} ${styles.clickableRow}`} key={note.id}><span>{formatActivityTime(note.created_at)}</span><strong>{leadTitle(lead)}</strong><span>{formatActivityType(note.note_type)}</span><span className={styles.pill}>{formatActivityBody(note.body)}</span></Link>)}</div> : <EmptyInline copy="No recent activity yet." />}
+        {recentNotes.length ? <div className={styles.compactRows}><div className={`${styles.compactRow} ${styles.compactHead}`}><span>Date</span><span>Motorcycle</span><span>Status</span></div>{recentNotes.map(({ note, lead }) => <Link href={leadHref(lead, "active", "customer")} className={`${styles.compactRow} ${styles.clickableRow}`} key={note.id}><span>{formatActivityTime(note.created_at)}</span><strong>{leadTitle(lead)}</strong><span className={styles.pill}>{formatActivityStatus(note)}</span></Link>)}</div> : <EmptyInline copy="No recent activity yet." />}
       </Panel>
       <Panel title="Notifications" link="Recorded in notification ledger">
         <EmptyInline copy="Dealer notification delivery is recorded by the live notification ledger when lifecycle events occur." />
@@ -301,10 +316,10 @@ function OpportunityRows({ leads, compact = false, section = "opportunities" }: 
   const rows = leads.map(lead => leadRow(lead));
   return <div className={`${styles.opTable} ${compact ? "" : styles.opportunityTable}`}>
     <div className={compact ? `${styles.tableHead} ${styles.dashboardOpportunityHead}` : `${styles.tableHead} ${styles.opportunityHead}`}>
-      {compact ? <><span>Date</span><span>Motorcycle</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span><span>Action</span></> : <><span>Motorcycle</span><span>Reg</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span><span>Action</span></>}
+      {compact ? <><span>Date</span><span>Motorcycle</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Condition</span><span>Vehicle check</span><span>Status</span><span>Action</span></> : <><span>Motorcycle</span><span>Reg</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span><span>Action</span></>}
     </div>
     {rows.map(row => compact
-      ? <Link className={`${styles.tableRow} ${styles.dashboardOpportunityRow} ${styles.clickableRow}`} href={leadHref(row.lead, section)} key={row.lead.id}><span>{formatLeadDate(row.lead.created_at || row.lead.date)}</span><span className={styles.bikeCell}>{row.image}<span><strong>{row.title}</strong><small>{row.lead.reg || "Registration pending"}</small></span></span><span>{row.mileage}</span><span><strong>{row.location}</strong><small>{row.distance}</small></span><span className={styles.price}>{row.asking}</span><span className={`${styles.checkChip} ${row.checkNeedsReview ? styles.warning : ""}`}>{row.check}</span><span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span><span className={styles.detailsButton}>View details</span></Link>
+      ? <Link className={`${styles.tableRow} ${styles.dashboardOpportunityRow} ${styles.clickableRow}`} href={leadHref(row.lead, section)} key={row.lead.id}><span>{formatLeadDate(row.lead.created_at || row.lead.date)}</span><span className={styles.bikeCell}>{row.image}<span><strong>{row.title}</strong><small>{row.lead.reg || "Registration pending"}</small></span></span><span>{row.mileage}</span><span><strong>{row.location}</strong><small>{row.distance}</small></span><span className={styles.price}>{row.asking}</span><span>{row.condition}</span><span className={`${styles.checkChip} ${row.checkNeedsReview ? styles.warning : ""}`}>{row.check}</span><span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span><span className={styles.detailsButton}>View details</span></Link>
       : <Link className={`${styles.tableRow} ${styles.opportunityRow} ${styles.clickableRow}`} href={leadHref(row.lead, section)} key={row.lead.id}><span className={styles.bikeCell}>{row.image}<span><strong>{row.title}</strong><small>{row.subtitle}</small></span></span><span>{row.lead.reg || "-"}</span><span>{row.mileage}</span><span><strong>{row.location}</strong><small>{row.distance}</small></span><span className={styles.price}>{row.asking}</span><span className={`${styles.checkChip} ${row.checkNeedsReview ? styles.warning : ""}`}>{row.check}</span><span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span><span className={styles.rowAction}>View opportunity →</span></Link>)}
   </div>;
 }
@@ -347,11 +362,13 @@ function LeadWorkspaceView({ dealer, lead, activeTab, tabsRef, busy, error, noti
       <article className={styles.customerLocked}>{unlocked ? <><CheckIcon /><h2>Customer details unlocked</h2><p>{customerName(lead)} · {lead.portal_location_label || "Location pending"}</p></> : <><LockIcon /><h2>Customer details</h2><p>Customer contact details will be available after you claim this opportunity.</p></>}</article>
     </section>
     <nav className={styles.leadTabs} aria-label="Lead workspace tabs" ref={tabsRef}>{tabs.map(([value, label]) => <button className={tab === value ? styles.active : ""} type="button" onClick={() => onSelectTab(value)} key={value}>{label}</button>)}</nav>
-    {tab === "overview" && <OverviewTab lead={lead} />}
-    {tab === "vehicle-check" && <VehicleCheckTab lead={lead} />}
-    {tab === "mot" && <MotTab lead={lead} />}
-    {tab === "location" && <LocationTab dealer={dealer} lead={lead} unlocked={unlocked} />}
-    {tab === "customer" && <CustomerWorkTab lead={lead} onChanged={onChanged} />}
+    <div className={styles.tabContent}>
+      {tab === "overview" && <OverviewTab lead={lead} />}
+      {tab === "vehicle-check" && <VehicleCheckTab lead={lead} />}
+      {tab === "mot" && <MotTab lead={lead} />}
+      {tab === "location" && <LocationTab dealer={dealer} lead={lead} unlocked={unlocked} />}
+      {tab === "customer" && <CustomerWorkTab lead={lead} onChanged={onChanged} />}
+    </div>
     {lightboxOpen && <PhotoLightbox images={images} title={title} index={imageIndex} setIndex={setImageIndex} onClose={() => setLightboxOpen(false)} />}
   </section>;
 }
@@ -563,7 +580,7 @@ function SupportPanel() {
 function DealerV4Shell({ dealer, section, counts, onSignOut, children }: { dealer: DealerPortalAccountWithPreferences; section: PortalSection; counts: { available: number; active: number; purchased: number; lost: number }; onSignOut?: () => void; children: React.ReactNode }) {
   return <main className={styles.app}>
     <aside className={styles.sidebar}><MotorLeadsLogo /><nav aria-label="Dealer Portal"><NavItem active={section === "dashboard"} href="/dealer-portal" icon={<HomeIcon />} label="Dashboard" /><NavItem active={section === "opportunities"} href="/dealer-portal/opportunities" icon={<DocIcon />} label="Opportunities" badge={String(counts.available)} /><NavItem active={section === "active"} href="/dealer-portal/active" icon={<ClockIcon />} label="Active Leads" badge={String(counts.active)} /><NavItem active={section === "purchased"} href="/dealer-portal/purchased" icon={<CheckIcon />} label="Purchased" badge={String(counts.purchased)} /><NavItem active={section === "lost"} href="/dealer-portal/lost" icon={<ReturnIcon />} label="Lost / Returned" badge={String(counts.lost)} /><NavItem active={section === "payments"} href="/dealer-portal/payments" icon={<TagIcon />} label="Payments" /><NavItem active={section === "dealership"} href="/dealer-portal/dealership" icon={<BuildingIcon />} label="My Dealership" /><NavItem active={section === "settings"} href="/dealer-portal/settings" icon={<GearIcon />} label="Account Settings" /><NavItem active={section === "support"} href="/dealer-portal/support" icon={<HelpIcon />} label="Help & Support" /></nav><Link className={styles.sidebarBack} href="/">← Back to website</Link></aside>
-    <section className={styles.workspace}><header className={styles.topbar}><div className={styles.topbarBrand}><div className={styles.logo}>Motor<span>Leads</span></div><small>Dealer Portal</small></div><div className={styles.topActions}><span>Help</span><span className={styles.profile}>{dealerInitials(dealer.trading_name)}</span><span>{dealer.trading_name}</span>{onSignOut && <button type="button" onClick={onSignOut}>Sign out</button>}</div></header>{children}</section>
+    <section className={styles.workspace}><header className={styles.topbar} data-dealer-topbar="true"><div className={styles.topbarBrand}><div className={styles.logo}>Motor<span>Leads</span></div><small>Dealer Portal</small></div><div className={styles.topActions}><span>Help</span><span className={styles.profile}>{dealerInitials(dealer.trading_name)}</span><span>{dealer.trading_name}</span>{onSignOut && <button type="button" onClick={onSignOut}>Sign out</button>}</div></header>{children}</section>
   </main>;
 }
 
@@ -578,7 +595,8 @@ function SimpleTable({ headers, rows, compact = false }: { headers: string[]; ro
 function PhotoLightbox({ images, title, index, setIndex, onClose }: { images: string[]; title: string; index: number; setIndex: React.Dispatch<React.SetStateAction<number>>; onClose: () => void }) {
   const previous = () => setIndex(current => (current + images.length - 1) % images.length);
   const next = () => setIndex(current => (current + 1) % images.length);
-  return <div className={styles.lightbox} role="dialog" aria-modal="true" aria-label={`${title} photos`}><button className={styles.lightboxClose} type="button" onClick={onClose} aria-label="Close gallery">×</button>{images.length > 1 && <button className={styles.lightboxNav} type="button" onClick={previous} aria-label="Previous photo">‹</button>}<figure><img src={images[index]} alt={`${title} large view`} /><figcaption>{title} · {index + 1} / {images.length}</figcaption>{images.length > 1 && <div className={styles.lightboxThumbs}>{images.map((image, thumbIndex) => <button className={thumbIndex === index ? styles.selected : ""} type="button" onClick={() => setIndex(thumbIndex)} aria-label={`Show photo ${thumbIndex + 1}`} key={`${image}-${thumbIndex}`}><img src={image} alt="" /></button>)}</div>}</figure>{images.length > 1 && <button className={styles.lightboxNav} type="button" onClick={next} aria-label="Next photo">›</button>}</div>;
+  if (typeof document === "undefined") return null;
+  return createPortal(<div className={styles.lightbox} role="dialog" aria-modal="true" aria-label={`${title} photos`}><button className={styles.lightboxClose} type="button" onClick={onClose} aria-label="Close gallery">×</button>{images.length > 1 && <button className={styles.lightboxNav} type="button" onClick={previous} aria-label="Previous photo">‹</button>}<figure><img src={images[index]} alt={`${title} large view`} /><figcaption>{title} · {index + 1} / {images.length}</figcaption>{images.length > 1 && <div className={styles.lightboxThumbs}>{images.map((image, thumbIndex) => <button className={thumbIndex === index ? styles.selected : ""} type="button" onClick={() => setIndex(thumbIndex)} aria-label={`Show photo ${thumbIndex + 1}`} key={`${image}-${thumbIndex}`}><img src={image} alt="" /></button>)}</div>}</figure>{images.length > 1 && <button className={styles.lightboxNav} type="button" onClick={next} aria-label="Next photo">›</button>}</div>, document.body);
 }
 
 function Metric({ icon, value, label, detail }: { icon: React.ReactNode; value: string; label: string; detail: string }) {
@@ -641,7 +659,7 @@ function leadRow(lead: DealerVisibleLead) {
   const image = images[0];
   const check = lead.portal_vehicle_check;
   const checkNeedsReview = check?.clear === false || check?.flags.some(item => item.state === "warning");
-  return { lead, title: leadTitle(lead), subtitle: lead.make ? `${lead.make} acquisition lead` : "Motorcycle acquisition lead", mileage: formatMileage(lead.mileage) || "Mileage pending", location: lead.portal_location_label || "Location pending", distance: lead.portal_distance_label?.replace(" from your dealership", "") || "", asking: moneyOrDash(lead.price), check: vehicleCheckLabel(lead), checkNeedsReview, status: displayLeadStatus(lead), image: image ? <img src={image} alt="" /> : <span className={styles.tableNoPhoto}>No photo</span> };
+  return { lead, title: leadTitle(lead), subtitle: lead.make ? `${lead.make} acquisition lead` : "Motorcycle acquisition lead", mileage: formatMileage(lead.mileage) || "Mileage pending", location: lead.portal_location_label || "Location pending", distance: lead.portal_distance_label?.replace(" from your dealership", "") || "", asking: moneyOrDash(lead.price), condition: displayText(lead.bike_condition || lead.damage) || "—", check: vehicleCheckLabel(lead), checkNeedsReview, status: displayLeadStatus(lead), image: image ? <img src={image} alt="" /> : <span className={styles.tableNoPhoto}>No photo</span> };
 }
 
 function filterAndSortLeads(leads: DealerVisibleLead[], search: string, sort: string, checkFilter: string) {
@@ -701,10 +719,33 @@ function formatActivityTime(value: string | null | undefined) {
   const sameDay = parsed.toDateString() === today.toDateString();
   return sameDay ? parsed.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
-function formatActivityType(value: string | null | undefined) { return displayText(value) || "Activity"; }
-function formatActivityBody(value: string | null | undefined) {
-  const text = String(value || "Updated").trim();
-  return text.replace(/\b[a-z]+(?:[_-][a-z0-9]+)+\b/gi, token => displayText(token).toLowerCase()).slice(0, 48);
+function formatActivityStatus(note: DealerLeadNote) {
+  const body = String(note.body || "").trim().toLowerCase();
+  const statusMatch = body.match(/status changed to ([a-z0-9_-]+)/);
+  const code = statusMatch?.[1] || (body.includes("purchase reported") || body.includes("successful purchase") ? "successful_purchase" : note.note_type);
+  return lifecycleStatusLabel(code);
+}
+function lifecycleStatusLabel(value: string | null | undefined) {
+  const labels: Record<string, string> = {
+    purchase_reported: "Successful purchase",
+    successful_purchase: "Successful purchase",
+    purchased: "Successful purchase",
+    purchased_later: "Purchased later",
+    collection_booked: "Collection booked",
+    agreed_to_purchase: "Agreed to purchase",
+    returned_to_pool: "Returned to pool",
+    attempting_contact: "Attempting contact",
+    contacted: "Contacted",
+    offer_made: "Offer made",
+    negotiating: "Negotiating",
+    lost: "Lost",
+    note: "Note",
+    call: "Call",
+    offer: "Offer",
+    status: "Status",
+  };
+  const key = String(value || "").toLowerCase();
+  return labels[key] || displayText(key) || "Activity";
 }
 function dealerDetails(dealer: DealerPortalAccountWithPreferences): [string, string | number | null | undefined][] { return [["Trading name", dealer.trading_name], ["Business/legal name", dealer.limited_company_name], ["Registered address", dealer.registered_address], ["Trading address", dealer.trading_address], ["Postcode", dealer.postcode], ["Website", dealer.website], ["Contact name", dealer.main_contact], ["Email", dealer.main_email], ["Telephone", dealer.telephone || dealer.mobile_whatsapp], ["Dealer status", statusLabel(dealer.account_status)], ["Successful Purchase Fee", `${formatGbp(dealer.successful_purchase_fee)} per purchase`], ["Attribution", `${dealer.attribution_period_days} days`]]; }
 function buyingDefaults(dealer: DealerPortalAccountWithPreferences): DealerBuyingPreferences { return dealer.buying_preferences ?? { dealer_account_id: dealer.id, motorcycle_types: [], makes_wanted: [], makes_excluded: [], models_wanted: [], minimum_year: null, maximum_age_years: null, minimum_value: null, maximum_value: null, maximum_mileage: null, minimum_engine_cc: null, maximum_engine_cc: null, accepts_non_running: false, accepts_insurance_category: false, accepts_outstanding_finance: false, accepts_imported: false, accepts_modified: false }; }

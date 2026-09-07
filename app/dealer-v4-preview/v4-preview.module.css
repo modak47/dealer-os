@@ -621,7 +621,7 @@
 
 .dashboardOpportunityHead,
 .dashboardOpportunityRow {
-  grid-template-columns: 78px minmax(220px, 300px) 94px minmax(126px, 170px) 96px 104px 76px 106px;
+  grid-template-columns: minmax(68px, .68fr) minmax(170px, 2.2fr) minmax(78px, .76fr) minmax(100px, 1fr) minmax(86px, .78fr) minmax(74px, .68fr) minmax(82px, .76fr) minmax(58px, .56fr) minmax(86px, .72fr);
 }
 
 .tableHead {
@@ -730,7 +730,7 @@
 
 .compactRow {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 92px 92px;
+  grid-template-columns: 84px minmax(0, 1fr) 144px;
   gap: 12px;
   align-items: center;
   min-height: 46px;
@@ -739,12 +739,22 @@
   font-size: 12px;
 }
 
+.compactHead {
+  min-height: 34px;
+  border-top: 0;
+  color: #526b86;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .compactRow strong {
   color: #09224a;
 }
 
 .pill {
   justify-self: start;
+  max-width: 100%;
   padding: 5px 8px;
   border-radius: 4px;
   background: #fff0d2;
@@ -1059,7 +1069,7 @@
   position: relative;
   display: grid;
   place-items: center;
-  height: clamp(250px, 29vw, 380px);
+  height: clamp(420px, 31vw, 520px);
   overflow: hidden;
   border-radius: 6px;
   background: #06213b;
@@ -1067,6 +1077,8 @@
 
 .mainImageButton {
   position: static;
+  display: grid;
+  place-items: center;
   width: 100%;
   height: 100%;
   border: 0;
@@ -1076,8 +1088,10 @@
 }
 
 .mainImageButton img {
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   object-position: center;
   display: block;
@@ -1219,6 +1233,11 @@
 .leadTabs .active {
   background: #0b86ff;
   color: #ffffff;
+}
+
+.tabContent {
+  min-height: calc(100vh - 140px);
+  padding-bottom: calc(100vh - 120px);
 }
 
 .overviewGrid {
@@ -1929,8 +1948,8 @@
 .lightbox figure > img {
   width: auto;
   height: auto;
-  max-width: calc(100vw - 180px);
-  max-height: calc(100vh - 170px);
+  max-width: min(90vw, calc(100vw - 180px));
+  max-height: min(90vh, calc(100vh - 170px));
   object-fit: contain;
   object-position: center;
   border-radius: 7px;
@@ -2351,7 +2370,7 @@
 
   .dashboardOpportunityHead,
   .dashboardOpportunityRow {
-    grid-template-columns: 60px minmax(160px, 1fr) 68px 100px 70px 80px 56px 84px;
+    grid-template-columns: 58px minmax(140px, 1.8fr) 64px minmax(84px, .95fr) 72px 62px 72px 52px 76px;
   }
 
   .opportunityHead,
@@ -2552,13 +2571,16 @@
     padding: 10px 0;
   }
 
-  .compactRow span:nth-child(3),
+  .compactHead {
+    display: none;
+  }
+
   .compactRow .pill {
     grid-column: 2;
   }
 
   .mainPhoto {
-    height: 220px;
+    height: 260px;
   }
 }
 
