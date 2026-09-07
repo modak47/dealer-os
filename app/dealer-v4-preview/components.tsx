@@ -1,43 +1,24 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import styles from "./v4-preview.module.css";
 
 const bikeRows = [
-  { date: "15 Apr 2025", make: "Honda CBR650R", year: "2023", mileage: "24,000", location: "SG2", status: "New", image: "/images/style-categories/super-sports.png" },
-  { date: "14 Apr 2025", make: "Yamaha MT-07", year: "2022", mileage: "8,500", location: "CV4", status: "New", image: "/images/style-categories/roadster.png" },
-  { date: "14 Apr 2025", make: "Kawasaki Z900", year: "2021", mileage: "12,300", location: "LS12", status: "New", image: "/images/style-categories/125cc.png" },
-  { date: "13 Apr 2025", make: "Triumph Street Triple", year: "2020", mileage: "15,200", location: "B31", status: "Viewed", image: "/images/style-categories/roadster.png" },
-  { date: "12 Apr 2025", make: "BMW S1000RR", year: "2019", mileage: "18,400", location: "M20", status: "Viewed", image: "/images/style-categories/super-sports.png" },
+  { id: "honda-cb650r", date: "15 Apr 2025", make: "Honda CBR650R", year: "2021", mileage: "7,200", location: "Guildford", status: "New", image: "/images/style-categories/roadster.png" },
+  { id: "yamaha-mt-07", date: "14 Apr 2025", make: "Yamaha MT-07", year: "2020", mileage: "11,850", location: "Chelmsford", status: "New", image: "/images/style-categories/125cc.png" },
+  { id: "triumph-street-triple-rs", date: "14 Apr 2025", make: "Triumph Street Triple RS", year: "2022", mileage: "6,400", location: "Reading", status: "New", image: "/images/style-categories/super-sports.png" },
+  { id: "bmw-s1000rr", date: "13 Apr 2025", make: "BMW S1000RR", year: "2019", mileage: "18,400", location: "Maidstone", status: "Viewed", image: "/images/style-categories/super-sports.png" },
+  { id: "kawasaki-z900", date: "12 Apr 2025", make: "Kawasaki Z900", year: "2023", mileage: "3,950", location: "Oxford", status: "Viewed", image: "/images/style-categories/roadster.png" },
 ];
 
 const opportunityRows = [
-  { year: "2021", make: "Honda", model: "CB650R", reg: "CB21 XRA", mileage: "7,200 miles", location: "Guildford", distance: "42 miles", asking: "£5,900", check: "Clear", status: "New", image: "/images/style-categories/roadster.png" },
-  { year: "2020", make: "Yamaha", model: "MT-07", reg: "MT20 JVR", mileage: "11,850 miles", location: "Chelmsford", distance: "78 miles", asking: "£4,850", check: "Clear", status: "Viewed", image: "/images/style-categories/125cc.png" },
-  { year: "2022", make: "Triumph", model: "Street Triple RS", reg: "RX22 LDN", mileage: "6,400 miles", location: "Reading", distance: "64 miles", asking: "£7,250", check: "Advisory", status: "New", image: "/images/style-categories/super-sports.png" },
-  { year: "2019", make: "BMW", model: "S1000RR", reg: "BM19 RRF", mileage: "18,400 miles", location: "Maidstone", distance: "48 miles", asking: "£10,400", check: "Clear", status: "Viewed", image: "/images/style-categories/super-sports.png" },
-  { year: "2023", make: "Kawasaki", model: "Z900", reg: "KZ23 OPL", mileage: "3,950 miles", location: "Oxford", distance: "91 miles", asking: "£7,950", check: "Clear", status: "New", image: "/images/style-categories/roadster.png" },
-  { year: "2018", make: "Ducati", model: "Scrambler Icon", reg: "DU18 SCR", mileage: "15,200 miles", location: "Brighton", distance: "8 miles", asking: "£5,650", check: "Advisory", status: "Saved", image: "/images/style-categories/custom.png" },
-];
-
-const workspaceFacts = [
-  ["Location", "Guildford"],
-  ["Approx distance", "42 miles"],
-  ["MOT", "Valid until Apr 2027"],
-  ["Vehicle Check", "Clear"],
-  ["Owners", "2"],
-  ["Keys", "2"],
-  ["Service history", "Full history"],
-];
-
-const vehicleFacts = [
-  ["Registration", "CB21 XRA"],
-  ["Make", "Honda"],
-  ["Model", "CB650R"],
-  ["Year", "2021"],
-  ["Engine", "649cc"],
-  ["Colour", "Red"],
-  ["Mileage", "7,200 miles"],
-  ["Owners", "2"],
-  ["Keys", "2"],
+  { id: "honda-cb650r", year: "2021", make: "Honda", model: "CB650R", reg: "CB21 XRA", mileage: "7,200 miles", engine: "649cc", colour: "Red", location: "Guildford", district: "GU1", distance: "42 miles", asking: "£5,900", check: "Clear", status: "New", image: "/images/style-categories/roadster.png", customer: "Sarah Thompson" },
+  { id: "yamaha-mt-07", year: "2020", make: "Yamaha", model: "MT-07", reg: "MT20 JVR", mileage: "11,850 miles", engine: "689cc", colour: "Blue", location: "Chelmsford", district: "CM1", distance: "78 miles", asking: "£4,850", check: "Clear", status: "Viewed", image: "/images/style-categories/125cc.png", customer: "Daniel Morgan" },
+  { id: "triumph-street-triple-rs", year: "2022", make: "Triumph", model: "Street Triple RS", reg: "RX22 LDN", mileage: "6,400 miles", engine: "765cc", colour: "Silver", location: "Reading", district: "RG1", distance: "64 miles", asking: "£7,250", check: "Advisory", status: "New", image: "/images/style-categories/super-sports.png", customer: "Priya Shah" },
+  { id: "bmw-s1000rr", year: "2019", make: "BMW", model: "S1000RR", reg: "BM19 RRF", mileage: "18,400 miles", engine: "999cc", colour: "White", location: "Maidstone", district: "ME14", distance: "48 miles", asking: "£10,400", check: "Clear", status: "Viewed", image: "/images/style-categories/super-sports.png", customer: "Oliver Kent" },
+  { id: "kawasaki-z900", year: "2023", make: "Kawasaki", model: "Z900", reg: "KZ23 OPL", mileage: "3,950 miles", engine: "948cc", colour: "Green", location: "Oxford", district: "OX1", distance: "91 miles", asking: "£7,950", check: "Clear", status: "New", image: "/images/style-categories/roadster.png", customer: "Amelia Rose" },
+  { id: "ducati-scrambler-icon", year: "2018", make: "Ducati", model: "Scrambler Icon", reg: "DU18 SCR", mileage: "15,200 miles", engine: "803cc", colour: "Yellow", location: "Brighton", district: "BN2", distance: "8 miles", asking: "£5,650", check: "Advisory", status: "Saved", image: "/images/style-categories/custom.png", customer: "Tom Bailey" },
 ];
 
 const conditionRows = [
@@ -104,6 +85,49 @@ const userRows = [
   ["Maya Patel", "maya@brightonmotorcycles.example", "Dealer User", "Active", "Yesterday 15:44"],
   ["Lewis Grant", "lewis@brightonmotorcycles.example", "Dealer User", "Invited", "Invite sent"],
 ];
+
+type MockOpportunity = (typeof opportunityRows)[number];
+
+const galleryImages = [
+  "/images/style-categories/roadster.png",
+  "/images/style-categories/super-sports.png",
+  "/images/style-categories/125cc.png",
+  "/images/style-categories/custom.png",
+];
+
+function opportunityHref(id: string, suffix = "") {
+  return `/dealer-portal-v4-preview/opportunity/${id}${suffix}`;
+}
+
+function getOpportunity(id?: string) {
+  return opportunityRows.find((row) => row.id === id) ?? opportunityRows[0];
+}
+
+function workspaceFacts(opportunity: MockOpportunity) {
+  return [
+    ["Location", opportunity.location],
+    ["Approx distance", opportunity.distance],
+    ["MOT", "Valid until Apr 2027"],
+    ["Vehicle Check", opportunity.check],
+    ["Owners", "2"],
+    ["Keys", "2"],
+    ["Service history", "Full history"],
+  ];
+}
+
+function vehicleFacts(opportunity: MockOpportunity) {
+  return [
+    ["Registration", opportunity.reg],
+    ["Make", opportunity.make],
+    ["Model", opportunity.model],
+    ["Year", opportunity.year],
+    ["Engine", opportunity.engine],
+    ["Colour", opportunity.colour],
+    ["Mileage", opportunity.mileage],
+    ["Owners", "2"],
+    ["Keys", "2"],
+  ];
+}
 
 export function MotorLeadsPreviewLogo() {
   return <div className={styles.logo}>Motor<span>Leads</span><small>Sell smarter. Ride further.</small></div>;
@@ -175,15 +199,15 @@ export function DealerPortalV4Preview() {
         <Panel title="Latest opportunities" link="View all opportunities →">
           <div className={styles.opTable}>
             <div className={styles.tableHead}><span>Date</span><span>Make & model</span><span>Year</span><span>Mileage</span><span>Location</span><span>Status</span><span>Actions</span></div>
-            {bikeRows.map(row => <div className={styles.tableRow} key={`${row.date}-${row.make}`}>
+            {bikeRows.map(row => <Link className={`${styles.tableRow} ${styles.clickableRow}`} href={opportunityHref(row.id)} key={`${row.date}-${row.make}`}>
               <span>{row.date}</span>
               <span className={styles.bikeCell}><img src={row.image} alt="" /><strong>{row.make}</strong></span>
               <span>{row.year}</span>
               <span>{row.mileage}</span>
               <span>{row.location}</span>
               <span className={`${styles.status} ${row.status === "Viewed" ? styles.viewed : ""}`}>{row.status}</span>
-              <Link className={styles.detailsButton} href="/dealer-portal-v4-preview/opportunities">View details</Link>
-            </div>)}
+              <span className={styles.detailsButton}>View details</span>
+            </Link>)}
           </div>
         </Panel>
         <section className={styles.lowerGrid}>
@@ -229,7 +253,7 @@ export function DealerOpportunitiesV4Preview() {
       <Panel title="Available opportunities" link="Updated just now">
         <div className={`${styles.opTable} ${styles.opportunityTable}`}>
           <div className={`${styles.tableHead} ${styles.opportunityHead}`}><span>Motorcycle</span><span>Reg</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span><span>Action</span></div>
-          {opportunityRows.map((row) => <div className={`${styles.tableRow} ${styles.opportunityRow}`} key={row.reg}>
+          {opportunityRows.map((row) => <Link className={`${styles.tableRow} ${styles.opportunityRow} ${styles.clickableRow}`} href={opportunityHref(row.id)} key={row.reg}>
             <span className={styles.bikeCell}><img src={row.image} alt="" /><span><strong>{row.year} {row.make} {row.model}</strong><small>{row.make} acquisition lead</small></span></span>
             <span>{row.reg}</span>
             <span>{row.mileage}</span>
@@ -237,78 +261,111 @@ export function DealerOpportunitiesV4Preview() {
             <span className={styles.price}>{row.asking}</span>
             <span className={`${styles.checkChip} ${row.check === "Advisory" ? styles.warning : ""}`}>{row.check}</span>
             <span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span>
-            <Link className={styles.rowAction} href="/dealer-portal-v4-preview/opportunity">View opportunity →</Link>
-          </div>)}
+            <span className={styles.rowAction}>View opportunity →</span>
+          </Link>)}
         </div>
       </Panel>
     </section>
   </DealerV4Shell>;
 }
 
-export function DealerLeadWorkspaceV4Preview({ tab = "overview", state = "available" }: { tab?: LeadTab; state?: "available" | "claimed" }) {
+export function DealerLeadWorkspaceV4Preview({ tab = "overview", state = "available", opportunityId }: { tab?: LeadTab; state?: "available" | "claimed"; opportunityId?: string }) {
+  const opportunity = getOpportunity(opportunityId);
+  const [activeTab, setActiveTab] = useState<LeadTab>(tab);
+  const [imageIndex, setImageIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const tabsRef = useRef<HTMLElement | null>(null);
   const isClaimed = state === "claimed";
+  const title = `${opportunity.year} ${opportunity.make} ${opportunity.model}`;
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLightboxOpen(false);
+      if (event.key === "ArrowLeft") setImageIndex((current) => (current + galleryImages.length - 1) % galleryImages.length);
+      if (event.key === "ArrowRight") setImageIndex((current) => (current + 1) % galleryImages.length);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [lightboxOpen]);
+
+  const selectTab = (nextTab: LeadTab) => {
+    setActiveTab(nextTab);
+    const params = new URLSearchParams();
+    if (nextTab !== "overview") params.set("tab", nextTab);
+    if (isClaimed) params.set("state", "claimed");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${opportunityHref(opportunity.id)}${query ? `?${query}` : ""}`);
+    requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ block: "start" }));
+  };
+
+  const showPrevious = () => setImageIndex((current) => (current + galleryImages.length - 1) % galleryImages.length);
+  const showNext = () => setImageIndex((current) => (current + 1) % galleryImages.length);
+
   return <DealerV4Shell active="Opportunities">
     <section className={styles.dashboard}>
       <Link className={styles.breadcrumb} href="/dealer-portal-v4-preview/opportunities">← Opportunities</Link>
       <section className={styles.leadHeader}>
         <div>
           <span className={styles.status}>{isClaimed ? "Claimed" : "Available"}</span>
-          <h1>2021 Honda CB650R</h1>
-          <p>CB21 XRA · 7,200 miles · 649cc · Red</p>
+          <h1>{title}</h1>
+          <p>{opportunity.reg} · {opportunity.mileage} · {opportunity.engine} · {opportunity.colour}</p>
         </div>
         <aside className={styles.claimBox}>
           <span>Seller asking</span>
-          <strong>£5,900</strong>
+          <strong>{opportunity.asking}</strong>
           <button className={styles.blueButton} type="button">{isClaimed ? "Working lead" : "Claim opportunity"}</button>
         </aside>
       </section>
       <section className={styles.summaryCells}>
-        {workspaceFacts.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+        {workspaceFacts(opportunity).map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
       </section>
       <section className={styles.workspaceGrid}>
         <article className={styles.galleryPanel}>
           <div className={styles.mainPhoto}>
-            <button type="button" aria-label="Previous photo">‹</button>
-            <img src="/images/style-categories/roadster.png" alt="Honda CB650R preview" />
-            <button type="button" aria-label="Next photo">›</button>
-            <span>1 / 4 photos</span>
+            <button type="button" onClick={showPrevious} aria-label="Previous photo">‹</button>
+            <button className={styles.mainImageButton} type="button" onClick={() => setLightboxOpen(true)} aria-label="Open photo gallery">
+              <img src={galleryImages[imageIndex]} alt={`${title} preview`} />
+            </button>
+            <button type="button" onClick={showNext} aria-label="Next photo">›</button>
+            <span>{imageIndex + 1} / {galleryImages.length} photos</span>
           </div>
           <div className={styles.thumbnails}>
-            {["/images/style-categories/roadster.png", "/images/style-categories/super-sports.png", "/images/style-categories/125cc.png", "/images/style-categories/custom.png"].map((image, index) => <img className={index === 0 ? styles.selected : ""} src={image} alt="" key={image} />)}
+            {galleryImages.map((image, index) => <button className={index === imageIndex ? styles.selected : ""} type="button" onClick={() => setImageIndex(index)} aria-label={`Show photo ${index + 1}`} key={image}><img src={image} alt="" /></button>)}
           </div>
         </article>
         <article className={styles.customerLocked}>
-          {isClaimed ? <><CheckIcon /><h2>Customer details unlocked</h2><p>Sarah Thompson · Guildford · GU1</p></> : <><LockIcon /><h2>Customer details</h2><p>Customer contact details will be available after you claim this opportunity.</p></>}
+          {isClaimed ? <><CheckIcon /><h2>Customer details unlocked</h2><p>{opportunity.customer} · {opportunity.location} · {opportunity.district}</p></> : <><LockIcon /><h2>Customer details</h2><p>Customer contact details will be available after you claim this opportunity.</p></>}
         </article>
       </section>
-      <nav className={styles.leadTabs} aria-label="Lead workspace preview tabs">
-        <LeadTabLink tab="overview" current={tab}>Overview</LeadTabLink>
-        <LeadTabLink tab="vehicle-check" current={tab}>Vehicle Check</LeadTabLink>
-        <LeadTabLink tab="mot" current={tab}>MOT & Mileage</LeadTabLink>
-        <LeadTabLink tab="location" current={tab}>Location</LeadTabLink>
-        <LeadTabLink tab="customer" current={tab} claimed>Customer / Work Lead</LeadTabLink>
+      <nav className={styles.leadTabs} aria-label="Lead workspace preview tabs" ref={tabsRef}>
+        <LeadTabButton tab="overview" current={activeTab} onSelect={selectTab}>Overview</LeadTabButton>
+        <LeadTabButton tab="vehicle-check" current={activeTab} onSelect={selectTab}>Vehicle Check</LeadTabButton>
+        <LeadTabButton tab="mot" current={activeTab} onSelect={selectTab}>MOT & Mileage</LeadTabButton>
+        <LeadTabButton tab="location" current={activeTab} onSelect={selectTab}>Location</LeadTabButton>
+        <LeadTabButton tab="customer" current={activeTab} onSelect={selectTab}>Customer / Work Lead</LeadTabButton>
       </nav>
-      {tab === "overview" && <OverviewTab />}
-      {tab === "vehicle-check" && <VehicleCheckTab />}
-      {tab === "mot" && <MotMileageTab />}
-      {tab === "location" && <LocationTab />}
-      {tab === "customer" && <CustomerWorkLeadTab claimed={isClaimed} />}
+      {activeTab === "overview" && <OverviewTab opportunity={opportunity} />}
+      {activeTab === "vehicle-check" && <VehicleCheckTab />}
+      {activeTab === "mot" && <MotMileageTab />}
+      {activeTab === "location" && <LocationTab opportunity={opportunity} />}
+      {activeTab === "customer" && <CustomerWorkLeadTab claimed={isClaimed} opportunity={opportunity} />}
+      {lightboxOpen && <PhotoLightbox title={title} index={imageIndex} setIndex={setImageIndex} onClose={() => setLightboxOpen(false)} />}
     </section>
   </DealerV4Shell>;
 }
 
 type LeadTab = "overview" | "vehicle-check" | "mot" | "location" | "customer";
 
-function LeadTabLink({ tab, current, claimed, children }: { tab: LeadTab; current: LeadTab; claimed?: boolean; children: React.ReactNode }) {
-  const href = `/dealer-portal-v4-preview/opportunity?tab=${tab}${claimed ? "&state=claimed" : ""}`;
-  return <Link className={current === tab ? styles.active : ""} href={href}>{children}</Link>;
+function LeadTabButton({ tab, current, onSelect, children }: { tab: LeadTab; current: LeadTab; onSelect: (tab: LeadTab) => void; children: React.ReactNode }) {
+  return <button className={current === tab ? styles.active : ""} type="button" onClick={() => onSelect(tab)}>{children}</button>;
 }
 
-function OverviewTab() {
+function OverviewTab({ opportunity }: { opportunity: MockOpportunity }) {
   return <section className={styles.overviewGrid}>
         <Panel title="Bike details" link="Vehicle record">
           <div className={styles.factTable}>
-            {vehicleFacts.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+            {vehicleFacts(opportunity).map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
           </div>
         </Panel>
         <Panel title="Condition & history" link="Seller supplied">
@@ -377,23 +434,23 @@ function MotMileageTab() {
   </section>;
 }
 
-function LocationTab() {
+function LocationTab({ opportunity }: { opportunity: MockOpportunity }) {
   return <section className={styles.locationLayout}>
     <article className={styles.mapPreview}><div><LocationIcon /><strong>Approximate area</strong><span>Seller location shown by town only before claim.</span></div></article>
     <article className={styles.panel}>
       <header className={styles.panelHeader}><h2>Location</h2><span>Approximate</span></header>
       <div className={styles.factTable}>
-        <div><span>Seller area</span><strong>Guildford</strong></div>
-        <div><span>Postcode district</span><strong>GU1</strong></div>
+        <div><span>Seller area</span><strong>{opportunity.location}</strong></div>
+        <div><span>Postcode district</span><strong>{opportunity.district}</strong></div>
         <div><span>Your dealership</span><strong>BN1 9ET</strong></div>
-        <div><span>Distance</span><strong>42 miles from your dealership</strong></div>
+        <div><span>Distance</span><strong>{opportunity.distance} from your dealership</strong></div>
       </div>
       <div className={styles.panelActions}><button type="button" className={styles.outlineMini}>View Map</button><button type="button" className={styles.outlineMini}>Directions</button></div>
     </article>
   </section>;
 }
 
-function CustomerWorkLeadTab({ claimed }: { claimed: boolean }) {
+function CustomerWorkLeadTab({ claimed, opportunity }: { claimed: boolean; opportunity: MockOpportunity }) {
   if (!claimed) return <section className={styles.singlePanelGrid}>
     <article className={styles.lockedWide}><LockIcon /><h2>Customer details</h2><p>Claim this opportunity to unlock the customer contact details and begin working the lead.</p><button type="button" className={styles.blueButton}>Claim opportunity</button></article>
   </section>;
@@ -401,12 +458,12 @@ function CustomerWorkLeadTab({ claimed }: { claimed: boolean }) {
   return <section className={styles.crmLayout}>
     <article className={styles.panel}>
       <header className={styles.panelHeader}><h2>Customer details</h2><span>Claimed lead</span></header>
-      <div className={styles.contactCard}><h3>Sarah Thompson</h3><p>Guildford · GU1</p><div><a href="tel:07123456789">Call 07123 456789</a><a href="mailto:sarah@example.com">Email customer</a></div></div>
+      <div className={styles.contactCard}><h3>{opportunity.customer}</h3><p>{opportunity.location} · {opportunity.district}</p><div><a href="tel:07123456789">Call 07123 456789</a><a href="mailto:sarah@example.com">Email customer</a></div></div>
     </article>
     <article className={styles.panel}>
       <header className={styles.panelHeader}><h2>Work lead</h2><span>Current state</span></header>
       <div className={styles.workflowChips}>{["Attempting Contact", "Contacted", "Offer Made", "Negotiating", "Agreed", "Collection Booked"].map((step, index) => <span className={index === 3 ? styles.active : ""} key={step}>{step}</span>)}</div>
-      <div className={styles.leadStats}><div><span>Seller asking</span><strong>£5,900</strong></div><div><span>Latest offer</span><strong>£5,350</strong></div><div><span>Last activity</span><strong>Today 08:40</strong></div></div>
+      <div className={styles.leadStats}><div><span>Seller asking</span><strong>{opportunity.asking}</strong></div><div><span>Latest offer</span><strong>£5,350</strong></div><div><span>Last activity</span><strong>Today 08:40</strong></div></div>
     </article>
     <article className={styles.panel}>
       <header className={styles.panelHeader}><h2>Activity timeline</h2><span>Chronological</span></header>
@@ -418,6 +475,21 @@ function CustomerWorkLeadTab({ claimed }: { claimed: boolean }) {
       <div className={styles.terminalActions}><button type="button">Lost</button><button type="button">Return to Pool</button><button type="button">Report Purchase</button></div>
     </article>
   </section>;
+}
+
+function PhotoLightbox({ title, index, setIndex, onClose }: { title: string; index: number; setIndex: React.Dispatch<React.SetStateAction<number>>; onClose: () => void }) {
+  const previous = () => setIndex((current) => (current + galleryImages.length - 1) % galleryImages.length);
+  const next = () => setIndex((current) => (current + 1) % galleryImages.length);
+  return <div className={styles.lightbox} role="dialog" aria-modal="true" aria-label={`${title} photos`}>
+    <button className={styles.lightboxClose} type="button" onClick={onClose} aria-label="Close gallery">×</button>
+    <button className={styles.lightboxNav} type="button" onClick={previous} aria-label="Previous photo">‹</button>
+    <figure>
+      <img src={galleryImages[index]} alt={`${title} large view`} />
+      <figcaption>{title} · {index + 1} / {galleryImages.length}</figcaption>
+      <div className={styles.lightboxThumbs}>{galleryImages.map((image, thumbIndex) => <button className={thumbIndex === index ? styles.selected : ""} type="button" onClick={() => setIndex(thumbIndex)} aria-label={`Show photo ${thumbIndex + 1}`} key={image}><img src={image} alt="" /></button>)}</div>
+    </figure>
+    <button className={styles.lightboxNav} type="button" onClick={next} aria-label="Next photo">›</button>
+  </div>;
 }
 
 export function DealerActiveLeadsV4Preview() {

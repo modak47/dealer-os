@@ -633,6 +633,20 @@
   font-size: 12px;
 }
 
+.clickableRow {
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .16s ease, box-shadow .16s ease;
+}
+
+.clickableRow:hover,
+.clickableRow:focus-visible {
+  background: #f6fbff;
+  box-shadow: inset 3px 0 0 #0b86ff;
+  outline: none;
+}
+
 .bikeCell {
   display: grid;
   grid-template-columns: 45px minmax(0, 1fr);
@@ -852,7 +866,11 @@
 
 .opportunityHead,
 .opportunityRow {
-  grid-template-columns: minmax(230px, 1.4fr) 86px 104px minmax(112px, .8fr) 98px 104px 78px 132px;
+  grid-template-columns: minmax(230px, 320px) 86px 104px minmax(112px, 150px) 98px 104px 78px 132px;
+}
+
+.opportunityTable {
+  max-width: 1180px;
 }
 
 .opportunityRow {
@@ -1025,19 +1043,29 @@
   position: relative;
   display: grid;
   place-items: center;
-  height: 270px;
+  height: clamp(250px, 29vw, 380px);
   overflow: hidden;
   border-radius: 6px;
   background: #06213b;
 }
 
-.mainPhoto img {
+.mainImageButton {
+  position: static;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: zoom-in;
 }
 
-.mainPhoto button {
+.mainImageButton img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.mainPhoto > button:not(.mainImageButton) {
   position: absolute;
   z-index: 2;
   display: grid;
@@ -1051,11 +1079,11 @@
   font-size: 24px;
 }
 
-.mainPhoto button:first-child {
+.mainPhoto > button:first-child {
   left: 12px;
 }
 
-.mainPhoto button:nth-of-type(2) {
+.mainPhoto > button:nth-of-type(3) {
   right: 12px;
 }
 
@@ -1078,12 +1106,22 @@
   margin-top: 10px;
 }
 
-.thumbnails img {
-  width: 100%;
-  height: 62px;
+.thumbnails button,
+.lightboxThumbs button {
+  padding: 0;
   border: 2px solid transparent;
   border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.thumbnails img,
+.lightboxThumbs img {
+  width: 100%;
+  height: 62px;
   object-fit: cover;
+  display: block;
+  border-radius: 3px;
 }
 
 .thumbnails .selected {
@@ -1112,6 +1150,9 @@
 }
 
 .leadTabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   gap: 6px;
   margin-bottom: 16px;
@@ -1132,16 +1173,28 @@
   font-weight: 750;
 }
 
-.leadTabs a {
+.leadTabs a,
+.leadTabs button {
   display: inline-flex;
   align-items: center;
   min-height: 36px;
   padding: 0 13px;
+  border: 0;
   border-radius: 5px;
+  background: transparent;
   color: #324c68;
   font-size: 12px;
   font-weight: 750;
+  font-family: inherit;
   text-decoration: none;
+  cursor: pointer;
+}
+
+.leadTabs button:focus-visible,
+.thumbnails button:focus-visible,
+.lightbox button:focus-visible {
+  outline: 2px solid #0b86ff;
+  outline-offset: 2px;
 }
 
 .leadTabs .active {
@@ -1795,6 +1848,80 @@
 .supportContact {
   margin-top: 16px;
   padding-top: 18px;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) 60px;
+  gap: 14px;
+  align-items: center;
+  padding: 28px;
+  background: rgba(2, 18, 32, .9);
+}
+
+.lightbox figure {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin: 0;
+  min-width: 0;
+}
+
+.lightbox figure > img {
+  max-width: 100%;
+  max-height: calc(100vh - 170px);
+  object-fit: contain;
+  border-radius: 7px;
+  background: #071d32;
+}
+
+.lightbox figcaption {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.lightboxClose,
+.lightboxNav {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .55);
+  border-radius: 50%;
+  background: rgba(7, 29, 50, .78);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  width: 42px;
+  height: 42px;
+  font-size: 28px;
+}
+
+.lightboxNav {
+  width: 46px;
+  height: 46px;
+  font-size: 34px;
+}
+
+.lightboxThumbs {
+  display: grid;
+  grid-template-columns: repeat(4, 82px);
+  gap: 8px;
+}
+
+.lightboxThumbs button.selected {
+  border-color: #0b86ff;
+}
+
+.lightboxThumbs img {
+  height: 54px;
 }
 
 @media (max-width: 1300px) {
