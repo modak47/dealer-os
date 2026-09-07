@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DealerPortalClient } from "./portal-client";
+import { DealerPortalV4Live } from "./v4-live-client";
 
 export const metadata: Metadata = {
   title: "Dealer Buying Portal",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function DealerPortalPage() {
-  return <DealerPortalClient />;
+  return <DealerPortalV4Live section="dashboard" />;
 }

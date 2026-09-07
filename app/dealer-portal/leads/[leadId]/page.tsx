@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LeadWorkspaceClient } from "../../portal-client";
+import { DealerLeadWorkspaceV4Live } from "../../v4-live-client";
 
 export const metadata: Metadata = {
   title: "Dealer Lead Workspace",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 
 export default async function DealerLeadWorkspacePage({ params }: { params: Promise<{ leadId: string }> }) {
   const { leadId } = await params;
-  return <LeadWorkspaceClient leadId={leadId} />;
+  return <DealerLeadWorkspaceV4Live leadId={leadId} />;
 }

@@ -1340,6 +1340,16 @@
   gap: 16px;
 }
 
+.singlePanelGrid > *,
+.overviewGrid > *,
+.motLayout > *,
+.locationLayout > *,
+.crmLayout > *,
+.profileGrid > *,
+.settingsGrid > * {
+  min-width: 0;
+}
+
 .motLayout,
 .locationLayout {
   grid-template-columns: minmax(0, 1.35fr) minmax(360px, .75fr);
@@ -1468,6 +1478,13 @@
   height: 38px;
   margin-bottom: 10px;
   color: #0b86ff;
+}
+
+.mapPreview iframe {
+  width: 100%;
+  height: 100%;
+  min-height: 350px;
+  border: 0;
 }
 
 .mapPreview strong {
@@ -1651,7 +1668,12 @@
 }
 
 .mockForm select,
-.mockForm textarea {
+.mockForm textarea,
+.mockForm input,
+.field input,
+.field select,
+.field textarea,
+.userInvite select {
   border: 1px solid #d6e2ee;
   border-radius: 5px;
   color: #123150;
@@ -1659,6 +1681,14 @@
 }
 
 .mockForm select {
+  height: 42px;
+  padding: 0 10px;
+}
+
+.mockForm input,
+.field input,
+.field select,
+.userInvite select {
   height: 42px;
   padding: 0 10px;
 }
@@ -1924,6 +1954,342 @@
   height: 54px;
 }
 
+.successMessage,
+.errorMessage,
+.emptyState,
+.loadingState {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #d9e5ef;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #324c68;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.successMessage {
+  border-color: #bcecd6;
+  background: #f3fcf8;
+  color: #00774d;
+}
+
+.errorMessage {
+  border-color: #ffc7c7;
+  background: #fff6f6;
+  color: #b91c1c;
+}
+
+.emptyState {
+  margin: 0 18px 18px;
+}
+
+.loadingState {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  width: max-content;
+  margin: 40px auto;
+}
+
+.loadingState span {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #cfe0ef;
+  border-top-color: #0b86ff;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.noPhotoText,
+.tableNoPhoto {
+  display: grid;
+  place-items: center;
+  min-height: 54px;
+  border: 1px dashed #cad9e6;
+  border-radius: 5px;
+  color: #526b86;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.sellerComments {
+  grid-column: 1 / -1;
+  margin: 0 18px 18px;
+  padding-top: 14px;
+  border-top: 1px solid #e3edf5;
+}
+
+.sellerComments span {
+  display: block;
+  margin-bottom: 7px;
+  color: #526b86;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sellerComments p,
+.conditionList p {
+  margin: 0;
+  color: #324c68;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.conditionList {
+  display: grid;
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+
+.conditionList p {
+  padding-top: 12px;
+  border-top: 1px solid #e3edf5;
+}
+
+.conditionList strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #09224a;
+}
+
+.checkHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 0 18px 16px;
+}
+
+.checkHeader strong {
+  color: #09224a;
+  font-size: 24px;
+}
+
+.checkGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.checkResult {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 13px;
+  border: 1px solid #dfe8f1;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.checkResult b {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #edf4fb;
+  color: #526b86;
+  font-size: 11px;
+}
+
+.checkResult.clear b {
+  background: #dff8ed;
+  color: #00774d;
+}
+
+.checkResult.warning b {
+  background: #fff0d0;
+  color: #996100;
+}
+
+.checkResult strong {
+  display: block;
+  color: #09224a;
+  font-size: 13px;
+}
+
+.checkResult span {
+  color: #526b86;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.mileageGraph {
+  display: grid;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.mileageGraph div {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 80px;
+  gap: 10px;
+  align-items: center;
+}
+
+.mileageGraph i {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dfe8f1;
+}
+
+.mileageGraph b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0b86ff;
+}
+
+.mileageGraph span,
+.mileageGraph strong {
+  color: #324c68;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.motTest {
+  border-top: 1px solid #e3edf5;
+}
+
+.motTest summary {
+  display: grid;
+  grid-template-columns: 1fr 120px 120px;
+  gap: 12px;
+  align-items: center;
+  min-height: 54px;
+  color: #17365a;
+  cursor: pointer;
+}
+
+.motTest summary b {
+  color: #00774d;
+}
+
+.motTest.warning summary b {
+  color: #b91c1c;
+}
+
+.motTest summary em {
+  margin-left: 8px;
+  color: #526b86;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.motTest > div {
+  padding: 0 0 16px 18px;
+}
+
+.motTest dl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.motTest dl div {
+  padding: 10px;
+  border: 1px solid #e3edf5;
+  border-radius: 5px;
+}
+
+.motTest dt {
+  color: #526b86;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.motTest dd {
+  margin: 4px 0 0;
+  color: #09224a;
+  font-weight: 750;
+}
+
+.motTest li,
+.motTest p {
+  color: #324c68;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.outcomePanel {
+  margin: 0 18px 14px;
+  border-top: 1px solid #e3edf5;
+  padding-top: 12px;
+}
+
+.outcomePanel summary {
+  color: #09224a;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.outcomePanel div,
+.outcomePanel form,
+.userInvite {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.fullField {
+  grid-column: 1 / -1;
+}
+
+.fullField span,
+.field span,
+.userInvite label span {
+  display: block;
+  margin-bottom: 6px;
+  color: #526b86;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fullField textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px;
+  border: 1px solid #d6e2ee;
+  border-radius: 5px;
+  color: #123150;
+  font: inherit;
+}
+
+.checklistGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.checkItem {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 40px;
+  color: #324c68;
+  font-size: 13px;
+}
+
+.userInvite {
+  padding: 0 18px 16px;
+}
+
 @media (max-width: 1300px) {
   .opportunityTable {
     padding: 0 10px 10px;
@@ -2017,12 +2383,16 @@
     max-width: 100vw;
     min-height: auto;
     padding: 14px;
+    overflow-x: hidden;
   }
 
   .sidebar nav {
     display: flex;
     gap: 8px;
     margin-top: 14px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     overflow-x: auto;
     padding-bottom: 4px;
   }
@@ -2120,7 +2490,14 @@
   .factTable div,
   .conditionTable div,
   .mockForm,
-  .motTests summary {
+  .motTests summary,
+  .checkGrid,
+  .outcomePanel div,
+  .outcomePanel form,
+  .userInvite,
+  .checklistGrid,
+  .motTest summary,
+  .motTest dl {
     grid-template-columns: 1fr;
   }
 
