@@ -358,7 +358,7 @@ function LeadWorkspaceView({ dealer, lead, activeTab, tabsRef, busy, error, noti
     </section>
     <section className={styles.summaryCells}>{workspaceFacts(lead, unlocked, latestNote, latestOffer).map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</section>
     <section className={styles.workspaceGrid}>
-      <article className={styles.galleryPanel}><WorkspaceGallery images={images} imageIndex={imageIndex} title={title} onPrevious={showPrevious} onNext={showNext} onSelect={setImageIndex} onOpen={(index) => { setImageIndex(index); setLightboxOpen(true); }} /></article>
+      <article className={styles.galleryPanel}><WorkspaceGallery images={images} imageIndex={imageIndex} title={title} onPrevious={showPrevious} onNext={showNext} onOpen={(index) => { setImageIndex(index); setLightboxOpen(true); }} /></article>
       <article className={styles.customerLocked}>{unlocked ? <><CheckIcon /><h2>Customer details unlocked</h2><p>{customerName(lead)} · {lead.portal_location_label || "Location pending"}</p></> : <><LockIcon /><h2>Customer details</h2><p>Customer contact details will be available after you claim this opportunity.</p></>}</article>
     </section>
     <nav className={styles.leadTabs} aria-label="Lead workspace tabs" ref={tabsRef}>{tabs.map(([value, label]) => <button className={tab === value ? styles.active : ""} type="button" onClick={() => onSelectTab(value)} key={value}>{label}</button>)}</nav>
@@ -373,18 +373,16 @@ function LeadWorkspaceView({ dealer, lead, activeTab, tabsRef, busy, error, noti
   </section>;
 }
 
-function WorkspaceGallery({ images, imageIndex, title, onPrevious, onNext, onSelect, onOpen }: { images: string[]; imageIndex: number; title: string; onPrevious: () => void; onNext: () => void; onSelect: (index: number) => void; onOpen: (index: number) => void }) {
+function WorkspaceGallery({ images, imageIndex, title, onPrevious, onNext, onOpen }: { images: string[]; imageIndex: number; title: string; onPrevious: () => void; onNext: () => void; onOpen: (index: number) => void }) {
   const image = images[imageIndex];
-  if (!image) return <div className={styles.mainPhoto}><span className={styles.noPhotoText}>No photos supplied</span></div>;
-  return <>
-    <div className={styles.mainPhoto}>
-      {images.length > 1 && <button type="button" onClick={onPrevious} aria-label="Previous photo">‹</button>}
+  if (!image) return <div className={styles.mainPhoto}><div className={styles.noPhotoText}><CameraIcon /><strong>No photos supplied</strong></div><span>0 photos</span></div>;
+  const hasMultiple = images.length > 1;
+  return <div className={styles.mainPhoto}>
+      <button className={styles.photoNavPrevious} type="button" onClick={onPrevious} aria-label="Previous photo" disabled={!hasMultiple}><ChevronIcon direction="left" /></button>
       <button className={styles.mainImageButton} type="button" onClick={() => onOpen(imageIndex)} aria-label="Open photo gallery"><img src={image} alt={`${title} preview`} /></button>
-      {images.length > 1 && <button type="button" onClick={onNext} aria-label="Next photo">›</button>}
-      <span>{imageIndex + 1} / {images.length} photo{images.length === 1 ? "" : "s"}</span>
-    </div>
-    {images.length > 1 && <div className={styles.thumbnails}>{images.map((thumb, index) => <button className={index === imageIndex ? styles.selected : ""} type="button" onClick={() => onSelect(index)} onDoubleClick={() => onOpen(index)} aria-label={`Show photo ${index + 1}`} key={`${thumb}-${index}`}><img src={thumb} alt="" /></button>)}</div>}
-  </>;
+      <button className={styles.photoNavNext} type="button" onClick={onNext} aria-label="Next photo" disabled={!hasMultiple}><ChevronIcon direction="right" /></button>
+      <span>{imageIndex + 1} of {images.length} photo{images.length === 1 ? "" : "s"}</span>
+    </div>;
 }
 
 function OverviewTab({ lead }: { lead: DealerVisibleLead }) {
@@ -596,7 +594,8 @@ function PhotoLightbox({ images, title, index, setIndex, onClose }: { images: st
   const previous = () => setIndex(current => (current + images.length - 1) % images.length);
   const next = () => setIndex(current => (current + 1) % images.length);
   if (typeof document === "undefined") return null;
-  return createPortal(<div className={styles.lightbox} role="dialog" aria-modal="true" aria-label={`${title} photos`}><button className={styles.lightboxClose} type="button" onClick={onClose} aria-label="Close gallery">×</button>{images.length > 1 && <button className={styles.lightboxNav} type="button" onClick={previous} aria-label="Previous photo">‹</button>}<figure><img src={images[index]} alt={`${title} large view`} /><figcaption>{title} · {index + 1} / {images.length}</figcaption>{images.length > 1 && <div className={styles.lightboxThumbs}>{images.map((image, thumbIndex) => <button className={thumbIndex === index ? styles.selected : ""} type="button" onClick={() => setIndex(thumbIndex)} aria-label={`Show photo ${thumbIndex + 1}`} key={`${image}-${thumbIndex}`}><img src={image} alt="" /></button>)}</div>}</figure>{images.length > 1 && <button className={styles.lightboxNav} type="button" onClick={next} aria-label="Next photo">›</button>}</div>, document.body);
+  const hasMultiple = images.length > 1;
+  return createPortal(<div className={styles.lightbox} role="dialog" aria-modal="true" aria-label={`${title} photos`}><button className={styles.lightboxClose} type="button" onClick={onClose} aria-label="Close gallery"><CloseIcon /></button><button className={styles.lightboxNav} type="button" onClick={previous} aria-label="Previous photo" disabled={!hasMultiple}><ChevronIcon direction="left" /></button><figure><img src={images[index]} alt={`${title} large view`} /><figcaption>{title} · {index + 1} of {images.length}</figcaption></figure><button className={styles.lightboxNav} type="button" onClick={next} aria-label="Next photo" disabled={!hasMultiple}><ChevronIcon direction="right" /></button></div>, document.body);
 }
 
 function Metric({ icon, value, label, detail }: { icon: React.ReactNode; value: string; label: string; detail: string }) {
@@ -769,3 +768,10 @@ function CheckIcon() { return <IconShell><circle cx="12" cy="12" r="9" /><path d
 function LightbulbIcon() { return <IconShell><path d="M9 18h6" /><path d="M10 22h4" /><path d="M8 14a6 6 0 1 1 8 0c-.8.7-1 1.5-1 2H9c0-.5-.2-1.3-1-2z" /></IconShell>; }
 function ReturnIcon() { return <IconShell><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-4" /></IconShell>; }
 function LocationIcon() { return <IconShell><path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></IconShell>; }
+function CameraIcon() { return <IconShell><path d="M5 8h3l1.2-2h5.6L16 8h3v10H5z" /><circle cx="12" cy="13" r="3" /></IconShell>; }
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d={direction === "left" ? "M15 5 8 12l7 7" : "m9 5 7 7-7 7"} /></svg>;
+}
+function CloseIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7 17 17" /><path d="M17 7 7 17" /></svg>;
+}

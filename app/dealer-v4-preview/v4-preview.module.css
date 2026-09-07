@@ -608,12 +608,15 @@
 
 .opTable {
   display: grid;
+  box-sizing: border-box;
   padding: 0 18px 12px;
+  width: 100%;
 }
 
 .tableHead,
 .tableRow {
   display: grid;
+  box-sizing: border-box;
   grid-template-columns: 74px minmax(210px, 1.5fr) 68px 84px 82px 84px 112px;
   gap: 12px;
   align-items: center;
@@ -621,7 +624,9 @@
 
 .dashboardOpportunityHead,
 .dashboardOpportunityRow {
-  grid-template-columns: minmax(68px, .68fr) minmax(170px, 2.2fr) minmax(78px, .76fr) minmax(100px, 1fr) minmax(86px, .78fr) minmax(74px, .68fr) minmax(82px, .76fr) minmax(58px, .56fr) minmax(86px, .72fr);
+  grid-template-columns: 72px minmax(210px, 1fr) 72px minmax(90px, .45fr) 84px 76px 90px 58px 88px;
+  gap: 8px;
+  width: 100%;
 }
 
 .tableHead {
@@ -714,6 +719,11 @@
   font-size: 12px;
   font-weight: 700;
   text-decoration: none;
+}
+
+.dashboardOpportunityRow .detailsButton {
+  justify-self: end;
+  width: 100%;
 }
 
 .lowerGrid {
@@ -1069,7 +1079,11 @@
   position: relative;
   display: grid;
   place-items: center;
-  height: clamp(420px, 31vw, 520px);
+  width: min(100%, 880px);
+  aspect-ratio: 4 / 3;
+  max-height: min(62vh, 660px);
+  min-height: 360px;
+  margin: 0 auto;
   overflow: hidden;
   border-radius: 6px;
   background: #06213b;
@@ -1104,18 +1118,36 @@
   place-items: center;
   width: 34px;
   height: 34px;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, .7);
   border-radius: 50%;
   background: rgba(5, 23, 41, .72);
   color: #ffffff;
-  font-size: 24px;
+  line-height: 0;
 }
 
-.mainPhoto > button:first-child {
+.mainPhoto > button:not(.mainImageButton):disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.mainPhoto > button:not(.mainImageButton) svg,
+.lightboxClose svg,
+.lightboxNav svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.photoNavPrevious {
   left: 12px;
 }
 
-.mainPhoto > button:nth-of-type(3) {
+.photoNavNext {
   right: 12px;
 }
 
@@ -1129,35 +1161,6 @@
   color: #ffffff;
   font-size: 12px;
   font-weight: 750;
-}
-
-.thumbnails {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.thumbnails button,
-.lightboxThumbs button {
-  padding: 0;
-  border: 2px solid transparent;
-  border-radius: 5px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.thumbnails img,
-.lightboxThumbs img {
-  width: 100%;
-  height: 62px;
-  object-fit: cover;
-  display: block;
-  border-radius: 3px;
-}
-
-.thumbnails .selected {
-  border-color: #0b86ff;
 }
 
 .customerLocked {
@@ -1966,11 +1969,13 @@
 .lightboxNav {
   display: grid;
   place-items: center;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, .55);
   border-radius: 50%;
   background: rgba(7, 29, 50, .78);
   color: #ffffff;
   cursor: pointer;
+  line-height: 0;
 }
 
 .lightboxClose {
@@ -1979,27 +1984,16 @@
   right: 22px;
   width: 42px;
   height: 42px;
-  font-size: 28px;
 }
 
 .lightboxNav {
   width: 46px;
   height: 46px;
-  font-size: 34px;
 }
 
-.lightboxThumbs {
-  display: grid;
-  grid-template-columns: repeat(4, 82px);
-  gap: 8px;
-}
-
-.lightboxThumbs button.selected {
-  border-color: #0b86ff;
-}
-
-.lightboxThumbs img {
-  height: 54px;
+.lightboxNav:disabled {
+  opacity: .35;
+  cursor: default;
 }
 
 .successMessage,
@@ -2070,6 +2064,20 @@
   font-size: 12px;
   font-weight: 750;
   text-align: center;
+}
+
+.noPhotoText {
+  gap: 8px;
+  min-width: 190px;
+  min-height: 118px;
+  padding: 18px;
+  border-color: rgba(255, 255, 255, .25);
+  color: #dbeaff;
+}
+
+.noPhotoText svg {
+  width: 30px;
+  height: 30px;
 }
 
 .sellerComments {
@@ -2580,7 +2588,9 @@
   }
 
   .mainPhoto {
-    height: 260px;
+    min-height: 0;
+    height: auto;
+    max-height: none;
   }
 }
 
