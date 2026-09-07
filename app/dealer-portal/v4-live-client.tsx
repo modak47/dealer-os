@@ -227,7 +227,9 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
     if (tab === "overview") url.searchParams.delete("tab");
     else url.searchParams.set("tab", tab);
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-    requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ block: "start" }));
+    requestAnimationFrame(() => {
+      tabsRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+    });
   }
 
   if (loading) return <V4Loading label="Loading opportunity..." />;
@@ -258,7 +260,7 @@ function Dashboard({ data, active, purchased, lost }: { data: PortalData; active
     </Panel>
     <section className={styles.lowerGrid}>
       <Panel title="Recent activity" link="Latest lead activity">
-        {recentNotes.length ? <div className={styles.compactRows}>{recentNotes.map(({ note, lead }) => <Link href={leadHref(lead, "active", "customer")} className={`${styles.compactRow} ${styles.clickableRow}`} key={note.id}><span>{formatLeadDate(note.created_at)}</span><strong>{leadTitle(lead)}</strong><span>{statusLabel(note.note_type)}</span><span className={styles.pill}>{note.body.slice(0, 32)}</span></Link>)}</div> : <EmptyInline copy="No recent activity yet." />}
+        {recentNotes.length ? <div className={styles.compactRows}>{recentNotes.map(({ note, lead }) => <Link href={leadHref(lead, "active", "customer")} className={`${styles.compactRow} ${styles.clickableRow}`} key={note.id}><span>{formatActivityTime(note.created_at)}</span><strong>{leadTitle(lead)}</strong><span>{formatActivityType(note.note_type)}</span><span className={styles.pill}>{formatActivityBody(note.body)}</span></Link>)}</div> : <EmptyInline copy="No recent activity yet." />}
       </Panel>
       <Panel title="Notifications" link="Recorded in notification ledger">
         <EmptyInline copy="Dealer notification delivery is recorded by the live notification ledger when lifecycle events occur." />
@@ -298,11 +300,11 @@ function LeadList({ leads, section, title, subtitle }: { leads: DealerVisibleLea
 function OpportunityRows({ leads, compact = false, section = "opportunities" }: { leads: DealerVisibleLead[]; compact?: boolean; section?: string }) {
   const rows = leads.map(lead => leadRow(lead));
   return <div className={`${styles.opTable} ${compact ? "" : styles.opportunityTable}`}>
-    <div className={compact ? styles.tableHead : `${styles.tableHead} ${styles.opportunityHead}`}>
-      {compact ? <><span>Date</span><span>Make & model</span><span>Year</span><span>Mileage</span><span>Location</span><span>Status</span><span>Actions</span></> : <><span>Motorcycle</span><span>Reg</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span><span>Action</span></>}
+    <div className={compact ? `${styles.tableHead} ${styles.dashboardOpportunityHead}` : `${styles.tableHead} ${styles.opportunityHead}`}>
+      {compact ? <><span>Date</span><span>Motorcycle</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span><span>Action</span></> : <><span>Motorcycle</span><span>Reg</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span><span>Action</span></>}
     </div>
     {rows.map(row => compact
-      ? <Link className={`${styles.tableRow} ${styles.clickableRow}`} href={leadHref(row.lead, section)} key={row.lead.id}><span>{formatLeadDate(row.lead.created_at || row.lead.date)}</span><span className={styles.bikeCell}>{row.image}<strong>{row.title}</strong></span><span>{row.lead.year || "-"}</span><span>{row.mileage}</span><span>{row.location}</span><span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span><span className={styles.detailsButton}>View details</span></Link>
+      ? <Link className={`${styles.tableRow} ${styles.dashboardOpportunityRow} ${styles.clickableRow}`} href={leadHref(row.lead, section)} key={row.lead.id}><span>{formatLeadDate(row.lead.created_at || row.lead.date)}</span><span className={styles.bikeCell}>{row.image}<span><strong>{row.title}</strong><small>{row.lead.reg || "Registration pending"}</small></span></span><span>{row.mileage}</span><span><strong>{row.location}</strong><small>{row.distance}</small></span><span className={styles.price}>{row.asking}</span><span className={`${styles.checkChip} ${row.checkNeedsReview ? styles.warning : ""}`}>{row.check}</span><span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span><span className={styles.detailsButton}>View details</span></Link>
       : <Link className={`${styles.tableRow} ${styles.opportunityRow} ${styles.clickableRow}`} href={leadHref(row.lead, section)} key={row.lead.id}><span className={styles.bikeCell}>{row.image}<span><strong>{row.title}</strong><small>{row.subtitle}</small></span></span><span>{row.lead.reg || "-"}</span><span>{row.mileage}</span><span><strong>{row.location}</strong><small>{row.distance}</small></span><span className={styles.price}>{row.asking}</span><span className={`${styles.checkChip} ${row.checkNeedsReview ? styles.warning : ""}`}>{row.check}</span><span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span><span className={styles.rowAction}>View opportunity →</span></Link>)}
   </div>;
 }
@@ -341,7 +343,7 @@ function LeadWorkspaceView({ dealer, lead, activeTab, tabsRef, busy, error, noti
     </section>
     <section className={styles.summaryCells}>{workspaceFacts(lead, unlocked, latestNote, latestOffer).map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</section>
     <section className={styles.workspaceGrid}>
-      <article className={styles.galleryPanel}><WorkspaceGallery images={images} imageIndex={imageIndex} title={title} onPrevious={showPrevious} onNext={showNext} onSelect={setImageIndex} onOpen={() => images.length && setLightboxOpen(true)} /></article>
+      <article className={styles.galleryPanel}><WorkspaceGallery images={images} imageIndex={imageIndex} title={title} onPrevious={showPrevious} onNext={showNext} onSelect={setImageIndex} onOpen={(index) => { setImageIndex(index); setLightboxOpen(true); }} /></article>
       <article className={styles.customerLocked}>{unlocked ? <><CheckIcon /><h2>Customer details unlocked</h2><p>{customerName(lead)} · {lead.portal_location_label || "Location pending"}</p></> : <><LockIcon /><h2>Customer details</h2><p>Customer contact details will be available after you claim this opportunity.</p></>}</article>
     </section>
     <nav className={styles.leadTabs} aria-label="Lead workspace tabs" ref={tabsRef}>{tabs.map(([value, label]) => <button className={tab === value ? styles.active : ""} type="button" onClick={() => onSelectTab(value)} key={value}>{label}</button>)}</nav>
@@ -354,23 +356,23 @@ function LeadWorkspaceView({ dealer, lead, activeTab, tabsRef, busy, error, noti
   </section>;
 }
 
-function WorkspaceGallery({ images, imageIndex, title, onPrevious, onNext, onSelect, onOpen }: { images: string[]; imageIndex: number; title: string; onPrevious: () => void; onNext: () => void; onSelect: (index: number) => void; onOpen: () => void }) {
+function WorkspaceGallery({ images, imageIndex, title, onPrevious, onNext, onSelect, onOpen }: { images: string[]; imageIndex: number; title: string; onPrevious: () => void; onNext: () => void; onSelect: (index: number) => void; onOpen: (index: number) => void }) {
   const image = images[imageIndex];
   if (!image) return <div className={styles.mainPhoto}><span className={styles.noPhotoText}>No photos supplied</span></div>;
   return <>
     <div className={styles.mainPhoto}>
       {images.length > 1 && <button type="button" onClick={onPrevious} aria-label="Previous photo">‹</button>}
-      <button className={styles.mainImageButton} type="button" onClick={onOpen} aria-label="Open photo gallery"><img src={image} alt={`${title} preview`} /></button>
+      <button className={styles.mainImageButton} type="button" onClick={() => onOpen(imageIndex)} aria-label="Open photo gallery"><img src={image} alt={`${title} preview`} /></button>
       {images.length > 1 && <button type="button" onClick={onNext} aria-label="Next photo">›</button>}
       <span>{imageIndex + 1} / {images.length} photo{images.length === 1 ? "" : "s"}</span>
     </div>
-    {images.length > 1 && <div className={styles.thumbnails}>{images.map((thumb, index) => <button className={index === imageIndex ? styles.selected : ""} type="button" onClick={() => onSelect(index)} aria-label={`Show photo ${index + 1}`} key={`${thumb}-${index}`}><img src={thumb} alt="" /></button>)}</div>}
+    {images.length > 1 && <div className={styles.thumbnails}>{images.map((thumb, index) => <button className={index === imageIndex ? styles.selected : ""} type="button" onClick={() => onSelect(index)} onDoubleClick={() => onOpen(index)} aria-label={`Show photo ${index + 1}`} key={`${thumb}-${index}`}><img src={thumb} alt="" /></button>)}</div>}
   </>;
 }
 
 function OverviewTab({ lead }: { lead: DealerVisibleLead }) {
   const sellerComments = lead.customer_message || lead.extras;
-  const rows = [["Registration", lead.reg], ["Make", lead.make], ["Model", lead.model], ["Year", lead.year], ["Engine", displayEngine(lead.engine)], ["Colour", lead.colour], ["Mileage", formatMileage(lead.mileage)], ["Owners", lead.owners], ["Keys", lead.spare_keys], ["Service history", lead.service || lead.history], ["MOT", lead.mot], ["Condition", lead.bike_condition || lead.damage]];
+  const rows = [["Registration", lead.reg], ["Make", lead.make], ["Model", lead.model], ["Year", lead.year], ["Engine", displayEngine(lead.engine)], ["Colour", lead.colour], ["Mileage", formatMileage(lead.mileage)], ["Owners", displayText(lead.owners)], ["Keys", displayText(lead.spare_keys)], ["Service history", displayText(lead.service || lead.history)], ["MOT", formatReadableDate(lead.mot) || displayText(lead.mot)], ["Condition", displayText(lead.bike_condition || lead.damage)]];
   return <section className={styles.overviewGrid}>
     <Panel title="Bike details" link="Vehicle record"><div className={styles.factTable}>{rows.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value || "Not supplied"}</strong></div>)}</div>{sellerComments && <div className={styles.sellerComments}><span>Seller comments</span><p>{sellerComments}</p></div>}</Panel>
     <Panel title="Condition & history" link="Seller supplied"><div className={styles.conditionList}>{conditionRows(lead).map(([label, value]) => <p key={label}><strong>{label}</strong>{value || "Not supplied"}</p>)}</div></Panel>
@@ -388,7 +390,7 @@ function MotTab({ lead }: { lead: DealerVisibleLead }) {
   const check = lead.portal_vehicle_check;
   if (!check) return <section className={styles.singlePanelGrid}><Panel title="MOT & Mileage" link="Not available"><p>MOT and mileage history will show here once available.</p></Panel></section>;
   return <section className={styles.motLayout}>
-    <Panel title={`MOT History${lead.reg ? ` - ${lead.reg}` : ""}`} link={check.mot_expiry ? `Expiry ${check.mot_expiry}` : "Stored history"}>{(check.mileage_history?.length ?? 0) > 0 && <MileageGraph history={check.mileage_history ?? []} />}<div className={styles.motTests}>{(check.mot_history ?? []).length ? (check.mot_history ?? []).map((item, index) => <MotRow item={item} expanded={index === 0} key={`${item.date}-${index}`} />) : <p>Historic MOT records are not available from the stored vehicle check yet.</p>}</div></Panel>
+    <Panel title={`MOT History${lead.reg ? ` - ${lead.reg}` : ""}`} link={check.mot_expiry ? `Valid until ${formatMotDate(check.mot_expiry)}` : "Stored history"}>{(check.mileage_history?.length ?? 0) > 0 && <MileageGraph history={check.mileage_history ?? []} />}<div className={styles.motTests}>{(check.mot_history ?? []).length ? (check.mot_history ?? []).map((item, index) => <MotRow item={item} expanded={index === 0} key={`${item.date}-${index}`} />) : <p>Historic MOT records are not available from the stored vehicle check yet.</p>}</div></Panel>
   </section>;
 }
 
@@ -600,7 +602,7 @@ function EmptyInline({ copy }: { copy: string }) {
 }
 
 function V4Loading({ label }: { label: string }) {
-  return <main className={styles.app}><section className={styles.workspace}><div className={styles.loadingState} role="status" aria-live="polite"><span />{label}</div></section></main>;
+  return <main className={styles.loadingApp}><div className={styles.loadingState} role="status" aria-live="polite"><span />{label}</div></main>;
 }
 
 function DealerUnavailable({ error }: { error?: string }) {
@@ -639,7 +641,7 @@ function leadRow(lead: DealerVisibleLead) {
   const image = images[0];
   const check = lead.portal_vehicle_check;
   const checkNeedsReview = check?.clear === false || check?.flags.some(item => item.state === "warning");
-  return { lead, title: leadTitle(lead), subtitle: lead.make ? `${lead.make} acquisition lead` : "Motorcycle acquisition lead", mileage: formatMileage(lead.mileage) || "Mileage pending", location: lead.portal_location_label || "Location pending", distance: lead.portal_distance_label?.replace(" from your dealership", "") || "", asking: moneyOrText(lead.price), check: checkNeedsReview ? "Advisory" : check?.clear === true ? "Clear" : check?.status || "Unknown", checkNeedsReview, status: displayLeadStatus(lead), image: image ? <img src={image} alt="" /> : <span className={styles.tableNoPhoto}>No photo</span> };
+  return { lead, title: leadTitle(lead), subtitle: lead.make ? `${lead.make} acquisition lead` : "Motorcycle acquisition lead", mileage: formatMileage(lead.mileage) || "Mileage pending", location: lead.portal_location_label || "Location pending", distance: lead.portal_distance_label?.replace(" from your dealership", "") || "", asking: moneyOrDash(lead.price), check: vehicleCheckLabel(lead), checkNeedsReview, status: displayLeadStatus(lead), image: image ? <img src={image} alt="" /> : <span className={styles.tableNoPhoto}>No photo</span> };
 }
 
 function filterAndSortLeads(leads: DealerVisibleLead[], search: string, sort: string, checkFilter: string) {
@@ -659,11 +661,11 @@ function filterAndSortLeads(leads: DealerVisibleLead[], search: string, sort: st
 function workspaceFacts(lead: DealerVisibleLead, unlocked: boolean, latestNote: DealerLeadNote | null, latestOffer: DealerLeadNote | null): [string, string][] {
   const check = lead.portal_vehicle_check;
   if (unlocked) return [["Status", statusLabel(lead.portal_claim_status || "claimed")], ["Latest offer", latestOffer?.body || "No offer recorded"], ["Last activity", latestNote ? formatLeadDate(latestNote.created_at) : "No activity yet"]];
-  return [["Location / Distance", [lead.portal_location_label, lead.portal_distance_label?.replace(" from your dealership", " away")].filter(Boolean).join(" · ") || "Location pending"], ["MOT", check?.mot_expiry || lead.mot || "Not supplied"], ["Vehicle Check", check?.clear === false ? "Needs review" : check?.clear === true ? "Clear" : check?.status || "Unknown"]];
+  return [["Location / Distance", [lead.portal_location_label, lead.portal_distance_label?.replace(" from your dealership", " away")].filter(Boolean).join(" · ") || "Location pending"], ["MOT", check?.mot_expiry ? formatMotDate(check.mot_expiry) : formatReadableDate(lead.mot) || displayText(lead.mot) || "Not supplied"], ["Vehicle Check", vehicleCheckLabel(lead)]];
 }
 
 function conditionRows(lead: DealerVisibleLead): [string, string | null | undefined][] {
-  return [["Condition", lead.bike_condition], ["Service history", lead.service || lead.history], ["Finance", lead.finance_information], ["Extras / modifications", lead.extras], ["Damage", lead.damage]];
+  return [["Condition", displayText(lead.bike_condition)], ["Service history", displayText(lead.service || lead.history)], ["Finance", displayText(lead.finance_information)], ["Extras / modifications", displayText(lead.extras)], ["Damage", displayText(lead.damage)]];
 }
 
 function activeLeads(leads: DealerVisibleLead[]) { return leads.filter(lead => !terminalStatuses.has(String(lead.portal_claim_status))); }
@@ -674,12 +676,36 @@ function leadHref(lead: DealerVisibleLead, from = "opportunities", tab?: LeadTab
 function leadTitle(lead: DealerVisibleLead) { return [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending"; }
 function displayLeadStatus(lead: DealerVisibleLead) { return statusLabel(lead.portal_claim_status || lead.status || "New").replace(/^Dealer Pool Available$/i, "New").replace(/^Dealer Allocated$/i, "New"); }
 function moneyOrText(value: string | number | null | undefined) { const amount = safeNumber(value); return amount == null ? String(value || "Not supplied") : formatGbp(amount); }
+function moneyOrDash(value: string | number | null | undefined) { const amount = safeNumber(value); return amount == null ? "—" : formatGbp(amount); }
 function displayEngine(value: string | number | null | undefined) { if (value == null || value === "") return ""; const text = String(value).trim(); return /\bcc\b/i.test(text) ? text : `${text}cc`; }
 function dealerInitials(name: string | null | undefined) { const parts = (name || "Dealer").trim().split(/\s+/).filter(Boolean); return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : parts[0]?.slice(0, 2) || "D").toUpperCase(); }
 function paymentLeadTitle(lead: DealerAccountFee["lead"]) { if (!lead) return "Motorcycle purchase"; return `#${lead.id} ${lead.reg || "No reg"} ${[lead.year, lead.make, lead.model].filter(Boolean).join(" ")}`.trim(); }
 function isSafeDealerNext(value: string | null) { return Boolean(value && (value === "/dealer-portal" || value.startsWith("/dealer-portal/"))); }
 function isLeadTab(value: string | null): value is LeadTab { return value === "overview" || value === "vehicle-check" || value === "mot" || value === "location" || value === "customer"; }
 function formatMotDate(value: string | null | undefined) { if (!value) return "Date not returned"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }
+function formatReadableDate(value: string | number | null | undefined) { if (typeof value !== "string") return ""; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "" : parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }
+function displayText(value: string | number | null | undefined) { if (value == null || value === "") return ""; return String(value).replace(/[_-]+/g, " ").replace(/\b\w/g, char => char.toUpperCase()); }
+function vehicleCheckLabel(lead: DealerVisibleLead) {
+  const check = lead.portal_vehicle_check;
+  if (!check) return "Unavailable";
+  const needsReview = check.clear === false || check.flags.some(item => item.state === "warning");
+  if (needsReview) return "Review";
+  if (check.clear === true) return "Clear";
+  return displayText(check.status) || "Unavailable";
+}
+function formatActivityTime(value: string | null | undefined) {
+  if (!value) return "Date pending";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return formatLeadDate(value);
+  const today = new Date();
+  const sameDay = parsed.toDateString() === today.toDateString();
+  return sameDay ? parsed.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+function formatActivityType(value: string | null | undefined) { return displayText(value) || "Activity"; }
+function formatActivityBody(value: string | null | undefined) {
+  const text = String(value || "Updated").trim();
+  return text.replace(/\b[a-z]+(?:[_-][a-z0-9]+)+\b/gi, token => displayText(token).toLowerCase()).slice(0, 48);
+}
 function dealerDetails(dealer: DealerPortalAccountWithPreferences): [string, string | number | null | undefined][] { return [["Trading name", dealer.trading_name], ["Business/legal name", dealer.limited_company_name], ["Registered address", dealer.registered_address], ["Trading address", dealer.trading_address], ["Postcode", dealer.postcode], ["Website", dealer.website], ["Contact name", dealer.main_contact], ["Email", dealer.main_email], ["Telephone", dealer.telephone || dealer.mobile_whatsapp], ["Dealer status", statusLabel(dealer.account_status)], ["Successful Purchase Fee", `${formatGbp(dealer.successful_purchase_fee)} per purchase`], ["Attribution", `${dealer.attribution_period_days} days`]]; }
 function buyingDefaults(dealer: DealerPortalAccountWithPreferences): DealerBuyingPreferences { return dealer.buying_preferences ?? { dealer_account_id: dealer.id, motorcycle_types: [], makes_wanted: [], makes_excluded: [], models_wanted: [], minimum_year: null, maximum_age_years: null, minimum_value: null, maximum_value: null, maximum_mileage: null, minimum_engine_cc: null, maximum_engine_cc: null, accepts_non_running: false, accepts_insurance_category: false, accepts_outstanding_finance: false, accepts_imported: false, accepts_modified: false }; }
 function geographyDefaults(dealer: DealerPortalAccountWithPreferences): DealerGeographyPreferences { return dealer.geography_preferences ?? { dealer_account_id: dealer.id, england: true, wales: true, scotland: false, northern_ireland: false, republic_of_ireland: false, maximum_radius_miles: null }; }
