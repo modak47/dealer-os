@@ -606,6 +606,17 @@
   font-weight: 700;
 }
 
+.dashboardOpportunitySplit {
+  display: grid;
+  grid-template-columns: minmax(0, .7fr) minmax(260px, .3fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.dashboardOpportunitySplit .panelHeader a {
+  white-space: nowrap;
+}
+
 .opTable {
   display: grid;
   box-sizing: border-box;
@@ -624,8 +635,8 @@
 
 .dashboardOpportunityHead,
 .dashboardOpportunityRow {
-  grid-template-columns: 72px minmax(210px, 1fr) 72px minmax(90px, .45fr) 84px 76px 90px 58px 88px;
-  gap: 8px;
+  grid-template-columns: minmax(200px, 1.45fr) minmax(118px, .9fr) 88px 92px 64px;
+  gap: 10px;
   width: 100%;
 }
 
@@ -721,9 +732,37 @@
   text-decoration: none;
 }
 
-.dashboardOpportunityRow .detailsButton {
-  justify-self: end;
-  width: 100%;
+.pipelineRows {
+  display: grid;
+  padding: 0 18px 16px;
+}
+
+.pipelineRows div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  min-height: 40px;
+  border-top: 1px solid #e3edf5;
+  color: #17365a;
+  font-size: 13px;
+}
+
+.pipelineRows div:first-child {
+  border-top: 0;
+}
+
+.pipelineRows span {
+  color: #324c68;
+  font-weight: 650;
+}
+
+.pipelineRows strong {
+  min-width: 28px;
+  color: #09224a;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: right;
 }
 
 .lowerGrid {
@@ -2378,7 +2417,7 @@
 
   .dashboardOpportunityHead,
   .dashboardOpportunityRow {
-    grid-template-columns: 58px minmax(140px, 1.8fr) 64px minmax(84px, .95fr) 72px 62px 72px 52px 76px;
+    grid-template-columns: minmax(185px, 1.35fr) minmax(112px, .9fr) 82px 84px 58px;
   }
 
   .opportunityHead,
@@ -2396,6 +2435,7 @@
   }
 
   .workspaceGrid,
+  .dashboardOpportunitySplit,
   .overviewGrid,
   .motLayout,
   .locationLayout,

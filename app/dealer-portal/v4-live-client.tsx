@@ -270,9 +270,14 @@ function Dashboard({ data, active, purchased, lost }: { data: PortalData; active
       <Metric icon={<CheckIcon />} value={String(purchased.length)} label="Purchased" detail="reported purchases" />
       <Metric icon={<ReturnIcon />} value={String(lost.length)} label="Lost / Returned" detail="historic outcomes" />
     </section>
-    <Panel title="Latest opportunities" linkHref="/dealer-portal/opportunities" link="View all opportunities →">
-      <OpportunityRows leads={latest} compact />
-    </Panel>
+    <section className={styles.dashboardOpportunitySplit}>
+      <Panel title="Latest opportunities" linkHref="/dealer-portal/opportunities" link="View all opportunities →">
+        <OpportunityRows leads={latest} compact />
+      </Panel>
+      <Panel title="Active lead pipeline" linkHref="/dealer-portal/active" link="View active leads →">
+        <ActiveLeadPipeline leads={active} />
+      </Panel>
+    </section>
     <section className={styles.lowerGrid}>
       <Panel title="Recent activity" link="Latest lead activity">
         {recentNotes.length ? <div className={styles.compactRows}><div className={`${styles.compactRow} ${styles.compactHead}`}><span>Date</span><span>Motorcycle</span><span>Status</span></div>{recentNotes.map(({ note, lead }) => <Link href={leadHref(lead, "active", "customer")} className={`${styles.compactRow} ${styles.clickableRow}`} key={note.id}><span>{formatActivityTime(note.created_at)}</span><strong>{leadTitle(lead)}</strong><span className={styles.pill}>{formatActivityStatus(note)}</span></Link>)}</div> : <EmptyInline copy="No recent activity yet." />}
@@ -283,6 +288,13 @@ function Dashboard({ data, active, purchased, lost }: { data: PortalData; active
     </section>
     <aside className={styles.tip}><LightbulbIcon /><p><strong>Tip:</strong> Keep your dealership profile current to help MotorLeads match you with relevant opportunities.</p><Link href="/dealer-portal/settings">Update my profile →</Link></aside>
   </section>;
+}
+
+function ActiveLeadPipeline({ leads }: { leads: DealerVisibleLead[] }) {
+  return <div className={styles.pipelineRows}>{workStatuses.map(([status, label]) => {
+    const count = leads.filter(lead => lead.portal_claim_status === status).length;
+    return <div key={status}><span>{label}</span><strong>{count}</strong></div>;
+  })}</div>;
 }
 
 function OpportunityList({ leads, title, subtitle, empty }: { leads: DealerVisibleLead[]; title: string; subtitle: string; empty: string }) {
@@ -316,10 +328,10 @@ function OpportunityRows({ leads, compact = false, section = "opportunities" }: 
   const rows = leads.map(lead => leadRow(lead));
   return <div className={`${styles.opTable} ${compact ? "" : styles.opportunityTable}`}>
     <div className={compact ? `${styles.tableHead} ${styles.dashboardOpportunityHead}` : `${styles.tableHead} ${styles.opportunityHead}`}>
-      {compact ? <><span>Date</span><span>Motorcycle</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Condition</span><span>Vehicle check</span><span>Status</span><span>Action</span></> : <><span>Motorcycle</span><span>Reg</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span><span>Action</span></>}
+      {compact ? <><span>Motorcycle</span><span>Mileage / Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span></> : <><span>Motorcycle</span><span>Reg</span><span>Mileage</span><span>Location</span><span>Seller asking</span><span>Vehicle check</span><span>Status</span><span>Action</span></>}
     </div>
     {rows.map(row => compact
-      ? <Link className={`${styles.tableRow} ${styles.dashboardOpportunityRow} ${styles.clickableRow}`} href={leadHref(row.lead, section)} key={row.lead.id}><span>{formatLeadDate(row.lead.created_at || row.lead.date)}</span><span className={styles.bikeCell}>{row.image}<span><strong>{row.title}</strong><small>{row.lead.reg || "Registration pending"}</small></span></span><span>{row.mileage}</span><span><strong>{row.location}</strong><small>{row.distance}</small></span><span className={styles.price}>{row.asking}</span><span>{row.condition}</span><span className={`${styles.checkChip} ${row.checkNeedsReview ? styles.warning : ""}`}>{row.check}</span><span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span><span className={styles.detailsButton}>View details</span></Link>
+      ? <Link className={`${styles.tableRow} ${styles.dashboardOpportunityRow} ${styles.clickableRow}`} href={leadHref(row.lead, section)} key={row.lead.id}><span className={styles.bikeCell}>{row.image}<span><strong>{row.title}</strong><small>{row.lead.reg || "Registration pending"} · {formatLeadDate(row.lead.created_at || row.lead.date)}</small></span></span><span><strong>{row.mileage}</strong><small>{[row.location, row.distance].filter(Boolean).join(" · ")}</small></span><span className={styles.price}>{row.asking}</span><span className={`${styles.checkChip} ${row.checkNeedsReview ? styles.warning : ""}`}>{row.check}</span><span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span></Link>
       : <Link className={`${styles.tableRow} ${styles.opportunityRow} ${styles.clickableRow}`} href={leadHref(row.lead, section)} key={row.lead.id}><span className={styles.bikeCell}>{row.image}<span><strong>{row.title}</strong><small>{row.subtitle}</small></span></span><span>{row.lead.reg || "-"}</span><span>{row.mileage}</span><span><strong>{row.location}</strong><small>{row.distance}</small></span><span className={styles.price}>{row.asking}</span><span className={`${styles.checkChip} ${row.checkNeedsReview ? styles.warning : ""}`}>{row.check}</span><span className={`${styles.status} ${row.status !== "New" ? styles.viewed : ""}`}>{row.status}</span><span className={styles.rowAction}>View opportunity →</span></Link>)}
   </div>;
 }
