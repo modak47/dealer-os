@@ -1059,8 +1059,10 @@
 
 .workspaceGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) 310px;
+  grid-template-columns: minmax(0, 430px) 310px;
   gap: 16px;
+  align-items: stretch;
+  max-width: 756px;
   margin-bottom: 16px;
 }
 
@@ -1079,11 +1081,9 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: min(100%, 880px);
-  aspect-ratio: 4 / 3;
-  max-height: min(62vh, 660px);
-  min-height: 360px;
-  margin: 0 auto;
+  width: min(100%, 430px);
+  height: clamp(340px, 30vw, 390px);
+  margin: 0;
   overflow: hidden;
   border-radius: 6px;
   background: #06213b;
