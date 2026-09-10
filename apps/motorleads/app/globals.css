@@ -93,16 +93,16 @@ svg {
 
 .ml-header-row {
   display: grid;
-  grid-template-columns: minmax(180px, 250px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr) auto;
   gap: 28px;
   align-items: center;
-  min-height: 82px;
+  min-height: 88px;
 }
 
 .ml-logo {
   display: block;
-  width: min(100%, 220px);
-  min-width: 160px;
+  width: min(100%, 285px);
+  min-width: 190px;
   line-height: 0;
   overflow: visible;
 }
@@ -1193,7 +1193,7 @@ h3 {
   }
 
   .ml-header-row {
-    grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(190px, 240px) minmax(0, 1fr) auto;
     gap: 18px;
   }
 
@@ -1235,8 +1235,8 @@ h3 {
   }
 
   .ml-logo {
-    width: 188px;
-    min-width: 160px;
+    width: 225px;
+    min-width: 180px;
   }
 
   .ml-desktop-nav,
@@ -1289,8 +1289,8 @@ h3 {
   }
 
   .ml-logo {
-    width: 188px;
-    min-width: 160px;
+    width: 198px;
+    min-width: 168px;
   }
 
   .ml-hero {
