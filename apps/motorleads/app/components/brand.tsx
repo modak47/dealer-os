@@ -3,10 +3,7 @@ import { site } from "../site";
 
 export function MotorGeeksLogo() {
   return <Link className="ml-logo" href="/" aria-label="MotorGeeks home">
-    <picture>
-      <source media="(max-width: 1024px)" srcSet={site.assets.wordmarkDark} />
-      <img src={site.assets.lockupDark} alt="MotorGeeks" />
-    </picture>
+    <img src={site.assets.wordmarkLight} alt="MotorGeeks" />
   </Link>;
 }
 

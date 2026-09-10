@@ -85,7 +85,7 @@ svg {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(4, 32, 54, .98);
+  background: #061326;
   border-bottom: 1px solid rgba(255, 255, 255, .1);
   color: white;
   backdrop-filter: blur(14px);
@@ -93,26 +93,22 @@ svg {
 
 .ml-header-row {
   display: grid;
-  grid-template-columns: minmax(220px, auto) 1fr auto;
-  gap: 34px;
+  grid-template-columns: minmax(180px, 250px) minmax(0, 1fr) auto;
+  gap: 28px;
   align-items: center;
-  min-height: 86px;
+  min-height: 82px;
 }
 
 .ml-logo {
   display: block;
-  width: min(100%, 290px);
-  min-width: 180px;
+  width: min(100%, 220px);
+  min-width: 160px;
   line-height: 0;
   overflow: visible;
 }
 
-.ml-logo picture,
 .ml-logo img {
   display: block;
-}
-
-.ml-logo img {
   width: 100%;
   height: auto;
   object-fit: contain;
@@ -121,10 +117,11 @@ svg {
 .ml-desktop-nav {
   display: flex;
   justify-content: center;
-  gap: 38px;
+  gap: clamp(18px, 2vw, 32px);
   font-family: var(--ml-ui-font);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .ml-desktop-nav a:hover {
@@ -133,8 +130,9 @@ svg {
 
 .ml-header-actions {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
+  white-space: nowrap;
 }
 
 .ml-button {
@@ -143,7 +141,7 @@ svg {
   justify-content: center;
   gap: 9px;
   min-height: 48px;
-  padding: 0 25px;
+  padding: 0 22px;
   border: 1px solid transparent;
   border-radius: 8px;
   font-family: var(--ml-ui-font);
@@ -247,8 +245,8 @@ svg {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 680px) 1fr;
-  gap: 48px;
+  grid-template-columns: minmax(0, 680px) minmax(280px, 420px);
+  gap: clamp(42px, 7vw, 92px);
   align-items: center;
   min-height: 615px;
   padding: 58px 0 72px;
@@ -354,34 +352,50 @@ svg {
 .ml-handwritten {
   justify-self: end;
   display: grid;
-  gap: 18px;
-  max-width: 360px;
-  padding: 12px 6px;
-  font-size: 38px;
-  line-height: 1.07;
+  gap: 14px;
+  width: min(100%, 370px);
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 8px;
+  background: rgba(6, 19, 38, .76);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .28);
+  font-family: var(--ml-ui-font);
+  font-size: 16px;
+  line-height: 1.2;
   text-align: left;
-  transform: rotate(-5deg);
-  text-shadow: 0 2px 10px rgba(0, 0, 0, .45);
+  transform: none;
+  text-shadow: none;
+  backdrop-filter: blur(10px);
 }
 
 .ml-handwritten b {
-  font: inherit;
+  max-width: 300px;
+  color: white;
+  font-family: var(--ml-display-font);
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: .98;
 }
 
 .ml-handwritten span {
-  width: 178px;
-  height: 5px;
+  width: 100%;
+  height: 1px;
   border-radius: 999px;
-  background: var(--ml-blue);
-  transform: rotate(-7deg);
+  background: rgba(255, 255, 255, .2);
+  transform: none;
 }
 
 .ml-handwritten em {
-  display: block;
+  display: flex;
+  gap: 12px;
+  align-items: center;
   margin-top: 0;
   color: white;
   font-style: normal;
-  font-size: 34px;
+  font-family: var(--ml-ui-font);
+  font-size: 17px;
+  font-weight: 900;
   line-height: 1.18;
 }
 
@@ -1179,16 +1193,22 @@ h3 {
   }
 
   .ml-header-row {
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) auto;
+    gap: 18px;
   }
 
   .ml-desktop-nav {
-    gap: 20px;
-    font-size: 14px;
+    gap: 16px;
+    font-size: 13px;
   }
 
   .ml-header-actions .ml-button-ghost {
     display: none;
+  }
+
+  .ml-header-actions .ml-button-orange {
+    min-height: 44px;
+    padding-inline: 18px;
   }
 
   .ml-trust-strip .ml-shell,
@@ -1205,6 +1225,40 @@ h3 {
 
   .ml-step-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .ml-header-row {
+    grid-template-columns: 1fr auto;
+    min-height: 74px;
+  }
+
+  .ml-logo {
+    width: 188px;
+    min-width: 160px;
+  }
+
+  .ml-desktop-nav,
+  .ml-header-actions {
+    display: none;
+  }
+
+  .ml-mobile-menu {
+    display: block;
+  }
+
+  .ml-mobile-menu div {
+    inset: 74px 18px auto;
+  }
+
+  .ml-why-grid {
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+
+  .ml-why-grid > div:nth-child(2) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1234,27 +1288,9 @@ h3 {
     scroll-margin-top: 86px;
   }
 
-  .ml-header-row {
-    grid-template-columns: 1fr auto;
-    min-height: 74px;
-  }
-
   .ml-logo {
-    width: 210px;
+    width: 188px;
     min-width: 160px;
-  }
-
-  .ml-desktop-nav,
-  .ml-header-actions {
-    display: none;
-  }
-
-  .ml-mobile-menu {
-    display: block;
-  }
-
-  .ml-mobile-menu div {
-    inset: 74px 18px auto;
   }
 
   .ml-hero {

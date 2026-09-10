@@ -26,7 +26,13 @@ export function Hero() {
         <p>Connect your motorcycle with trusted motorcycle dealers across the UK.</p>
         <ValuationCta />
       </div>
-      <div className="ml-handwritten"><b>More dealer interest<br />can mean a better sale.</b><span /><em><MotorGeeksTick />Quick<br /><MotorGeeksTick />Simple<br /><MotorGeeksTick />No obligation</em></div>
+      <div className="ml-handwritten">
+        <b>More dealer interest can mean a better sale.</b>
+        <span />
+        <em><MotorGeeksTick />Quick</em>
+        <em><MotorGeeksTick />Simple</em>
+        <em><MotorGeeksTick />No obligation</em>
+      </div>
     </div>
   </section>;
 }
