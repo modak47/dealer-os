@@ -4,3 +4,15 @@ body {
   min-height: 100%;
   background: #061326;
 }
+
+.portal-redirect {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  font-family: Arial, sans-serif;
+}
+
+.portal-redirect a {
+  color: #ffffff;
+  font-weight: 700;
+}
