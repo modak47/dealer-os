@@ -11,6 +11,11 @@ export type DealerNotificationEventType =
   | "lead_rereleased"
   | "purchase_reported"
   | "successful_purchase_fee_created"
+  | "marketplace_offer_submitted"
+  | "marketplace_offer_received"
+  | "marketplace_offer_accepted"
+  | "marketplace_offer_won"
+  | "marketplace_offer_not_selected"
   | "update_required"
   | "approaching_expiry";
 

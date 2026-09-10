@@ -587,6 +587,7 @@ export async function GET(request: Request) {
   for (const row of allocationRows) {
     const lead = relatedLead(row.lead);
     if (!lead || activeClaimByLead.has(Number(row.website_lead_id))) continue;
+    if (lead.opportunity_mode === "marketplace_offer") continue;
     if (!dealerVisibleAvailableStatuses.has(String(lead.status ?? ""))) continue;
     const redacted = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, false) as DealerVisibleLead;
     available.push({ ...redacted, ...await dealerLeadMeta(lead, session.dealer, false), portal_vehicle_check: dealerVehicleCheck(lead), portal_allocation_id: String(row.id), customer_unlocked: false });

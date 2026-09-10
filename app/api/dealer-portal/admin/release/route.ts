@@ -31,6 +31,12 @@ const releaseLeadSelect = [
   "autotrader_vehicle_lookup_data",
   "autotrader_vehicle_check_data",
   "vehicle_check_status",
+  "opportunity_mode",
+  "marketplace_status",
+  "seller_profile",
+  "seller_condition",
+  "seller_progress",
+  "marketplace_fee_amount",
 ].join(",");
 
 function leadId(value: unknown) {
@@ -57,6 +63,7 @@ export async function POST(request: Request) {
     const { data: lead, error: leadError } = await db.from("website_leads").select(releaseLeadSelect).eq("id", websiteLeadId).maybeSingle();
     if (leadError) return NextResponse.json({ error: "Unable to load website lead." }, { status: 500 });
     if (!lead) return NextResponse.json({ error: "Website lead not found." }, { status: 404 });
+    const releaseLead = lead as unknown as Record<string, unknown>;
     const dealerQuery = db.from("dealer_portal_accounts").select("*").eq("account_status", "active");
     const dealerResult = requestedDealerIds.length ? await dealerQuery.in("id", requestedDealerIds) : await dealerQuery;
     if (dealerResult.error) return NextResponse.json({ error: "Unable to load dealer portal accounts." }, { status: 500 });
@@ -128,8 +135,12 @@ export async function POST(request: Request) {
     }));
     const { data: inserted, error: allocationError } = await db.from("dealer_lead_allocations").insert(allocations).select("*");
     if (allocationError) return NextResponse.json({ error: `Unable to release lead: ${allocationError.message}` }, { status: 500 });
-    const status = requestedDealerIds.length === 1 && method === "direct" ? "dealer_allocated" : "dealer_pool_available";
-    const { error: updateError } = await db.from("website_leads").update({ status, updated_at: now }).eq("id", websiteLeadId);
+    const marketplace = releaseLead.opportunity_mode === "marketplace_offer";
+    const status = marketplace ? releaseLead.status : requestedDealerIds.length === 1 && method === "direct" ? "dealer_allocated" : "dealer_pool_available";
+    const leadUpdate = marketplace
+      ? { marketplace_status: "live_to_dealers", marketplace_released_at: now, updated_at: now }
+      : { status, updated_at: now };
+    const { error: updateError } = await db.from("website_leads").update(leadUpdate).eq("id", websiteLeadId);
     if (updateError) return NextResponse.json({ error: "Allocations were recorded, but the lead status could not be updated." }, { status: 500 });
     await db.from("dealer_portal_audit_events").insert({
       website_lead_id: websiteLeadId,
@@ -137,6 +148,8 @@ export async function POST(request: Request) {
       event_type: "lead_released_to_dealers",
       event_data: {
         allocation_method: method,
+        opportunity_mode: releaseLead.opportunity_mode,
+        marketplace_release: marketplace,
         dealer_count: dealers.length,
         available_count: availableDealers.length,
         excluded_count: evaluatedDealers.length - availableDealers.length,

@@ -18,7 +18,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { id: rawId } = await params;
   const id = parseId(rawId);
   if (!id) return NextResponse.json({ error: "Invalid lead ID." }, { status: 400 });
-  const { data, error } = await getSupabaseAdminClient().rpc("dealer_claim_lead", {
+  const db = getSupabaseAdminClient();
+  const lead = await db.from("website_leads").select("opportunity_mode").eq("id", id).maybeSingle();
+  if (lead.error) return NextResponse.json({ error: "Unable to verify lead type." }, { status: 500 });
+  if (lead.data?.opportunity_mode === "marketplace_offer") {
+    return NextResponse.json({ error: "Marketplace opportunities use Make an offer, not Claim opportunity." }, { status: 409 });
+  }
+  const { data, error } = await db.rpc("dealer_claim_lead", {
     p_website_lead_id: id,
     p_dealer_account_id: session.dealer.id,
     p_dealer_user_id: session.userId,

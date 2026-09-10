@@ -16,6 +16,9 @@ type PortalData = {
   role: DealerPortalUserRole;
   available: DealerVisibleLead[];
   claimed: DealerVisibleLead[];
+  marketplaceAvailable: MarketplaceAvailableLead[];
+  marketplaceOffers: MarketplaceOffer[];
+  marketplaceFeeAmount: number;
 };
 type PortalStatus = {
   accountStatus?: DealerPortalAccount["account_status"];
@@ -23,10 +26,12 @@ type PortalStatus = {
   error?: string;
 };
 
-type PortalSection = "dashboard" | "opportunities" | "active" | "purchased" | "lost" | "payments" | "dealership" | "settings" | "support";
+type PortalSection = "dashboard" | "opportunities" | "offer-leads" | "my-offers" | "active" | "purchased" | "lost" | "payments" | "dealership" | "settings" | "support";
 type LeadTab = "overview" | "vehicle-check" | "mot" | "location" | "customer";
 type DealerAccountFee = DealerPurchaseFee & { purchase?: Pick<DealerPurchase, "purchase_type" | "purchase_price" | "purchase_date" | "reported_at"> | null; lead?: { id: number; reg?: string | null; make?: string | null; model?: string | null; year?: string | null; mileage?: string | null } | null };
 type DealerPaymentsPayload = { fees: DealerAccountFee[]; ledger: DealerFeeLedgerEntry[] };
+type MarketplaceAvailableLead = { allocation_id: string; lead: DealerVisibleLead; marketplace_fee_amount: number | null };
+type MarketplaceOffer = { id: string; lead_id?: number; website_lead_id: number; amount_pence: number; note: string | null; status: string; submitted_at: string; revised_at: string | null; accepted_at?: string | null; lead?: DealerVisibleLead | null };
 const motorgeeksWebsiteUrl = "https://motorgeeks.co.uk";
 
 const terminalStatuses = new Set(["purchased", "purchased_later", "lost", "returned_to_pool"]);
@@ -141,15 +146,24 @@ export function DealerPortalV4Live({ section = "dashboard" }: { section?: Portal
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const response = await fetch("/api/dealer-portal/leads", { cache: "no-store" });
+    const [response, marketplaceResponse] = await Promise.all([
+      fetch("/api/dealer-portal/leads", { cache: "no-store" }),
+      fetch("/api/dealer-portal/offer-leads", { cache: "no-store" }),
+    ]);
     const payload = await response.json();
-    if (response.ok) {
-      setData(payload);
+    const marketplacePayload = await marketplaceResponse.json();
+    if (response.ok && marketplaceResponse.ok) {
+      setData({
+        ...payload,
+        marketplaceAvailable: marketplacePayload.available ?? [],
+        marketplaceOffers: marketplacePayload.offers ?? [],
+        marketplaceFeeAmount: Number(marketplacePayload.marketplace_fee_amount ?? 0),
+      });
       setStatus(null);
     } else {
       setData(null);
       setStatus(response.status === 403 ? payload : null);
-      setError(payload.error || "Unable to load dealer portal.");
+      setError(payload.error || marketplacePayload.error || "Unable to load dealer portal.");
     }
     setLoading(false);
   }, []);
@@ -172,10 +186,12 @@ export function DealerPortalV4Live({ section = "dashboard" }: { section?: Portal
   const purchased = purchasedLeads(data.claimed);
   const lost = lostLeads(data.claimed);
 
-  return <DealerV4Shell dealer={data.dealer} section={section} counts={{ available: data.available.length, active: active.length, purchased: purchased.length, lost: lost.length }} onSignOut={signOut}>
+  return <DealerV4Shell dealer={data.dealer} section={section} counts={{ available: data.available.length, offerLeads: data.marketplaceAvailable.length, offers: data.marketplaceOffers.length, active: active.length, purchased: purchased.length, lost: lost.length }} onSignOut={signOut}>
     {notice && <p className={styles.successMessage}>{notice}</p>}
     {section === "dashboard" && <Dashboard data={data} active={active} purchased={purchased} lost={lost} />}
     {section === "opportunities" && <OpportunityList leads={data.available} title="Opportunities" subtitle="Motorcycles currently available to your dealership." empty="No available opportunities right now." />}
+    {section === "offer-leads" && <MarketplaceOfferLeadList leads={data.marketplaceAvailable} />}
+    {section === "my-offers" && <MarketplaceMyOffers offers={data.marketplaceOffers} />}
     {section === "active" && <LeadList leads={active} section="active" title="Active Leads" subtitle="Claimed opportunities currently being worked by your dealership." />}
     {section === "purchased" && <LeadList leads={purchased} section="purchased" title="Purchased" subtitle="Purchase history and Successful Purchase Fee states." />}
     {section === "lost" && <LeadList leads={lost} section="lost" title="Lost / Returned" subtitle="A useful history of outcomes, return reasons and purchased-later records." />}
@@ -206,7 +222,12 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
     const response = await fetch("/api/dealer-portal/leads", { cache: "no-store" });
     const payload = await response.json();
     if (response.ok) {
-      setData(payload);
+      setData({
+        ...payload,
+        marketplaceAvailable: [],
+        marketplaceOffers: [],
+        marketplaceFeeAmount: 0,
+      });
       setStatus(null);
     } else {
       setData(null);
@@ -276,6 +297,103 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
   </DealerV4Shell>;
 }
 
+export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string }) {
+  const [data, setData] = useState<PortalData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const [directResponse, marketplaceResponse] = await Promise.all([
+      fetch("/api/dealer-portal/leads", { cache: "no-store" }),
+      fetch("/api/dealer-portal/offer-leads", { cache: "no-store" }),
+    ]);
+    const direct = await directResponse.json();
+    const marketplace = await marketplaceResponse.json();
+    if (directResponse.ok && marketplaceResponse.ok) {
+      setData({
+        ...direct,
+        marketplaceAvailable: marketplace.available ?? [],
+        marketplaceOffers: marketplace.offers ?? [],
+        marketplaceFeeAmount: Number(marketplace.marketplace_fee_amount ?? 0),
+      });
+    } else setError(direct.error || marketplace.error || "Unable to load this offer lead.");
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  const leadNumber = Number(leadId);
+  const available = data?.marketplaceAvailable.find(item => Number(item.lead.id) === leadNumber) ?? null;
+  const ownOffer = data?.marketplaceOffers.find(offer => Number(offer.website_lead_id || offer.lead_id) === leadNumber) ?? null;
+  const lead = available?.lead ?? ownOffer?.lead ?? null;
+  const marketplaceFeeAmount = Number(available?.marketplace_fee_amount ?? data?.marketplaceFeeAmount ?? 0);
+  const offerAmount = safeNumber(amount);
+  const totalCost = offerAmount == null ? null : offerAmount + marketplaceFeeAmount;
+
+  async function submitOffer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!lead) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const response = await fetch(`/api/dealer-portal/offer-leads/${lead.id}/offer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, note }),
+    });
+    const payload = await response.json();
+    if (response.ok) {
+      setNotice("Offer submitted to MotorGeeks for seller review.");
+      setAmount("");
+      setNote("");
+      await load();
+    } else setError(payload.error || "Unable to submit offer.");
+    setBusy(false);
+  }
+
+  if (loading) return <V4Loading label="Loading offer lead..." />;
+  if (!data) return <DealerUnavailable error={error} status={null} />;
+  if (!lead) return <DealerV4Shell dealer={data.dealer} section="offer-leads" counts={shellCounts(data)}><section className={styles.dashboard}><Link className={styles.breadcrumb} href="/dealer-portal/offer-leads">← Offer Leads</Link><EmptyPanel title="Offer lead not available" copy="This marketplace opportunity is not currently available to your dealership." /></section></DealerV4Shell>;
+
+  const images = lead.resolved_images ?? combineLeadImages(lead);
+  return <DealerV4Shell dealer={data.dealer} section="offer-leads" counts={shellCounts(data)}>
+    <section className={styles.dashboard}>
+      <Link className={styles.breadcrumb} href="/dealer-portal/offer-leads">← Offer Leads</Link>
+      {error && <p className={styles.errorMessage}>{error}</p>}{notice && <p className={styles.successMessage}>{notice}</p>}
+      <section className={styles.leadHeader}>
+        <div><span className={styles.status}>Marketplace Offer</span><h1>{leadTitle(lead)}</h1><p>{[lead.reg, formatMileage(lead.mileage), displayEngine(lead.engine), lead.colour].filter(Boolean).join(" · ")}</p></div>
+        <aside className={styles.claimBox}><span>Your offer</span><strong>{ownOffer ? formatOfferAmount(ownOffer.amount_pence) : "No offer submitted yet"}</strong>{ownOffer && <b>{offerStatusLabel(ownOffer.status)}</b>}</aside>
+      </section>
+      <section className={styles.summaryCells}>{marketplaceFacts(lead).map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</section>
+      <section className={styles.marketplaceWorkspace}>
+        <article className={styles.galleryPanel}><WorkspaceGallery images={images} imageIndex={0} title={leadTitle(lead)} onPrevious={() => undefined} onNext={() => undefined} onOpen={() => undefined} /></article>
+        <Panel title="Make an offer" link="Marketplace">
+          <form className={`${styles.mockForm} ${styles.marketplaceOfferForm}`} onSubmit={submitOffer}>
+            <Input label="Offer amount" value={amount} set={setAmount} type="number" required />
+            <label className={styles.fullField}><span>Offer note (optional)</span><small>This note will be shown to the seller. Do not include personal contact details.</small><textarea value={note} onChange={event => setNote(event.target.value)} placeholder="Subject to the motorcycle being as described." /></label>
+            <div className={styles.offerCostBox}>
+              <p><strong>Your offer:</strong> {offerAmount == null ? "Enter amount" : formatGbp(offerAmount)}</p>
+              <p><strong>MotorGeeks successful purchase fee:</strong> {formatGbp(marketplaceFeeAmount)}</p>
+              <p><strong>Total buying cost if purchase completes:</strong> {totalCost == null ? "Enter amount" : `${formatGbp(offerAmount!)} + ${formatGbp(marketplaceFeeAmount)} = ${formatGbp(totalCost)}`}</p>
+            </div>
+            <button className={styles.blueButton} disabled={busy || offerAmount == null || offerAmount <= 0}>{busy ? "Submitting..." : ownOffer ? "Revise offer" : "Make an offer"}</button>
+          </form>
+        </Panel>
+      </section>
+      <OverviewTab lead={lead} />
+    </section>
+  </DealerV4Shell>;
+}
+
 function Dashboard({ data, active, purchased, lost }: { data: PortalData; active: DealerVisibleLead[]; purchased: DealerVisibleLead[]; lost: DealerVisibleLead[] }) {
   const latest = data.available.slice(0, 5);
   const recentNotes = data.claimed.flatMap(lead => (lead.portal_notes ?? []).map(note => ({ note, lead }))).sort((a, b) => String(b.note.created_at).localeCompare(String(a.note.created_at))).slice(0, 4);
@@ -331,6 +449,55 @@ function OpportunityList({ leads, title, subtitle, empty }: { leads: DealerVisib
     </div>
     <Panel title={title} link="Updated from live portal">
       {visible.length ? <OpportunityRows leads={visible} /> : <EmptyInline copy={empty} />}
+    </Panel>
+  </section>;
+}
+
+function MarketplaceOfferLeadList({ leads }: { leads: MarketplaceAvailableLead[] }) {
+  const [search, setSearch] = useState("");
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return leads.filter(item => {
+      const lead = item.lead;
+      const text = [lead.reg, lead.make, lead.model, lead.year, lead.portal_location_label, lead.bike_condition].join(" ").toLowerCase();
+      return !term || text.includes(term);
+    });
+  }, [leads, search]);
+  return <section className={styles.dashboard}>
+    <div className={styles.dashboardHeader}><div><h1>Offer Leads</h1><p>MotorGeeks marketplace opportunities authorised for your dealership.</p></div><span className={styles.dashboardDate}>{visible.length} available</span></div>
+    <div className={styles.toolbar}>
+      <label className={styles.searchBox}>Search<input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search make, model, location or registration" /></label>
+    </div>
+    <Panel title="Offer Leads" link="Make an offer, not claim">
+      {visible.length ? <div className={`${styles.opTable} ${styles.opportunityTable}`}>
+        <div className={`${styles.tableHead} ${styles.marketplaceHead}`}><span>Motorcycle</span><span>Mileage</span><span>Location</span><span>Condition</span><span>Vehicle Check</span><span>Status</span><span>Action</span></div>
+        {visible.map(item => {
+          const row = leadRow(item.lead);
+          return <Link className={`${styles.tableRow} ${styles.marketplaceRow} ${styles.clickableRow}`} href={`/dealer-portal/offer-leads/${item.lead.id}`} key={item.allocation_id}>
+            <span className={styles.bikeCell}>{row.image}<span><strong>{row.title}</strong><small>{item.lead.reg || "Registration pending"} · {formatLeadDate(item.lead.created_at || item.lead.date)}</small></span></span>
+            <span>{row.mileage}</span><span><strong>{row.location}</strong><small>{row.distance}</small></span><span>{row.condition}</span>
+            <span className={`${styles.checkChip} ${row.checkNeedsReview ? styles.warning : ""}`}>{row.check}</span><span className={styles.status}>{marketplaceStatusLabel(item.lead.marketplace_status)}</span><span className={styles.rowAction}>View / make offer →</span>
+          </Link>;
+        })}
+      </div> : <EmptyInline copy="No marketplace offer leads are available right now." />}
+    </Panel>
+  </section>;
+}
+
+function MarketplaceMyOffers({ offers }: { offers: MarketplaceOffer[] }) {
+  return <section className={styles.dashboard}>
+    <div className={styles.dashboardHeader}><div><h1>My Offers</h1><p>Your MotorGeeks marketplace offers only. Other dealers&apos; offers are never shown here.</p></div><span className={styles.dashboardDate}>{offers.length} offers</span></div>
+    <Panel title="My Offers" link="Dealer-private">
+      {offers.length ? <div className={`${styles.opTable} ${styles.myOffersTable}`}>
+        <div className={`${styles.tableHead} ${styles.myOffersHead}`}><span>Motorcycle</span><span>Amount</span><span>Date</span><span>Status</span><span>Action</span></div>
+        {offers.map(offer => {
+          const lead = offer.lead;
+          return <Link className={`${styles.tableRow} ${styles.myOffersRow} ${styles.clickableRow}`} href={`/dealer-portal/offer-leads/${offer.website_lead_id || offer.lead_id}`} key={offer.id}>
+            <span className={styles.bikeCell}>{lead ? leadRow(lead).image : <span className={styles.tableNoPhoto}>No photo</span>}<span><strong>{lead ? leadTitle(lead) : "Marketplace motorcycle"}</strong><small>{lead?.reg || "Registration pending"}</small></span></span>
+            <span className={styles.price}>{formatOfferAmount(offer.amount_pence)}</span><span>{formatLeadDate(offer.revised_at || offer.submitted_at)}</span><span className={`${styles.status} ${offer.status === "accepted" ? styles.viewed : ""}`}>{offerStatusLabel(offer.status)}</span><span className={styles.rowAction}>View opportunity →</span>
+          </Link>;
+        })}
+      </div> : <EmptyInline copy="You have not submitted any marketplace offers yet." />}
     </Panel>
   </section>;
 }
@@ -607,9 +774,9 @@ function SupportPanel() {
   return <section className={styles.dashboard}><div className={styles.dashboardHeader}><div><h1>Help & Support</h1><p>Support for using MotorGeeks opportunities and account tools.</p></div><Link className={styles.blueButton} href={motorgeeksWebsiteUrl}>Back to MotorGeeks</Link></div><section className={styles.supportGrid}>{["Claiming opportunities", "Working active leads", "Reporting a purchase", "Successful Purchase Fees", "Managing dealership users", "Buying preferences"].map(topic => <article className={styles.supportCard} key={topic}><HelpIcon /><h2>{topic}</h2><p>Contact MotorGeeks support for help with this area.</p></article>)}</section><article className={`${styles.panel} ${styles.supportContact}`}><h2>Contact MotorGeeks support</h2><p>Email support@motorgeeks.co.uk for help with your dealer account, opportunities or billing questions.</p></article></section>;
 }
 
-function DealerV4Shell({ dealer, section, counts, onSignOut, children }: { dealer: DealerPortalAccountWithPreferences; section: PortalSection; counts: { available: number; active: number; purchased: number; lost: number }; onSignOut?: () => void; children: React.ReactNode }) {
+function DealerV4Shell({ dealer, section, counts, onSignOut, children }: { dealer: DealerPortalAccountWithPreferences; section: PortalSection; counts: { available: number; offerLeads: number; offers: number; active: number; purchased: number; lost: number }; onSignOut?: () => void; children: React.ReactNode }) {
   return <main className={styles.app}>
-    <aside className={styles.sidebar}><MotorGeeksLogo /><nav aria-label="Dealer Portal"><NavItem active={section === "dashboard"} href="/dealer-portal" icon={<HomeIcon />} label="Dashboard" /><NavItem active={section === "opportunities"} href="/dealer-portal/opportunities" icon={<DocIcon />} label="Opportunities" badge={String(counts.available)} /><NavItem active={section === "active"} href="/dealer-portal/active" icon={<ClockIcon />} label="Active Leads" badge={String(counts.active)} /><NavItem active={section === "purchased"} href="/dealer-portal/purchased" icon={<CheckIcon />} label="Purchased" badge={String(counts.purchased)} /><NavItem active={section === "lost"} href="/dealer-portal/lost" icon={<ReturnIcon />} label="Lost / Returned" badge={String(counts.lost)} /><NavItem active={section === "payments"} href="/dealer-portal/payments" icon={<TagIcon />} label="Payments" /><NavItem active={section === "dealership"} href="/dealer-portal/dealership" icon={<BuildingIcon />} label="My Dealership" /><NavItem active={section === "settings"} href="/dealer-portal/settings" icon={<GearIcon />} label="Account Settings" /><NavItem active={section === "support"} href="/dealer-portal/support" icon={<HelpIcon />} label="Help & Support" /></nav><Link className={styles.sidebarBack} href={motorgeeksWebsiteUrl}>← Back to website</Link></aside>
+    <aside className={styles.sidebar}><MotorGeeksLogo /><nav aria-label="Dealer Portal"><NavItem active={section === "dashboard"} href="/dealer-portal" icon={<HomeIcon />} label="Dashboard" /><NavItem active={section === "offer-leads"} href="/dealer-portal/offer-leads" icon={<DocIcon />} label="Offer Leads" badge={String(counts.offerLeads)} /><NavItem active={section === "my-offers"} href="/dealer-portal/my-offers" icon={<TagIcon />} label="My Offers" badge={String(counts.offers)} /><NavItem active={section === "opportunities"} href="/dealer-portal/opportunities" icon={<DocIcon />} label="Opportunities" badge={String(counts.available)} /><NavItem active={section === "active"} href="/dealer-portal/active" icon={<ClockIcon />} label="Active Leads" badge={String(counts.active)} /><NavItem active={section === "purchased"} href="/dealer-portal/purchased" icon={<CheckIcon />} label="Purchased" badge={String(counts.purchased)} /><NavItem active={section === "lost"} href="/dealer-portal/lost" icon={<ReturnIcon />} label="Lost / Returned" badge={String(counts.lost)} /><NavItem active={section === "payments"} href="/dealer-portal/payments" icon={<TagIcon />} label="Payments" /><NavItem active={section === "dealership"} href="/dealer-portal/dealership" icon={<BuildingIcon />} label="My Dealership" /><NavItem active={section === "settings"} href="/dealer-portal/settings" icon={<GearIcon />} label="Account Settings" /><NavItem active={section === "support"} href="/dealer-portal/support" icon={<HelpIcon />} label="Help & Support" /></nav><Link className={styles.sidebarBack} href={motorgeeksWebsiteUrl}>← Back to website</Link></aside>
     <section className={styles.workspace}><header className={styles.topbar} data-dealer-topbar="true"><div className={styles.topbarBrand}><MotorGeeksLogo /><small>Dealer Portal</small></div><div className={styles.topActions}><span>Help</span><span className={styles.profile}>{dealerInitials(dealer.trading_name)}</span><span>{dealer.trading_name}</span>{onSignOut && <button type="button" onClick={onSignOut}>Sign out</button>}</div></header>{children}</section>
   </main>;
 }
@@ -730,10 +897,36 @@ function conditionRows(lead: DealerVisibleLead): [string, string | null | undefi
 function activeLeads(leads: DealerVisibleLead[]) { return leads.filter(lead => !terminalStatuses.has(String(lead.portal_claim_status))); }
 function purchasedLeads(leads: DealerVisibleLead[]) { return leads.filter(lead => ["purchased", "purchased_later"].includes(String(lead.portal_claim_status))); }
 function lostLeads(leads: DealerVisibleLead[]) { return leads.filter(lead => ["lost", "returned_to_pool"].includes(String(lead.portal_claim_status))); }
-function shellCounts(data: PortalData) { return { available: data.available.length, active: activeLeads(data.claimed).length, purchased: purchasedLeads(data.claimed).length, lost: lostLeads(data.claimed).length }; }
+function shellCounts(data: PortalData) { return { available: data.available.length, offerLeads: data.marketplaceAvailable.length, offers: data.marketplaceOffers.length, active: activeLeads(data.claimed).length, purchased: purchasedLeads(data.claimed).length, lost: lostLeads(data.claimed).length }; }
 function leadHref(lead: DealerVisibleLead, from = "opportunities", tab?: LeadTab) { return `/dealer-portal/leads/${lead.id}?from=${from}${tab ? `&tab=${tab}` : ""}`; }
 function leadTitle(lead: DealerVisibleLead) { return [lead.year, lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle details pending"; }
 function displayLeadStatus(lead: DealerVisibleLead) { return statusLabel(lead.portal_claim_status || lead.status || "New").replace(/^Dealer Pool Available$/i, "New").replace(/^Dealer Allocated$/i, "New"); }
+function marketplaceStatusLabel(value: string | null | undefined) {
+  const labels: Record<string, string> = {
+    live_to_dealers: "Available",
+    offer_received: "Offer received",
+    offer_accepted: "Offer accepted",
+    purchase_pending: "Purchase pending",
+    purchased: "Purchased",
+    closed: "Closed",
+  };
+  return labels[String(value || "")] || statusLabel(value || "available");
+}
+function offerStatusLabel(value: string | null | undefined) {
+  const labels: Record<string, string> = {
+    submitted: "Submitted",
+    viewed: "Viewed",
+    accepted: "Accepted",
+    not_selected: "Not selected",
+    withdrawn: "Withdrawn",
+    closed: "Closed",
+  };
+  return labels[String(value || "")] || statusLabel(value || "submitted");
+}
+function formatOfferAmount(value: number | null | undefined) { return formatGbp(Number(value ?? 0) / 100); }
+function marketplaceFacts(lead: DealerVisibleLead): [string, string][] {
+  return [["Location", lead.portal_location_label || "Location pending"], ["Mileage", formatMileage(lead.mileage) || "Mileage pending"], ["Condition", displayText(lead.bike_condition || lead.damage) || "Not supplied"], ["Vehicle Check", vehicleCheckLabel(lead)]];
+}
 function moneyOrText(value: string | number | null | undefined) { const amount = safeNumber(value); return amount == null ? String(value || "Not supplied") : formatGbp(amount); }
 function moneyOrDash(value: string | number | null | undefined) { const amount = safeNumber(value); return amount == null ? "—" : formatGbp(amount); }
 function displayEngine(value: string | number | null | undefined) { if (value == null || value === "") return ""; const text = String(value).trim(); return /\bcc\b/i.test(text) ? text : `${text}cc`; }

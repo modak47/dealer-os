@@ -1018,6 +1018,61 @@
   min-height: 64px;
 }
 
+.marketplaceHead,
+.marketplaceRow {
+  grid-template-columns: minmax(230px, 330px) 120px minmax(132px, 170px) minmax(120px, 150px) 108px 108px 150px;
+}
+
+.marketplaceRow {
+  min-height: 70px;
+}
+
+.myOffersHead,
+.myOffersRow {
+  grid-template-columns: minmax(250px, 1fr) 130px 140px 120px 150px;
+}
+
+.myOffersTable {
+  max-width: 980px;
+}
+
+.marketplaceWorkspace {
+  display: grid;
+  grid-template-columns: minmax(340px, .9fr) minmax(320px, .75fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.offerCostBox {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #dfe8f1;
+  border-radius: 6px;
+  background: #f7fbff;
+}
+
+.offerCostBox p {
+  margin: 0;
+  color: #284461;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.offerCostBox strong {
+  color: #09224a;
+}
+
+.marketplaceOfferForm {
+  grid-template-columns: 1fr;
+  padding: 0 18px 18px;
+}
+
+.marketplaceOfferForm .offerCostBox,
+.marketplaceOfferForm .blueButton {
+  width: 100%;
+}
+
 .opportunityRow small,
 .bikeCell small {
   display: block;
@@ -1813,6 +1868,10 @@
   padding: 0 18px 14px;
 }
 
+.mockForm.marketplaceOfferForm {
+  grid-template-columns: 1fr;
+}
+
 .mockForm select,
 .mockForm textarea,
 .mockForm input,
@@ -2427,6 +2486,14 @@
   text-transform: uppercase;
 }
 
+.fullField small {
+  display: block;
+  margin: -2px 0 8px;
+  color: #526b86;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .fullField textarea {
   width: 100%;
   min-height: 80px;
@@ -2501,6 +2568,7 @@
   }
 
   .workspaceGrid,
+  .marketplaceWorkspace,
   .dashboardOpportunitySplit,
   .overviewGrid,
   .motLayout,
@@ -2658,12 +2726,16 @@
 
   .tableHead,
   .opportunityHead,
+  .marketplaceHead,
+  .myOffersHead,
   .simpleHead {
     display: none;
   }
 
   .tableRow,
   .opportunityRow,
+  .marketplaceRow,
+  .myOffersRow,
   .simpleRow {
     grid-template-columns: 1fr;
     gap: 8px;

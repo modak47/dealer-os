@@ -421,17 +421,29 @@ function ReleaseQueueRow({ lead, selected, saving, onSelect }: { lead: WebsiteLe
   const title = [lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle";
   const location = lead.location_town || lead.postcode || "Location not set";
   const checkStatus = lead.vehicle_check_status === "checked" ? "Check done" : lead.vehicle_check_status === "failed" ? "Check failed" : lead.reg ? "Check pending" : "No reg";
+  const marketplace = lead.opportunity_mode === "marketplace_offer";
+  const profile = safeRecord(lead.seller_profile);
+  const sellerProgress = safeRecord(lead.seller_progress);
+  const profileFields = ["firstName", "lastName", "email", "mobile", "postcode"].filter(key => Boolean(profile[key])).length;
+  const source = marketplace ? "MotorGeeks" : lead.website || lead.lead_source || "Website";
   return <article className={selected ? "selected" : ""}>
     <button className="dealer-release-toggle" type="button" disabled={saving} onClick={onSelect}><span>{selected ? "Remove" : "Select"}</span></button>
-    <div className="dealer-release-bike"><b>#{lead.id} {lead.reg || "No reg"}</b><strong>{lead.year ? `${lead.year} ` : ""}{title}</strong><small>{statusLabel(lead.status)} · {formatLeadDate(lead.date || lead.created_at)}</small></div>
+    <div className="dealer-release-bike"><b>#{lead.id} {lead.reg || "No reg"}</b><strong>{lead.year ? `${lead.year} ` : ""}{title}</strong><small>{source} · {marketplace ? "Marketplace Offer" : "Direct claim"} · {statusLabel(lead.status)} · {formatLeadDate(lead.date || lead.created_at)}</small></div>
     <dl>
+      <div><dt>Source</dt><dd>{source}</dd></div>
+      <div><dt>Mode</dt><dd>{marketplace ? "Marketplace Offer" : "Direct Claim"}</dd></div>
       <div><dt>Location</dt><dd>{location}</dd></div>
       <div><dt>Mileage</dt><dd>{formatMileage(lead.mileage)}</dd></div>
       <div><dt>Asking</dt><dd>{price === null ? "Not set" : formatGbp(price)}</dd></div>
       <div><dt>Vehicle Check</dt><dd>{checkStatus}</dd></div>
+      {marketplace && <><div><dt>Seller profile</dt><dd>{profileFields}/5 fields</dd></div><div><dt>Marketplace</dt><dd>{statusLabel(lead.marketplace_status || "submitted")}</dd></div><div><dt>Photos</dt><dd>{sellerProgress.photosSkipped ? "Skipped for now" : "Uploaded photos linked privately"}</dd></div></>}
     </dl>
     <Link className="dealer-release-open" href={`/website-leads/${lead.id}`}>Open</Link>
   </article>;
+}
+
+function safeRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function OverviewPanel({ title, empty, children }: { title: string; empty: string; children: ReactNode }) {
