@@ -93,7 +93,6 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
     if (!files?.length) return;
     setUploading(true);
     setMessage("");
-    const body = new FormData();
     try {
       const prepared = await Promise.all(Array.from(files).map(preparePhotoForUpload));
       const oversized = prepared.find(file => file.size > maxUploadBytes);
@@ -101,14 +100,16 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
         setMessage(`${oversized.name} is too large to upload. Please choose a smaller photo or screenshot.`);
         return;
       }
-      prepared.forEach(file => body.append("photos", file));
-      const response = await fetch("/api/valuation/photos", { method: "POST", body });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setMessage(payload.error || "Photo upload failed. Please try a smaller photo.");
-        return;
+      const uploadedPhotos: UploadedPhoto[] = [];
+      for (const file of prepared) {
+        const body = new FormData();
+        body.append("photos", file);
+        const response = await fetch("/api/valuation/photos", { method: "POST", body });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `Photo upload failed for ${file.name}. Please try a smaller photo.`);
+        uploadedPhotos.push(...(payload.photos || []));
       }
-      setPhotos(current => [...current, ...(payload.photos || [])]);
+      setPhotos(current => [...current, ...uploadedPhotos]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Photo upload failed. Please try a smaller photo.");
     } finally {
