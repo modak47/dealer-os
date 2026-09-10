@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Motorcycle image unavailable">
+  <rect width="1200" height="800" fill="#1c252b"/>
+  <path d="M360 560a105 105 0 1 0 0-210 105 105 0 0 0 0 210Zm480 0a105 105 0 1 0 0-210 105 105 0 0 0 0 210ZM360 455h155l110-150h120l95 150M515 455h230L610 330l-70-95h-95" fill="none" stroke="#8b959c" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="600" y="680" fill="#8b959c" font-family="Arial, sans-serif" font-size="40" text-anchor="middle">IMAGE COMING SOON</text>
+</svg>

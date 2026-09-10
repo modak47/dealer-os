@@ -1,0 +1,1444 @@
+:root {
+  --ml-navy: #061326;
+  --ml-navy-deep: #061326;
+  --ml-navy-ink: #02111d;
+  --ml-blue: #0085F5;
+  --ml-blue-dark: #006fd0;
+  --ml-cyan: #00B9ED;
+  --ml-orange: #ff5a1f;
+  --ml-orange-dark: #e64612;
+  --ml-yellow: #ffd943;
+  --ml-ink: #071b2c;
+  --ml-muted: #647386;
+  --ml-line: #d9e4ee;
+  --ml-soft: #f3f8fd;
+  --ml-white: #ffffff;
+  --ml-shell: min(100% - 84px, 1360px);
+  --ml-ui-font: var(--font-body), "Inter", "Segoe UI", Arial, sans-serif;
+  --ml-display-font: var(--font-display), "Arial Narrow", "Impact", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 98px;
+}
+
+body {
+  margin: 0;
+  background: var(--ml-white);
+  color: var(--ml-ink);
+  font-family: var(--ml-ui-font);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: var(--ml-ui-font);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+summary {
+  cursor: pointer;
+}
+
+img,
+svg {
+  display: block;
+}
+
+.ml-shell {
+  width: var(--ml-shell);
+  margin: 0 auto;
+}
+
+.ml-hero,
+.ml-trust-strip,
+.ml-process,
+.ml-why,
+.ml-proof,
+.ml-image-cta,
+.ml-faq-section,
+.ml-content-band,
+.ml-form-section,
+.ml-page-hero,
+.ml-dealer-hero,
+.ml-dealer-points,
+.ml-dealer-detail,
+.ml-valuation-shell {
+  scroll-margin-top: 98px;
+}
+
+.ml-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(4, 32, 54, .98);
+  border-bottom: 1px solid rgba(255, 255, 255, .1);
+  color: white;
+  backdrop-filter: blur(14px);
+}
+
+.ml-header-row {
+  display: grid;
+  grid-template-columns: minmax(220px, auto) 1fr auto;
+  gap: 34px;
+  align-items: center;
+  min-height: 86px;
+}
+
+.ml-logo {
+  display: block;
+  width: min(100%, 290px);
+  min-width: 180px;
+  line-height: 0;
+  overflow: visible;
+}
+
+.ml-logo picture,
+.ml-logo img {
+  display: block;
+}
+
+.ml-logo img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.ml-desktop-nav {
+  display: flex;
+  justify-content: center;
+  gap: 38px;
+  font-family: var(--ml-ui-font);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.ml-desktop-nav a:hover {
+  color: #9fd0ff;
+}
+
+.ml-header-actions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.ml-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 0 25px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-family: var(--ml-ui-font);
+  font-weight: 900;
+  transition: transform .18s ease, background .18s ease, border-color .18s ease;
+}
+
+.ml-button:hover {
+  transform: translateY(-1px);
+}
+
+.ml-button-orange {
+  background: var(--ml-orange);
+  color: white;
+  box-shadow: 0 18px 34px rgba(255, 90, 31, .28);
+}
+
+.ml-button-orange:hover {
+  background: var(--ml-orange-dark);
+}
+
+.ml-button-blue {
+  background: var(--ml-blue);
+  color: white;
+}
+
+.ml-button-ghost {
+  border-color: rgba(255, 255, 255, .55);
+  background: rgba(0, 0, 0, .08);
+  color: white;
+}
+
+.ml-mobile-menu {
+  display: none;
+  justify-self: end;
+}
+
+.ml-mobile-menu summary {
+  display: grid;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  place-content: center;
+  list-style: none;
+}
+
+.ml-mobile-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.ml-mobile-menu summary span {
+  width: 21px;
+  height: 2px;
+  border-radius: 999px;
+  background: white;
+}
+
+.ml-mobile-menu div {
+  position: absolute;
+  inset: 84px 18px auto;
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 14px;
+  background: #051d30;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .32);
+}
+
+.ml-mobile-menu a {
+  padding: 15px;
+  border-radius: 9px;
+  font-weight: 850;
+}
+
+.ml-mobile-menu a:last-child {
+  background: var(--ml-orange);
+}
+
+.ml-hero {
+  position: relative;
+  min-height: 615px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(2, 20, 34, .96) 0%, rgba(3, 26, 43, .84) 38%, rgba(3, 26, 43, .18) 74%),
+    url("/images/motorleads-hero-scenic.jpg") center center / cover no-repeat;
+  color: white;
+}
+
+.ml-hero:after,
+.ml-image-cta:after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 170px;
+  background: linear-gradient(0deg, rgba(4, 26, 43, .92), transparent);
+  pointer-events: none;
+}
+
+.ml-hero-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 680px) 1fr;
+  gap: 48px;
+  align-items: center;
+  min-height: 615px;
+  padding: 58px 0 72px;
+}
+
+.ml-hero-copy h1 {
+  margin: 0;
+  max-width: 690px;
+  font-family: var(--ml-display-font);
+  font-size: clamp(72px, 6.2vw, 104px);
+  font-weight: 800;
+  letter-spacing: -.025em;
+  line-height: .9;
+}
+
+.ml-hero-copy h1 span {
+  color: var(--ml-blue);
+}
+
+.ml-hero-copy p {
+  max-width: 620px;
+  margin: 22px 0 26px;
+  font-family: var(--ml-ui-font);
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.18;
+}
+
+.ml-reg-form {
+  display: grid;
+  grid-template-columns: 72px minmax(330px, 430px) minmax(230px, auto);
+  align-items: stretch;
+  max-width: 820px;
+}
+
+.ml-reg-form > span {
+  display: grid;
+  place-items: center;
+  border-radius: 8px 0 0 8px;
+  background: var(--ml-yellow);
+  color: #051729;
+  font-weight: 950;
+}
+
+.ml-reg-form label {
+  display: block;
+  min-width: 0;
+}
+
+.ml-reg-form label span,
+.ml-newsletter span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.ml-reg-form input {
+  width: 100%;
+  height: 60px;
+  border: 0;
+  padding: 0 22px;
+  color: var(--ml-ink);
+  font-family: var(--ml-ui-font);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ml-reg-form button {
+  border: 0;
+  border-radius: 0 8px 8px 0;
+  background: var(--ml-orange);
+  color: white;
+  padding: 0 34px;
+  font-family: var(--ml-ui-font);
+  font-weight: 950;
+}
+
+.ml-reg-form > a {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.ml-reg-form.compact {
+  grid-template-columns: 62px minmax(260px, 1fr) minmax(230px, auto);
+}
+
+.ml-handwritten,
+.ml-scribble,
+.ml-why-note,
+.ml-footer-bottom b,
+.ml-image-cta b {
+  color: #f7fbff;
+  font-family: "Segoe Print", "Bradley Hand ITC", cursive;
+  font-weight: 800;
+}
+
+.ml-handwritten {
+  justify-self: end;
+  display: grid;
+  gap: 18px;
+  max-width: 360px;
+  padding: 12px 6px;
+  font-size: 38px;
+  line-height: 1.07;
+  text-align: left;
+  transform: rotate(-5deg);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .45);
+}
+
+.ml-handwritten b {
+  font: inherit;
+}
+
+.ml-handwritten span {
+  width: 178px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--ml-blue);
+  transform: rotate(-7deg);
+}
+
+.ml-handwritten em {
+  display: block;
+  margin-top: 0;
+  color: white;
+  font-style: normal;
+  font-size: 34px;
+  line-height: 1.18;
+}
+
+.ml-handwritten em i {
+  display: none;
+}
+
+.ml-soft-tick {
+  flex: 0 0 auto;
+  width: 1.45em;
+  height: 1.17em;
+  margin-top: .05em;
+  overflow: visible;
+}
+
+.ml-soft-tick path {
+  fill: none;
+  stroke: var(--ml-blue);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ml-trust-strip {
+  background: var(--ml-navy);
+  color: white;
+}
+
+.ml-trust-strip .ml-shell {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+
+.ml-trust-strip article {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 18px;
+  align-items: center;
+  min-height: 116px;
+  padding: 27px 28px;
+  border-right: 1px solid rgba(255, 255, 255, .1);
+}
+
+.ml-trust-strip svg,
+.ml-step-row svg,
+.ml-dealer-points svg,
+.ml-proof svg {
+  width: 56px;
+  height: 56px;
+  color: var(--ml-blue);
+}
+
+.ml-trust-strip b,
+.ml-trust-strip span {
+  display: block;
+}
+
+.ml-trust-strip b {
+  font-family: var(--ml-ui-font);
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.ml-trust-strip span {
+  margin-top: 5px;
+  color: #c2d1df;
+  font-family: var(--ml-ui-font);
+  font-size: 14px;
+}
+
+.ml-process,
+.ml-proof,
+.ml-faq-section,
+.ml-content-band,
+.ml-form-section {
+  background: white;
+  color: var(--ml-ink);
+}
+
+.ml-process {
+  padding: 62px 0;
+}
+
+.ml-process-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, .74fr) minmax(0, 1.4fr);
+  gap: 50px;
+  align-items: center;
+}
+
+.ml-section-intro span,
+.ml-why span,
+.ml-proof span,
+.ml-page-hero span,
+.ml-dealer-hero span,
+.ml-form-heading span,
+.ml-valuation-shell span,
+.ml-image-cta span {
+  color: var(--ml-blue);
+  font-size: 14px;
+  font-weight: 950;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--ml-display-font);
+}
+
+.ml-section-intro h2,
+.ml-proof h2,
+.ml-faq-head h2,
+.ml-page-hero h1,
+.ml-dealer-detail h2,
+.ml-valuation-shell h1 {
+  margin: 9px 0 14px;
+  font-size: clamp(42px, 4vw, 62px);
+  line-height: .94;
+}
+
+.ml-section-intro p,
+.ml-proof p,
+.ml-faq-head p,
+.ml-page-hero p,
+.ml-dealer-detail p,
+.ml-valuation-shell p,
+.ml-content-band p {
+  color: var(--ml-muted);
+  font-family: var(--ml-ui-font);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.ml-scribble {
+  display: block;
+  margin-top: 24px;
+  color: var(--ml-blue);
+  font-size: 25px;
+  transform: rotate(-5deg);
+}
+
+.ml-step-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.ml-step-row article {
+  position: relative;
+  min-height: 245px;
+  padding: 34px 28px;
+  border-left: 1px solid var(--ml-line);
+}
+
+.ml-step-row i {
+  position: absolute;
+  top: 0;
+  left: 24px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: var(--ml-blue);
+  color: white;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.ml-step-row svg {
+  margin: 20px 0 18px;
+}
+
+.ml-step-row h3 {
+  margin: 0 0 10px;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.ml-step-row p {
+  margin: 0;
+  color: var(--ml-muted);
+  font-family: var(--ml-ui-font);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.ml-why {
+  position: relative;
+  overflow: hidden;
+  padding: 78px 0;
+  background:
+    linear-gradient(90deg, rgba(4, 29, 47, .98) 0%, rgba(4, 29, 47, .94) 58%, rgba(4, 29, 47, .42) 100%),
+    url("/images/motorleads-why-closeup.jpg") right center / auto 100% no-repeat;
+  color: white;
+}
+
+.ml-why-grid {
+  display: grid;
+  grid-template-columns: minmax(330px, .9fr) minmax(0, 1fr);
+  gap: 70px;
+  align-items: center;
+}
+
+.ml-why h2 {
+  margin: 9px 0 18px;
+  font-size: clamp(42px, 4.5vw, 66px);
+  line-height: .92;
+}
+
+.ml-why p {
+  color: #d5e2ee;
+  font-family: var(--ml-ui-font);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.ml-why-grid > div:nth-child(2) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 30px;
+}
+
+.ml-why article {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.ml-why svg {
+  width: 48px;
+  height: 48px;
+  color: var(--ml-blue);
+}
+
+.ml-why h3 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.ml-why-note {
+  position: absolute;
+  right: clamp(42px, 9vw, 130px);
+  bottom: 44px;
+  color: var(--ml-blue);
+  font-size: 31px;
+  transform: rotate(-8deg);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, .45);
+}
+
+.ml-proof {
+  padding: 68px 0;
+  background: #f4f9fe;
+}
+
+.ml-proof .ml-shell {
+  display: grid;
+  grid-template-columns: .8fr 1.2fr;
+  gap: 34px;
+  align-items: center;
+}
+
+.ml-proof-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.ml-proof-rating {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+  padding: 22px 24px;
+  border: 1px solid var(--ml-line);
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 18px 40px rgba(10, 40, 66, .06);
+}
+
+.ml-proof-rating b {
+  font-family: var(--ml-display-font);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.ml-proof-rating span {
+  max-width: 470px;
+  color: var(--ml-muted);
+  font-family: var(--ml-ui-font);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ml-proof-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.ml-proof-cards article {
+  min-height: 170px;
+  padding: 24px;
+  border: 1px solid var(--ml-line);
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 16px 36px rgba(10, 40, 66, .07);
+}
+
+.ml-proof-cards b {
+  display: block;
+  margin-top: 18px;
+  font-weight: 950;
+}
+
+.ml-proof-cards p {
+  margin: 8px 0 0;
+  font-family: var(--ml-ui-font);
+  font-size: 14px;
+}
+
+.ml-image-cta {
+  position: relative;
+  overflow: hidden;
+  padding: 74px 0;
+  background:
+    linear-gradient(90deg, rgba(2, 20, 34, .96), rgba(2, 20, 34, .58)),
+    url("/images/motorleads-cta-road.jpg") center center / cover no-repeat;
+  color: white;
+}
+
+.ml-image-cta .ml-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 760px) 1fr;
+  gap: 30px;
+  align-items: end;
+}
+
+.ml-image-cta h2 {
+  margin: 8px 0;
+  font-size: clamp(44px, 5vw, 70px);
+  line-height: .9;
+}
+
+.ml-image-cta p {
+  margin: 0 0 25px;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.ml-image-cta b {
+  justify-self: end;
+  align-self: center;
+  color: white;
+  font-size: 34px;
+  transform: rotate(-7deg);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, .55);
+}
+
+.ml-faq-section {
+  padding: 62px 0 72px;
+}
+
+.ml-faq-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 26px;
+}
+
+.ml-faq-head a {
+  color: var(--ml-blue-dark);
+  font-weight: 950;
+  text-decoration: underline;
+}
+
+.ml-faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 24px;
+}
+
+.ml-faq-grid details {
+  border: 1px solid var(--ml-line);
+  border-radius: 8px;
+  background: white;
+}
+
+.ml-faq-grid summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 24px;
+  list-style: none;
+  font-family: var(--ml-ui-font);
+  font-weight: 950;
+}
+
+.ml-faq-grid summary::-webkit-details-marker {
+  display: none;
+}
+
+.ml-faq-grid summary span {
+  color: var(--ml-blue);
+  font-size: 22px;
+}
+
+.ml-faq-grid details p {
+  margin: 0;
+  padding: 0 24px 20px;
+  color: var(--ml-muted);
+  line-height: 1.55;
+}
+
+.ml-footer {
+  padding: 54px 0 40px;
+  background: var(--ml-navy-deep);
+  color: white;
+}
+
+.ml-footer-grid {
+  display: grid;
+  grid-template-columns: 1.25fr .7fr .8fr 1fr;
+  gap: 70px;
+}
+
+.ml-footer p,
+.ml-footer a {
+  color: #c3d4e3;
+  font-family: var(--ml-ui-font);
+  line-height: 1.6;
+}
+
+.ml-footer h2 {
+  margin: 0 0 14px;
+  font-size: 20px;
+}
+
+.ml-footer nav,
+.ml-footer-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+}
+
+.ml-socials {
+  display: flex;
+  gap: 17px;
+  margin-top: 24px;
+  font-weight: 950;
+}
+
+.ml-newsletter {
+  display: grid;
+  grid-template-columns: 1fr 54px;
+  margin-top: 12px;
+}
+
+.ml-newsletter input {
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: 7px 0 0 7px;
+  padding: 0 16px;
+}
+
+.ml-newsletter button {
+  border: 0;
+  border-radius: 0 7px 7px 0;
+  background: var(--ml-blue);
+  color: white;
+  font-size: 24px;
+}
+
+.ml-footer-bottom {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 58px;
+}
+
+.ml-footer-bottom b {
+  color: white;
+  font-size: 29px;
+  transform: rotate(-6deg);
+}
+
+.ml-page-hero,
+.ml-dealer-hero,
+.ml-valuation-shell {
+  background:
+    linear-gradient(90deg, rgba(3, 24, 40, .96), rgba(3, 24, 40, .75)),
+    url("/images/motorleads-how-lifestyle.jpg") right center / cover no-repeat;
+  color: white;
+}
+
+.ml-page-hero.how-page {
+  background:
+    linear-gradient(90deg, rgba(3, 24, 40, .96), rgba(3, 24, 40, .72), rgba(3, 24, 40, .18)),
+    url("/images/motorleads-how-lifestyle.jpg") right center / cover no-repeat;
+}
+
+.ml-page-hero.dealer-access {
+  background:
+    linear-gradient(90deg, rgba(3, 24, 40, .97), rgba(3, 24, 40, .73), rgba(3, 24, 40, .24)),
+    url("/images/motorleads-dealer-access-detail.jpg") right center / cover no-repeat;
+}
+
+.ml-valuation-shell {
+  background:
+    linear-gradient(90deg, rgba(3, 24, 40, .96), rgba(3, 24, 40, .78), rgba(3, 24, 40, .24)),
+    url("/images/motorleads-valuation-driveway.jpg") right center / cover no-repeat;
+}
+
+.ml-page-hero .ml-shell,
+.ml-valuation-shell .ml-shell {
+  padding: 90px 0;
+}
+
+.ml-page-hero.compact .ml-shell {
+  padding: 68px 0;
+}
+
+.ml-page-hero h1,
+.ml-dealer-hero h1,
+.ml-valuation-shell h1 {
+  max-width: 830px;
+  color: white;
+}
+
+.ml-page-hero p,
+.ml-valuation-shell p {
+  max-width: 710px;
+  color: #d4e4f0;
+}
+
+.ml-content-band {
+  padding: 64px 0 80px;
+}
+
+.ml-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.ml-two-col article,
+.ml-legal-card {
+  padding: 34px;
+  border: 1px solid var(--ml-line);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 16px 34px rgba(10, 40, 66, .06);
+}
+
+.ml-two-col h2,
+.ml-legal-card h2 {
+  margin: 0 0 12px;
+  font-size: 36px;
+}
+
+.ml-dealer-hero {
+  min-height: 560px;
+  background:
+    linear-gradient(90deg, rgba(3, 24, 40, .98), rgba(3, 24, 40, .76), rgba(3, 24, 40, .18)),
+    url("/images/motorleads-dealers-showroom.jpg") right center / cover no-repeat;
+}
+
+.ml-dealer-hero .ml-shell {
+  display: grid;
+  align-items: center;
+  min-height: 560px;
+}
+
+.ml-dealer-hero h1 {
+  margin: 10px 0 18px;
+  font-size: clamp(52px, 6vw, 88px);
+  line-height: .9;
+}
+
+.ml-dealer-hero p {
+  max-width: 610px;
+  color: #d5e3ef;
+  font-size: 22px;
+  line-height: 1.35;
+}
+
+.ml-dealer-hero .ml-shell div div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.ml-dealer-points {
+  padding: 36px 0;
+  background: #eef6fd;
+}
+
+.ml-dealer-points .ml-shell {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.ml-dealer-points article {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 18px;
+  border-radius: 10px;
+  background: white;
+  font-weight: 900;
+}
+
+.ml-dealer-points svg {
+  width: 30px;
+  height: 30px;
+}
+
+.ml-dealer-detail {
+  padding: 70px 0;
+  background: white;
+}
+
+.ml-dealer-detail .ml-shell {
+  display: grid;
+  grid-template-columns: 1fr .62fr;
+  gap: 34px;
+}
+
+.ml-dealer-detail .ml-shell > div:last-child {
+  padding: 32px;
+  border-radius: 12px;
+  background: var(--ml-navy);
+  color: white;
+}
+
+.ml-dealer-detail h3 {
+  margin: 0 0 12px;
+  font-size: 34px;
+}
+
+.ml-form-section {
+  padding: 64px 0 84px;
+}
+
+.ml-form-card {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  max-width: 940px;
+  padding: 34px;
+  border: 1px solid var(--ml-line);
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 18px 45px rgba(10, 40, 66, .08);
+}
+
+.ml-form-heading,
+.ml-form-card .full,
+.ml-form-error,
+.ml-form-card > button {
+  grid-column: 1 / -1;
+}
+
+.ml-form-heading h2 {
+  margin: 8px 0 6px;
+  font-size: 44px;
+  line-height: .95;
+}
+
+.ml-form-heading p {
+  margin: 0;
+  color: var(--ml-muted);
+}
+
+.ml-form-card label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #1b3550;
+  font-size: 13px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.ml-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.ml-form-card input,
+.ml-form-card textarea {
+  width: 100%;
+  border: 1px solid var(--ml-line);
+  border-radius: 8px;
+  padding: 14px 15px;
+  color: var(--ml-ink);
+  font-size: 16px;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.ml-form-card textarea {
+  resize: vertical;
+}
+
+.ml-consent {
+  display: flex !important;
+  grid-template-columns: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  color: var(--ml-muted) !important;
+  text-transform: none !important;
+}
+
+.ml-consent input {
+  width: auto;
+}
+
+.ml-form-error {
+  margin: 0;
+  color: #c93420;
+  font-weight: 800;
+}
+
+.ml-form-success {
+  max-width: 720px;
+  padding: 42px;
+  border: 1px solid #bde9c7;
+  border-radius: 14px;
+  background: #effbf2;
+}
+
+.ml-form-success strong {
+  font-family: var(--font-display);
+  font-size: 44px;
+}
+
+.ml-form-success button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ml-blue);
+  color: white;
+  padding: 0 18px;
+  font-weight: 900;
+}
+
+.ml-valuation-shell .ml-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 54px;
+  align-items: center;
+}
+
+.ml-valuation-shell aside {
+  padding: 30px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .08);
+}
+
+.ml-valuation-shell aside svg {
+  width: 70px;
+  height: 70px;
+  color: var(--ml-blue);
+}
+
+.ml-valuation-shell h2 {
+  font-size: 35px;
+}
+
+.ml-valuation-shell li {
+  margin: 12px 0;
+  color: #d6e5f0;
+  font-weight: 800;
+}
+
+@media (max-width: 1120px) {
+  :root {
+    --ml-shell: min(100% - 44px, 1100px);
+  }
+
+  .ml-header-row {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .ml-desktop-nav {
+    gap: 20px;
+    font-size: 14px;
+  }
+
+  .ml-header-actions .ml-button-ghost {
+    display: none;
+  }
+
+  .ml-trust-strip .ml-shell,
+  .ml-dealer-points .ml-shell {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ml-process-grid,
+  .ml-proof .ml-shell,
+  .ml-dealer-detail .ml-shell,
+  .ml-valuation-shell .ml-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .ml-step-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  html {
+    scroll-padding-top: 86px;
+  }
+
+  :root {
+    --ml-shell: min(100% - 30px, 720px);
+  }
+
+  .ml-hero,
+  .ml-trust-strip,
+  .ml-process,
+  .ml-why,
+  .ml-proof,
+  .ml-image-cta,
+  .ml-faq-section,
+  .ml-content-band,
+  .ml-form-section,
+  .ml-page-hero,
+  .ml-dealer-hero,
+  .ml-dealer-points,
+  .ml-dealer-detail,
+  .ml-valuation-shell {
+    scroll-margin-top: 86px;
+  }
+
+  .ml-header-row {
+    grid-template-columns: 1fr auto;
+    min-height: 74px;
+  }
+
+  .ml-logo {
+    width: 210px;
+    min-width: 160px;
+  }
+
+  .ml-desktop-nav,
+  .ml-header-actions {
+    display: none;
+  }
+
+  .ml-mobile-menu {
+    display: block;
+  }
+
+  .ml-mobile-menu div {
+    inset: 74px 18px auto;
+  }
+
+  .ml-hero {
+    min-height: auto;
+    background:
+      linear-gradient(180deg, rgba(3, 25, 42, .98) 0%, rgba(3, 25, 42, .88) 56%, rgba(3, 25, 42, .44) 100%),
+      url("/images/motorleads-hero-scenic.jpg") center bottom / auto 54% no-repeat,
+      var(--ml-navy);
+  }
+
+  .ml-hero-grid {
+    grid-template-columns: 1fr;
+    min-height: 680px;
+    padding: 34px 0 260px;
+    align-items: start;
+  }
+
+  .ml-hero-copy h1 {
+    font-size: 47px;
+  }
+
+  .ml-hero-copy p {
+    font-size: 17px;
+  }
+
+  .ml-handwritten {
+    display: none;
+  }
+
+  .ml-reg-form,
+  .ml-reg-form.compact {
+    grid-template-columns: 48px 1fr;
+  }
+
+  .ml-reg-form button {
+    grid-column: 1 / -1;
+    min-height: 52px;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .ml-reg-form > span {
+    border-radius: 8px 0 0 0;
+  }
+
+  .ml-reg-form input {
+    height: 52px;
+    border-radius: 0 8px 0 0;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .ml-trust-strip .ml-shell,
+  .ml-proof-cards,
+  .ml-why-grid > div:nth-child(2),
+  .ml-faq-grid,
+  .ml-footer-grid,
+  .ml-two-col,
+  .ml-form-card,
+  .ml-dealer-points .ml-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .ml-trust-strip article {
+    grid-template-columns: 48px 1fr;
+    padding: 18px 0;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, .1);
+  }
+
+  .ml-trust-strip svg {
+    width: 42px;
+    height: 42px;
+  }
+
+  .ml-process,
+  .ml-why,
+  .ml-proof,
+  .ml-faq-section,
+  .ml-form-section,
+  .ml-dealer-detail {
+    padding: 46px 0;
+  }
+
+  .ml-process-grid {
+    gap: 28px;
+  }
+
+  .ml-section-intro h2,
+  .ml-proof h2,
+  .ml-faq-head h2,
+  .ml-page-hero h1,
+  .ml-dealer-detail h2,
+  .ml-valuation-shell h1 {
+    font-size: 39px;
+  }
+
+  .ml-step-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ml-step-row article {
+    min-height: auto;
+    padding: 25px 20px 25px 84px;
+    border-left: 0;
+    border-top: 1px solid var(--ml-line);
+  }
+
+  .ml-step-row i {
+    top: 24px;
+    left: 20px;
+  }
+
+  .ml-step-row svg {
+    margin-top: 0;
+  }
+
+  .ml-why {
+    background:
+      linear-gradient(180deg, rgba(4, 29, 47, .98), rgba(4, 29, 47, .9)),
+      url("/images/motorleads-why-closeup.jpg") center bottom / cover no-repeat;
+  }
+
+  .ml-why-grid {
+    gap: 34px;
+  }
+
+  .ml-why h2 {
+    font-size: 40px;
+  }
+
+  .ml-why-note,
+  .ml-image-cta b {
+    display: none;
+  }
+
+  .ml-proof .ml-shell {
+    gap: 20px;
+  }
+
+  .ml-image-cta .ml-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .ml-image-cta h2 {
+    font-size: 38px;
+  }
+
+  .ml-faq-head,
+  .ml-footer-bottom {
+    display: grid;
+    align-items: start;
+  }
+
+  .ml-footer-grid {
+    gap: 32px;
+  }
+
+  .ml-page-hero .ml-shell,
+  .ml-valuation-shell .ml-shell {
+    padding: 58px 0;
+  }
+
+  .ml-dealer-hero {
+    min-height: 620px;
+    background:
+      linear-gradient(180deg, rgba(3, 24, 40, .98), rgba(3, 24, 40, .8)),
+      url("/images/motorleads-dealers-showroom.jpg") center bottom / cover no-repeat;
+  }
+
+  .ml-dealer-hero .ml-shell {
+    min-height: 620px;
+    align-items: start;
+    padding-top: 54px;
+  }
+
+  .ml-dealer-hero h1 {
+    font-size: 44px;
+  }
+
+  .ml-dealer-hero p {
+    font-size: 17px;
+  }
+
+  .ml-form-card {
+    padding: 24px 18px;
+  }
+}
