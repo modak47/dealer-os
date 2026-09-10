@@ -30,6 +30,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
   const [message, setMessage] = useState("");
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [removingPhotoId, setRemovingPhotoId] = useState("");
   const [submitted, setSubmitted] = useState<{ reference: string; secureLinkSent: boolean } | null>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -117,6 +118,22 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
     }
   }
 
+  async function removePhoto(photo: UploadedPhoto) {
+    if (!photo.id || removingPhotoId) return;
+    setRemovingPhotoId(photo.id);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/valuation/photos?id=${encodeURIComponent(photo.id)}`, { method: "DELETE" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Unable to remove that photo.");
+      setPhotos(current => current.filter(item => item.id !== photo.id));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to remove that photo.");
+    } finally {
+      setRemovingPhotoId("");
+    }
+  }
+
   async function submit() {
     setMessage("");
     const response = await fetch("/api/valuation/submit", { method: "POST" });
@@ -193,9 +210,10 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
         <p>Good photos help dealers give you better offers. You can add up to 20 and continue without them if needed.</p>
         <div className="mg-photo-guidance">{photoGuidance.map(item => <span key={item}>{item}</span>)}</div>
         <label className="mg-uploader"><input type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={event => upload(event.target.files)} /><b>{uploading ? "Uploading..." : "Choose photos"}</b><small>JPG, PNG and WEBP are resized automatically. HEIC/HEIF must be under 4MB.</small></label>
-        <div className="mg-photo-count">{photos.length ? `${photos.length} photos added` : "No photos added yet"}</div>
+        <div className="mg-photo-count">{photos.length ? `${photos.length} ${photos.length === 1 ? "photo" : "photos"} added` : "No photos added yet"}</div>
         {photos.length > 0 && <div className="mg-photo-preview-grid" aria-label="Uploaded photo previews">
           {photos.map((photo, index) => <figure key={photo.id || `${photo.original_filename}-${index}`}>
+            <button className="mg-photo-remove" type="button" onClick={() => void removePhoto(photo)} disabled={!photo.id || removingPhotoId === photo.id} aria-label={`Remove ${photo.original_filename || `photo ${index + 1}`}`}>×</button>
             {photo.preview_url ? <img src={photo.preview_url} alt={photo.original_filename || `Uploaded motorcycle photo ${index + 1}`} /> : <span>No preview</span>}
             <figcaption>{photo.original_filename || `Photo ${index + 1}`}</figcaption>
           </figure>)}

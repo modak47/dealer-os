@@ -76,3 +76,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to upload photos." }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { draft } = await ensureDraft();
+    const id = new URL(request.url).searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "Photo ID is required." }, { status: 400 });
+    const db = getSupabaseAdmin();
+    const { error } = await db
+      .from("lead_photos")
+      .update({ status: "removed" })
+      .eq("id", id)
+      .eq("draft_id", draft.id)
+      .is("website_lead_id", null);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const { count, error: countError } = await db
+      .from("lead_photos")
+      .select("id", { count: "exact", head: true })
+      .eq("draft_id", draft.id)
+      .neq("status", "removed");
+    if (countError) return NextResponse.json({ error: countError.message }, { status: 500 });
+    await db.from("seller_valuation_drafts").update({ photo_count: count ?? 0 }).eq("id", draft.id);
+    return NextResponse.json({ ok: true, photo_count: count ?? 0 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to remove photo." }, { status: 500 });
+  }
+}
