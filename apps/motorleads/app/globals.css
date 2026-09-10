@@ -347,7 +347,7 @@ svg {
 .ml-scribble,
 .ml-why-note,
 .ml-footer-bottom b,
-.ml-image-cta b {
+.ml-image-cta > .ml-shell > b {
   color: #f7fbff;
   font-family: "Segoe Print", "Bradley Hand ITC", cursive;
   font-weight: 800;
@@ -385,7 +385,7 @@ svg {
 .ml-handwritten span {
   width: 180px;
   height: 4px;
-  margin: 7px 0 2px 10px;
+  margin: 8px 0 17px 10px;
   border-radius: 999px;
   background: var(--ml-blue);
   transform: rotate(-7deg);
@@ -393,15 +393,15 @@ svg {
 
 .ml-handwritten em {
   display: flex;
-  gap: 8px;
+  gap: 13px;
   align-items: center;
-  margin-top: -2px;
+  margin: 0 0 2px 8px;
   color: white;
   font-style: normal;
   font-family: inherit;
-  font-size: 24px;
+  font-size: 23px;
   font-weight: 800;
-  line-height: .95;
+  line-height: 1.03;
 }
 
 .ml-handwritten em i {
@@ -410,9 +410,9 @@ svg {
 
 .ml-soft-tick {
   flex: 0 0 auto;
-  width: 1.18em;
-  height: .95em;
-  margin-top: .02em;
+  width: 1.05em;
+  height: .86em;
+  margin-top: .08em;
   overflow: visible;
 }
 
@@ -755,7 +755,7 @@ h3 {
   font-weight: 800;
 }
 
-.ml-image-cta b {
+.ml-image-cta > .ml-shell > b {
   justify-self: end;
   align-self: center;
   color: white;
