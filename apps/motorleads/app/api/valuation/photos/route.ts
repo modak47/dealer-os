@@ -13,7 +13,7 @@ const allowed = new Map([
   ["image/heif", "heif"],
 ]);
 const maxFiles = 20;
-const maxBytes = 15 * 1024 * 1024;
+const maxBytes = 4 * 1024 * 1024;
 
 export async function GET() {
   try {
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     for (const [index, file] of files.entries()) {
       const extension = allowed.get(file.type);
       if (!extension) return NextResponse.json({ error: `${file.name} is not a supported image type.` }, { status: 400 });
-      if (file.size > maxBytes) return NextResponse.json({ error: `${file.name} is larger than 15MB.` }, { status: 400 });
+      if (file.size > maxBytes) return NextResponse.json({ error: `${file.name} is still too large after resizing. Please choose a photo under 4MB.` }, { status: 400 });
       const path = `${draft.id}/${randomUUID()}.${extension}`;
       const buffer = Buffer.from(await file.arrayBuffer());
       const upload = await db.storage.from(photoBucket).upload(path, buffer, { contentType: file.type, upsert: false });

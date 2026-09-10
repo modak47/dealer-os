@@ -11,6 +11,8 @@ type Seller = FormRecord;
 
 const steps = ["Your motorcycle", "Condition & history", "Photos", "Offers"];
 const photoGuidance = ["Front", "Rear", "Left side", "Right side", "Dashboard", "Damage", "Service history"];
+const maxUploadBytes = 4 * 1024 * 1024;
+const maxPhotoEdge = 1800;
 type UploadedPhoto = {
   id?: string;
   preview_url?: string | null;
@@ -92,15 +94,26 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
     setUploading(true);
     setMessage("");
     const body = new FormData();
-    Array.from(files).forEach(file => body.append("photos", file));
-    const response = await fetch("/api/valuation/photos", { method: "POST", body });
-    const payload = await response.json().catch(() => ({}));
-    setUploading(false);
-    if (!response.ok) {
-      setMessage(payload.error || "Photo upload failed.");
-      return;
+    try {
+      const prepared = await Promise.all(Array.from(files).map(preparePhotoForUpload));
+      const oversized = prepared.find(file => file.size > maxUploadBytes);
+      if (oversized) {
+        setMessage(`${oversized.name} is too large to upload. Please choose a smaller photo or screenshot.`);
+        return;
+      }
+      prepared.forEach(file => body.append("photos", file));
+      const response = await fetch("/api/valuation/photos", { method: "POST", body });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setMessage(payload.error || "Photo upload failed. Please try a smaller photo.");
+        return;
+      }
+      setPhotos(current => [...current, ...(payload.photos || [])]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Photo upload failed. Please try a smaller photo.");
+    } finally {
+      setUploading(false);
     }
-    setPhotos(current => [...current, ...(payload.photos || [])]);
   }
 
   async function submit() {
@@ -178,7 +191,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
         <h2>Add some photos</h2>
         <p>Good photos help dealers give you better offers. You can add up to 20 and continue without them if needed.</p>
         <div className="mg-photo-guidance">{photoGuidance.map(item => <span key={item}>{item}</span>)}</div>
-        <label className="mg-uploader"><input type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={event => upload(event.target.files)} /><b>{uploading ? "Uploading..." : "Choose photos"}</b><small>JPG, PNG, WEBP, HEIC or HEIF. Max 15MB each.</small></label>
+        <label className="mg-uploader"><input type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={event => upload(event.target.files)} /><b>{uploading ? "Uploading..." : "Choose photos"}</b><small>JPG, PNG and WEBP are resized automatically. HEIC/HEIF must be under 4MB.</small></label>
         <div className="mg-photo-count">{photos.length ? `${photos.length} photos added` : "No photos added yet"}</div>
         {photos.length > 0 && <div className="mg-photo-preview-grid" aria-label="Uploaded photo previews">
           {photos.map((photo, index) => <figure key={photo.id || `${photo.original_filename}-${index}`}>
@@ -238,4 +251,41 @@ function Radio({ label, value, set, options }: { label: string; value: unknown; 
 
 function displayValue(value: unknown, fallback: string) {
   return value === null || value === undefined || value === "" || typeof value === "object" ? fallback : String(value);
+}
+
+async function preparePhotoForUpload(file: File) {
+  if (file.size <= maxUploadBytes || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) return file;
+  const dataUrl = await readAsDataUrl(file);
+  const image = await loadImage(dataUrl);
+  const scale = Math.min(1, maxPhotoEdge / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) return file;
+  context.drawImage(image, 0, 0, width, height);
+  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.82));
+  if (!blob) return file;
+  const safeName = file.name.replace(/\.[^.]+$/, "") || "photo";
+  return new File([blob], `${safeName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+}
+
+function readAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}. Please try another photo.`));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not prepare that photo. Please try another image."));
+    image.src = src;
+  });
 }
