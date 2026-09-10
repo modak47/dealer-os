@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { DealerPaymentsV4Preview } from "@/app/dealer-v4-preview/components";
 
 export const metadata: Metadata = {
-  title: "MotorLeads Payments V4 Preview",
+  title: "MotorGeeks Payments V4 Preview",
   robots: { index: false, follow: false },
 };
 

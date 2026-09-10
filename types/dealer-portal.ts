@@ -1,6 +1,6 @@
 import type { WebsiteLead } from "./website-lead";
 
-export type DealerPortalAccountStatus = "pending" | "active" | "suspended" | "closed";
+export type DealerPortalAccountStatus = "pending" | "active" | "suspended" | "rejected" | "closed";
 export type DealerPortalUserRole = "dealer_admin" | "dealer_user";
 export type DealerLeadAllocationStatus = "available" | "claimed" | "expired" | "withdrawn" | "excluded";
 export type DealerLeadClaimStatus = "claimed" | "attempting_contact" | "contacted" | "offer_made" | "negotiating" | "agreed_to_purchase" | "collection_booked" | "purchased" | "lost" | "returned_to_pool" | "purchased_later";

@@ -16,7 +16,7 @@ function source(path: string) {
 
 describe("dealer notification content contract", () => {
   it("builds new-lead payloads from dealer-safe fields only", () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://dealers.yesmoto.co.uk";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://motorgeeks.co.uk";
     const payload = buildDealerSafeLeadNotificationPayload({
       id: 42,
       year: 2019,
@@ -47,6 +47,7 @@ describe("dealer notification content contract", () => {
     ].sort());
     assert.equal(payload.approximate_location, "Redbridge");
     assert.equal(payload.approximate_distance_miles, 52.2);
+    assert.equal(payload.dealer_portal_url, "https://motorgeeks.co.uk/dealer-portal/leads/42");
     assert.equal(JSON.stringify(payload).includes("07123"), false);
     assert.equal(JSON.stringify(payload).includes("seller@example.com"), false);
     assert.equal(JSON.stringify(payload).includes("IG1 1AA"), false);
@@ -70,6 +71,8 @@ describe("dealer notification content contract", () => {
     } as never, 52);
     assert.match(message.body, /2019 KTM 790 Duke/);
     assert.match(message.body, /Redbridge/);
+    assert.match(message.subject, /New lead matching your preferences/);
+    assert.match(message.body, /View Lead: .*\/dealer-portal\/leads\/42/);
     assert.doesNotMatch(message.body, /07123|seller@example\.com|IG1 1AA|6500|3500/);
   });
 

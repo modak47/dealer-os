@@ -22,8 +22,8 @@ export function leadOpportunityEventType(allocationMethod: DealerLeadAllocation[
   return "new_suitable_lead";
 }
 
-export function dealerPortalLink() {
-  return absoluteUrl("/dealer-portal");
+export function dealerPortalLink(leadId?: number | string | null) {
+  return absoluteUrl(leadId ? `/dealer-portal/leads/${leadId}` : "/dealer-portal");
 }
 
 export function buildDealerSafeLeadNotificationPayload(lead: LeadNotificationLead, distanceMiles?: number | null) {
@@ -35,7 +35,7 @@ export function buildDealerSafeLeadNotificationPayload(lead: LeadNotificationLea
     mileage: formatMileage(lead.mileage),
     approximate_location: lead.location_town ?? null,
     approximate_distance_miles: typeof distanceMiles === "number" && Number.isFinite(distanceMiles) ? Math.round(distanceMiles * 10) / 10 : null,
-    dealer_portal_url: dealerPortalLink(),
+    dealer_portal_url: dealerPortalLink(lead.id ?? null),
   };
 }
 
@@ -48,14 +48,14 @@ export function buildLeadOpportunityMessage(lead: LeadNotificationLead, distance
     payload.approximate_distance_miles != null ? `Approx distance: ${payload.approximate_distance_miles} miles` : null,
   ].filter(Boolean);
   return {
-    subject: `New YesMoto dealer opportunity: ${vehicle}`,
+    subject: `New lead matching your preferences: ${vehicle}`,
     body: [
-      `A motorcycle opportunity is available in the Dealer Portal.`,
+      `New matching lead`,
       "",
       vehicle,
       ...details,
       "",
-      `Open Dealer Portal: ${payload.dealer_portal_url}`,
+      `View Lead: ${payload.dealer_portal_url}`,
     ].join("\n"),
     payload,
   };
@@ -66,7 +66,7 @@ export function buildClaimEventPayload(leadId: number, claimId: string | null, s
     lead_id: leadId,
     claim_id: claimId,
     result: status,
-    dealer_portal_url: dealerPortalLink(),
+    dealer_portal_url: dealerPortalLink(leadId),
   };
 }
 
@@ -87,14 +87,14 @@ export function buildCommercialFeeMessage(input: {
       vehicle ? `Vehicle: ${vehicle}` : null,
       `Fee amount: ${amount}`,
       "",
-      `Open Dealer Portal: ${dealerPortalLink()}`,
+      `Open Dealer Portal: ${dealerPortalLink(input.lead?.id ?? null)}`,
     ].filter(Boolean).join("\n"),
     payload: {
       purchase_id: input.purchaseId,
       fee_id: input.feeId,
       fee_amount: input.feeAmount,
       vehicle: vehicle || null,
-      dealer_portal_url: dealerPortalLink(),
+      dealer_portal_url: dealerPortalLink(input.lead?.id ?? null),
     },
   };
 }

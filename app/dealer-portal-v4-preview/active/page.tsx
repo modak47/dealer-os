@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { DealerActiveLeadsV4Preview } from "@/app/dealer-v4-preview/components";
 
 export const metadata: Metadata = {
-  title: "MotorLeads Active Leads V4 Preview",
+  title: "MotorGeeks Active Leads V4 Preview",
   robots: { index: false, follow: false },
 };
 

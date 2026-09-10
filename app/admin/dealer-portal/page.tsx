@@ -26,7 +26,7 @@ const emptyAccount: Partial<DealerPortalAccountWithPreferences> = {
   telephone: "",
   mobile_whatsapp: "",
   postcode: "",
-  account_status: "active",
+  account_status: "pending",
   successful_purchase_fee: 50,
   attribution_period_days: 60,
 };
@@ -128,6 +128,12 @@ export default function DealerPortalAdminPage() {
   }, []);
 
   const activeAccounts = useMemo(() => accounts.filter(account => account.account_status === "active"), [accounts]);
+  const groupedAccounts = useMemo(() => ({
+    pending: accounts.filter(account => account.account_status === "pending"),
+    active: accounts.filter(account => account.account_status === "active"),
+    rejected: accounts.filter(account => account.account_status === "rejected"),
+    suspended: accounts.filter(account => account.account_status === "suspended"),
+  }), [accounts]);
   const portalLeads = useMemo(() => leads.filter(lead => String(lead.status ?? "").startsWith("dealer_")), [leads]);
   const releaseableLeads = useMemo(() => leads.filter(lead => !["purchased", "internal_buying", "purchase_agreed", "dealer_claimed", "dealer_purchased"].includes(String(lead.status ?? ""))), [leads]);
   const releaseQueue = useMemo(() => {
@@ -187,7 +193,7 @@ export default function DealerPortalAdminPage() {
     const payload = await response.json();
     if (response.ok) {
       const savedAccount = payload.account as DealerPortalAccountWithPreferences;
-      if (access.email.trim()) {
+      if (access.email.trim() && savedAccount.account_status === "active") {
         const accessResponse = await fetch(`/api/dealer-portal/admin/accounts/${savedAccount.id}/users`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -200,7 +206,7 @@ export default function DealerPortalAdminPage() {
           return;
         }
       }
-      setNotice(access.email.trim() ? "Dealer saved and portal login linked." : creating ? "Dealer portal account created." : "Dealer portal account updated.");
+      setNotice(access.email.trim() && savedAccount.account_status === "active" ? "Dealer saved and portal login linked." : savedAccount.account_status !== "active" ? "Dealer saved. Portal login access remains blocked until the account is active." : creating ? "Dealer portal account created." : "Dealer portal account updated.");
       setEditing(null);
       setAccess(emptyAccess);
       await load();
@@ -241,6 +247,23 @@ export default function DealerPortalAdminPage() {
       setError(`Released with ${failures.length} failure(s). ${failures.join(" ")}`);
       await load();
     }
+    setSaving(false);
+  }
+
+  async function setAccountStatus(account: DealerPortalAccountWithPreferences, accountStatus: DealerPortalAccount["account_status"]) {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    const response = await fetch(`/api/dealer-portal/admin/accounts/${account.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...account, account_status: accountStatus }),
+    });
+    const payload = await response.json();
+    if (response.ok) {
+      setNotice(`${account.trading_name} set to ${statusLabel(accountStatus)}.`);
+      await load();
+    } else setError(payload.error || "Unable to update dealer status.");
     setSaving(false);
   }
 
@@ -308,7 +331,7 @@ export default function DealerPortalAdminPage() {
       {activeTab === "dealers" && <section className="dealer-admin-panel">
         <section className="website-detail-card dealer-portal-accounts">
           <header><div><h2>Portal Dealers</h2><p>Dealer accounts are hidden from the daily view to keep this page cleaner.</p></div><button className="admin-primary" onClick={() => startEditing(emptyAccount)}>Add Portal Dealer</button></header>
-          {loading ? <p>Loading accounts...</p> : !accounts.length ? <p>No dealer portal accounts yet.</p> : <div className="dealer-contact-grid">{accounts.map(account => <article className="dealer-contact-card" key={account.id}><header><div><span>{account.account_status}</span><h2>{account.trading_name}</h2><p>{account.main_contact || "No main contact"} · {account.postcode || "Postcode not set"}</p></div><b>{new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(Number(account.successful_purchase_fee ?? 0))}</b></header><dl><div><dt>Email</dt><dd>{account.main_email || "-"}</dd></div><div><dt>Phone</dt><dd>{account.telephone || account.mobile_whatsapp || "-"}</dd></div><div><dt>Attribution</dt><dd>{account.attribution_period_days} days</dd></div><div><dt>Auto Trader</dt><dd>{account.autotrader_dealer_ref || "-"}</dd></div></dl><nav><button onClick={() => startEditing(account)}>Edit / Login</button></nav></article>)}</div>}
+          {loading ? <p>Loading accounts...</p> : !accounts.length ? <p>No dealer portal accounts yet.</p> : <div className="dealer-status-groups">{(["pending", "active", "rejected", "suspended"] as const).map(group => <section key={group}><h3>{group === "active" ? "Active / Approved" : statusLabel(group)}</h3><div className="dealer-contact-grid">{groupedAccounts[group].length ? groupedAccounts[group].map(account => <DealerAccountCard account={account} saving={saving} onEdit={() => startEditing(account)} onStatus={status => void setAccountStatus(account, status)} key={account.id} />) : <p>No {group === "active" ? "approved" : group} dealer accounts.</p>}</div></section>)}</div>}
         </section>
       </section>}
       {activeTab === "oversight" && <section className="dealer-admin-panel">
@@ -326,6 +349,14 @@ export default function DealerPortalAdminPage() {
     </section>
     {editing && <DealerAccountModal editing={editing} access={access} saving={saving} setAccess={setAccess} setField={setField} setBuyingField={setBuyingField} setGeographyField={setGeographyField} onSubmit={saveAccount} onClose={() => { setEditing(null); setAccess(emptyAccess); }} />}
   </main>;
+}
+
+function DealerAccountCard({ account, saving, onEdit, onStatus }: { account: DealerPortalAccountWithPreferences; saving: boolean; onEdit: () => void; onStatus: (status: DealerPortalAccount["account_status"]) => void }) {
+  return <article className="dealer-contact-card">
+    <header><div><span>{account.account_status}</span><h2>{account.trading_name}</h2><p>{account.main_contact || "No main contact"} · {account.postcode || "Postcode not set"}</p></div><b>{new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(Number(account.successful_purchase_fee ?? 0))}</b></header>
+    <dl><div><dt>Email</dt><dd>{account.main_email || "-"}</dd></div><div><dt>Phone</dt><dd>{account.telephone || account.mobile_whatsapp || "-"}</dd></div><div><dt>Submitted</dt><dd>{formatLeadDate(account.created_at)}</dd></div><div><dt>Website / reference</dt><dd>{account.website || account.autotrader_dealer_ref || "-"}</dd></div><div><dt>Address</dt><dd>{account.trading_address || account.registered_address || account.postcode || "-"}</dd></div><div><dt>Internal notes</dt><dd>{account.internal_notes || "-"}</dd></div></dl>
+    <nav><button onClick={onEdit}>Edit / Login</button>{account.account_status !== "active" && <button disabled={saving} onClick={() => onStatus("active")}>Approve</button>}{account.account_status !== "rejected" && <button disabled={saving} onClick={() => onStatus("rejected")}>Reject</button>}{account.account_status !== "suspended" && <button disabled={saving} onClick={() => onStatus("suspended")}>Suspend</button>}</nav>
+  </article>;
 }
 
 function DealerAccountModal({ editing, access, saving, setAccess, setField, setBuyingField, setGeographyField, onSubmit, onClose }: {
@@ -357,7 +388,7 @@ function DealerAccountModal({ editing, access, saving, setAccess, setField, setB
           {tabs.map(([key, label, sub]) => <button className={modalTab === key ? "active" : ""} type="button" onClick={() => setModalTab(key)} key={key}><b>{label}</b><span>{sub}</span></button>)}
         </nav>
         <div className="dealer-modal-tab-body">
-          {modalTab === "account" && <section className="dealer-modal-section"><h3><span>01</span>Dealer Account</h3><div className="dealer-modal-grid"><Input label="Trading name" value={editing.trading_name ?? ""} set={v => setField("trading_name", v)} required /><Input label="Limited company" value={editing.limited_company_name ?? ""} set={v => setField("limited_company_name", v)} /><Input label="Company reg" value={editing.company_registration_number ?? ""} set={v => setField("company_registration_number", v)} /><Input label="VAT number" value={editing.vat_number ?? ""} set={v => setField("vat_number", v)} /><Input label="Main contact" value={editing.main_contact ?? ""} set={v => setField("main_contact", v)} /><Input label="Main email" value={editing.main_email ?? ""} set={v => setField("main_email", v)} type="email" /><Input label="Telephone" value={editing.telephone ?? ""} set={v => setField("telephone", v)} /><Input label="WhatsApp/mobile" value={editing.mobile_whatsapp ?? ""} set={v => setField("mobile_whatsapp", v)} /><Input label="Accounts email" value={editing.accounts_email ?? ""} set={v => setField("accounts_email", v)} type="email" /><Input label="Website" value={editing.website ?? ""} set={v => setField("website", v)} /><Input label="Postcode" value={editing.postcode ?? ""} set={v => setField("postcode", v)} /><Input label="Auto Trader ref" value={editing.autotrader_dealer_ref ?? ""} set={v => setField("autotrader_dealer_ref", v)} /><label><span>Status</span><select value={editing.account_status ?? "pending"} onChange={event => setField("account_status", event.target.value)}><option value="pending">Pending</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="closed">Closed</option></select></label><Input label="Purchase fee" value={String(editing.successful_purchase_fee ?? 50)} set={v => setField("successful_purchase_fee", Number(v))} type="number" /><Input label="Attribution days" value={String(editing.attribution_period_days ?? 60)} set={v => setField("attribution_period_days", Number(v))} type="number" /><label className="full"><span>Trading address</span><textarea value={editing.trading_address ?? ""} onChange={event => setField("trading_address", event.target.value)} /></label><label className="full"><span>Registered address</span><textarea value={editing.registered_address ?? ""} onChange={event => setField("registered_address", event.target.value)} /></label><label className="full compact-notes"><span>Internal notes</span><textarea value={editing.internal_notes ?? ""} onChange={event => setField("internal_notes", event.target.value)} /></label></div></section>}
+          {modalTab === "account" && <section className="dealer-modal-section"><h3><span>01</span>Dealer Account</h3><div className="dealer-modal-grid"><Input label="Trading name" value={editing.trading_name ?? ""} set={v => setField("trading_name", v)} required /><Input label="Limited company" value={editing.limited_company_name ?? ""} set={v => setField("limited_company_name", v)} /><Input label="Company reg" value={editing.company_registration_number ?? ""} set={v => setField("company_registration_number", v)} /><Input label="VAT number" value={editing.vat_number ?? ""} set={v => setField("vat_number", v)} /><Input label="Main contact" value={editing.main_contact ?? ""} set={v => setField("main_contact", v)} /><Input label="Main email" value={editing.main_email ?? ""} set={v => setField("main_email", v)} type="email" /><Input label="Telephone" value={editing.telephone ?? ""} set={v => setField("telephone", v)} /><Input label="WhatsApp/mobile" value={editing.mobile_whatsapp ?? ""} set={v => setField("mobile_whatsapp", v)} /><Input label="Accounts email" value={editing.accounts_email ?? ""} set={v => setField("accounts_email", v)} type="email" /><Input label="Website" value={editing.website ?? ""} set={v => setField("website", v)} /><Input label="Postcode" value={editing.postcode ?? ""} set={v => setField("postcode", v)} /><Input label="Auto Trader ref" value={editing.autotrader_dealer_ref ?? ""} set={v => setField("autotrader_dealer_ref", v)} /><label><span>Status</span><select value={editing.account_status ?? "pending"} onChange={event => setField("account_status", event.target.value)}><option value="pending">Pending</option><option value="active">Active</option><option value="rejected">Rejected</option><option value="suspended">Suspended</option><option value="closed">Closed</option></select></label><Input label="Purchase fee" value={String(editing.successful_purchase_fee ?? 50)} set={v => setField("successful_purchase_fee", Number(v))} type="number" /><Input label="Attribution days" value={String(editing.attribution_period_days ?? 60)} set={v => setField("attribution_period_days", Number(v))} type="number" /><label className="full"><span>Trading address</span><textarea value={editing.trading_address ?? ""} onChange={event => setField("trading_address", event.target.value)} /></label><label className="full"><span>Registered address</span><textarea value={editing.registered_address ?? ""} onChange={event => setField("registered_address", event.target.value)} /></label><label className="full compact-notes"><span>Internal notes</span><textarea value={editing.internal_notes ?? ""} onChange={event => setField("internal_notes", event.target.value)} /></label></div></section>}
           {modalTab === "buying" && <section className="dealer-modal-section"><h3><span>02</span>Buying Preferences</h3><div className="dealer-modal-grid"><AdminTextListInput label="Types" value={buying.motorcycle_types} set={value => setBuyingField("motorcycle_types", value)} /><AdminTextListInput label="Makes wanted" value={buying.makes_wanted} set={value => setBuyingField("makes_wanted", value)} /><AdminTextListInput label="Makes excluded" value={buying.makes_excluded} set={value => setBuyingField("makes_excluded", value)} /><AdminTextListInput label="Models wanted" value={buying.models_wanted} set={value => setBuyingField("models_wanted", value)} /><AdminNumberPreference label="Minimum year" value={buying.minimum_year} set={value => setBuyingField("minimum_year", value)} /><AdminNumberPreference label="Max age years" value={buying.maximum_age_years} set={value => setBuyingField("maximum_age_years", value)} /><AdminNumberPreference label="Min value" value={buying.minimum_value} set={value => setBuyingField("minimum_value", value)} /><AdminNumberPreference label="Max value" value={buying.maximum_value} set={value => setBuyingField("maximum_value", value)} /><AdminNumberPreference label="Max mileage" value={buying.maximum_mileage} set={value => setBuyingField("maximum_mileage", value)} /><AdminNumberPreference label="Min engine cc" value={buying.minimum_engine_cc} set={value => setBuyingField("minimum_engine_cc", value)} /><AdminNumberPreference label="Max engine cc" value={buying.maximum_engine_cc} set={value => setBuyingField("maximum_engine_cc", value)} /></div></section>}
           {modalTab === "history" && <section className="dealer-modal-section dealer-modal-split"><div><h3><span>03</span>Vehicle History Rules</h3><p>These rules are for preference matching later. They do not expose internal valuation data to the dealer.</p></div><div className="dealer-modal-checks"><AdminCheckbox label="Accept non-running" checked={buying.accepts_non_running} set={value => setBuyingField("accepts_non_running", value)} /><AdminCheckbox label="Accept insurance category" checked={buying.accepts_insurance_category} set={value => setBuyingField("accepts_insurance_category", value)} /><AdminCheckbox label="Accept outstanding finance" checked={buying.accepts_outstanding_finance} set={value => setBuyingField("accepts_outstanding_finance", value)} /><AdminCheckbox label="Accept imported" checked={buying.accepts_imported} set={value => setBuyingField("accepts_imported", value)} /><AdminCheckbox label="Accept modified" checked={buying.accepts_modified} set={value => setBuyingField("accepts_modified", value)} /></div></section>}
           {modalTab === "geography" && <section className="dealer-modal-section dealer-modal-split"><div><h3><span>04</span>Geography</h3><p>Set where this dealer wants to buy from, plus the maximum distance from their dealership.</p></div><div><div className="dealer-modal-checks"><AdminCheckbox label="England" checked={geography.england} set={value => setGeographyField("england", value)} /><AdminCheckbox label="Wales" checked={geography.wales} set={value => setGeographyField("wales", value)} /><AdminCheckbox label="Scotland" checked={geography.scotland} set={value => setGeographyField("scotland", value)} /><AdminCheckbox label="Northern Ireland" checked={geography.northern_ireland} set={value => setGeographyField("northern_ireland", value)} /><AdminCheckbox label="Republic of Ireland" checked={geography.republic_of_ireland} set={value => setGeographyField("republic_of_ireland", value)} /></div><div className="dealer-modal-radius"><AdminNumberPreference label="Buying radius miles" value={geography.maximum_radius_miles} set={value => setGeographyField("maximum_radius_miles", value)} /></div></div></section>}

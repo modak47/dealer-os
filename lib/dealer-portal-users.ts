@@ -46,6 +46,7 @@ export async function inviteOrLinkDealerPortalUser(session: DealerPortalSession,
   }
 
   await assertSingleDealerAccountForUser(authUser.id, session.dealer.id);
+  await assertDealerPortalUserLimit(session.dealer.id, authUser.id);
   const currentUserId = await getCurrentUserId();
   const { data, error } = await db.from("dealer_portal_users").upsert({
     dealer_account_id: session.dealer.id,
@@ -64,6 +65,19 @@ export async function inviteOrLinkDealerPortalUser(session: DealerPortalSession,
     eventData: { email, role, managed_by: session.userId },
   });
   return { portalUser: { ...(data as DealerPortalUser), role: cleanDealerPortalUserRole((data as DealerPortalUser).role), email }, invited };
+}
+
+export async function assertDealerPortalUserLimit(dealerAccountId: string, incomingUserId: string, maxUsers = 4) {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("dealer_portal_users")
+    .select("user_id")
+    .eq("dealer_account_id", dealerAccountId)
+    .eq("active", true);
+  if (error) throw new Error(`Unable to verify dealership user limit: ${error.message}`);
+  const activeUsers = new Set((data ?? []).map(row => String(row.user_id)));
+  if (!activeUsers.has(incomingUserId) && activeUsers.size >= maxUsers) {
+    throw new Error("Dealer Portal accounts are limited to one main account and three additional users.");
+  }
 }
 
 export async function updateDealerPortalUserForSession(session: DealerPortalSession, portalUserId: string, body: Record<string, unknown>) {

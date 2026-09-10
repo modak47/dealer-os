@@ -14,6 +14,12 @@ const dealerBuyingPreferenceAuditFields = ["motorcycle_types", "makes_wanted", "
 const dealerGeographyPreferenceAuditFields = ["england", "wales", "scotland", "northern_ireland", "republic_of_ireland", "maximum_radius_miles"];
 
 export async function getCurrentDealerPortalAccount() {
+  const membership = await getCurrentDealerPortalMembership();
+  if (!membership || membership.dealer.account_status !== "active") return null;
+  return membership;
+}
+
+export async function getCurrentDealerPortalMembership() {
   const userId = await getCurrentUserId();
   if (!userId) return null;
   const { data, error } = await getSupabaseAdminClient()
@@ -25,11 +31,11 @@ export async function getCurrentDealerPortalAccount() {
   const relatedDealer = Array.isArray(data?.dealer) ? data.dealer[0] : data?.dealer;
   if (error || !relatedDealer) return null;
   const dealer = relatedDealer as unknown as DealerPortalAccount;
-  if (dealer.account_status !== "active") return null;
   return { userId, role: normaliseDealerRole(data?.role), dealer: await withDealerPreferences(dealer) };
 }
 
 export type DealerPortalSession = NonNullable<Awaited<ReturnType<typeof getCurrentDealerPortalAccount>>>;
+export type DealerPortalMembership = NonNullable<Awaited<ReturnType<typeof getCurrentDealerPortalMembership>>>;
 
 export function normaliseDealerRole(value: unknown): DealerPortalUserRole {
   return value === "dealer_admin" ? "dealer_admin" : "dealer_user";
@@ -64,7 +70,7 @@ export function cleanDealerAccountPayload(body: Record<string, unknown>, userId:
     updated_by: userId,
   };
   if (!payload.trading_name) throw new Error("Trading name is required.");
-  if (!["pending", "active", "suspended", "closed"].includes(String(payload.account_status))) throw new Error("Account status is invalid.");
+  if (!["pending", "active", "suspended", "rejected", "closed"].includes(String(payload.account_status))) throw new Error("Account status is invalid.");
   if (creating) payload.created_by = userId;
   return payload;
 }

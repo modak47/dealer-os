@@ -17,6 +17,11 @@ type PortalData = {
   available: DealerVisibleLead[];
   claimed: DealerVisibleLead[];
 };
+type PortalStatus = {
+  accountStatus?: DealerPortalAccount["account_status"];
+  dealer?: Pick<DealerPortalAccount, "id" | "trading_name" | "main_email"> | null;
+  error?: string;
+};
 
 type PortalSection = "dashboard" | "opportunities" | "active" | "purchased" | "lost" | "payments" | "dealership" | "settings" | "support";
 type LeadTab = "overview" | "vehicle-check" | "mot" | "location" | "customer";
@@ -90,17 +95,17 @@ export function DealerLoginV4Live({ configured }: { configured: boolean }) {
     <section className={styles.loginHero}>
       <Link className={styles.loginBack} href="/">← Back to website</Link>
       <div className={styles.loginCopy}>
-        <MotorLeadsLogo />
+        <MotorGeeksLogo />
         <h1>Dealer access to quality motorcycle <span>opportunities</span></h1>
         <p>Join a network of verified motorcycle dealers and get access to genuine seller opportunities across the UK.</p>
-        <ul><li>Real seller enquiries</li><li>High quality, verified motorcycles</li><li>A simple, secure platform</li></ul>
+        <ul><li><MotorGeeksTick />Real seller enquiries</li><li><MotorGeeksTick />High quality, verified motorcycles</li><li><MotorGeeksTick />A simple, secure platform</li></ul>
       </div>
       <p className={styles.scribble}>The right bikes. The right buyers.</p>
     </section>
     <section className={styles.loginLower}>
       <form className={styles.loginCard} onSubmit={submit}>
         <h2>Dealer login</h2>
-        <p>Log in to access your MotorLeads dealer portal.</p>
+        <p>Log in to access your MotorGeeks dealer portal.</p>
         <label className={styles.field}>Email address<input value={email} onChange={event => setEmail(event.target.value)} placeholder="yourname@dealership.co.uk" type="email" autoComplete="email" required disabled={!configured || loading} /></label>
         <label className={`${styles.field} ${styles.password}`}>Password<input value={password} onChange={event => setPassword(event.target.value)} placeholder="Enter your password" type="password" autoComplete="current-password" required disabled={!configured || loading} /><span>◉</span></label>
         <div className={styles.loginOptions}>
@@ -110,15 +115,15 @@ export function DealerLoginV4Live({ configured }: { configured: boolean }) {
         {message && <p className={message.includes("sent") ? styles.successMessage : styles.errorMessage}>{message}</p>}
         <button className={styles.orangeButton} type="submit" disabled={!configured || loading}>{loading ? "Logging in..." : "Log in →"}</button>
         <div className={styles.divider}>or</div>
-        <Link className={styles.outlineButton} href="/dealer-access">Request dealer access →</Link>
-        <Link className={styles.loginNetwork} href="/dealer-access">Not a dealer yet? Join our verified dealer network</Link>
+        <a className={styles.outlineButton} href="mailto:support@motorgeeks.co.uk?subject=Dealer%20access%20request">Request dealer access →</a>
+        <a className={styles.loginNetwork} href="mailto:support@motorgeeks.co.uk?subject=Dealer%20access%20request">Not a dealer yet? Join our verified dealer network</a>
       </form>
       <aside className={styles.benefitColumn}>
         <Benefit icon={<ShieldIcon />} title="Verified dealer network">All dealers are reviewed and approved before access is granted.</Benefit>
         <Benefit icon={<ChartIcon />} title="Genuine opportunities">Access real seller motorcycle enquiries, not duplicated or low quality leads.</Benefit>
         <Benefit icon={<LockIcon />} title="Secure and confidential">Your account and all data is protected with industry standard security.</Benefit>
         <Benefit icon={<SupportIcon />} title="Support when you need it">Our team is here to help if you have any questions.</Benefit>
-        <div className={styles.quote}><p>MotorLeads dealer access is available to approved motorcycle dealers only.</p></div>
+        <div className={styles.quote}><p>MotorGeeks dealer access is available to approved motorcycle dealers only.</p></div>
         <p className={`${styles.scribble} ${styles.lowerScribble}`}>More opportunities ahead.</p>
       </aside>
     </section>
@@ -127,6 +132,7 @@ export function DealerLoginV4Live({ configured }: { configured: boolean }) {
 
 export function DealerPortalV4Live({ section = "dashboard" }: { section?: PortalSection }) {
   const [data, setData] = useState<PortalData | null>(null);
+  const [status, setStatus] = useState<PortalStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -136,8 +142,14 @@ export function DealerPortalV4Live({ section = "dashboard" }: { section?: Portal
     setError("");
     const response = await fetch("/api/dealer-portal/leads", { cache: "no-store" });
     const payload = await response.json();
-    if (response.ok) setData(payload);
-    else setError(payload.error || "Unable to load dealer portal.");
+    if (response.ok) {
+      setData(payload);
+      setStatus(null);
+    } else {
+      setData(null);
+      setStatus(response.status === 403 ? payload : null);
+      setError(payload.error || "Unable to load dealer portal.");
+    }
     setLoading(false);
   }, []);
 
@@ -153,7 +165,7 @@ export function DealerPortalV4Live({ section = "dashboard" }: { section?: Portal
   }
 
   if (loading) return <V4Loading label="Loading dealer portal..." />;
-  if (!data) return <DealerUnavailable error={error} />;
+  if (!data) return <DealerUnavailable error={error} status={status} />;
 
   const active = activeLeads(data.claimed);
   const purchased = purchasedLeads(data.claimed);
@@ -175,6 +187,7 @@ export function DealerPortalV4Live({ section = "dashboard" }: { section?: Portal
 
 export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
   const [data, setData] = useState<PortalData | null>(null);
+  const [status, setStatus] = useState<PortalStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -191,8 +204,14 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
     setError("");
     const response = await fetch("/api/dealer-portal/leads", { cache: "no-store" });
     const payload = await response.json();
-    if (response.ok) setData(payload);
-    else setError(payload.error || "Unable to load this opportunity.");
+    if (response.ok) {
+      setData(payload);
+      setStatus(null);
+    } else {
+      setData(null);
+      setStatus(response.status === 403 ? payload : null);
+      setError(payload.error || "Unable to load this opportunity.");
+    }
     setLoading(false);
   }, []);
 
@@ -248,7 +267,7 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
   }
 
   if (loading) return <V4Loading label="Loading opportunity..." />;
-  if (!data) return <DealerUnavailable error={error} />;
+  if (!data) return <DealerUnavailable error={error} status={status} />;
   if (!lead) return <DealerV4Shell dealer={data.dealer} section="opportunities" counts={shellCounts(data)}><section className={styles.dashboard}><Link className={styles.breadcrumb} href="/dealer-portal/opportunities">← Back to opportunities</Link><EmptyPanel title="Lead not available" copy="This opportunity is not currently available to your dealership, or it has moved out of your authorised portal records." /></section></DealerV4Shell>;
 
   return <DealerV4Shell dealer={data.dealer} section="opportunities" counts={shellCounts(data)}>
@@ -286,7 +305,7 @@ function Dashboard({ data, active, purchased, lost }: { data: PortalData; active
         <EmptyInline copy="Dealer notification delivery is recorded by the live notification ledger when lifecycle events occur." />
       </Panel>
     </section>
-    <aside className={styles.tip}><LightbulbIcon /><p><strong>Tip:</strong> Keep your dealership profile current to help MotorLeads match you with relevant opportunities.</p><Link href="/dealer-portal/settings">Update my profile →</Link></aside>
+    <aside className={styles.tip}><LightbulbIcon /><p><strong>Tip:</strong> Keep your dealership profile current to help MotorGeeks match you with relevant opportunities.</p><Link href="/dealer-portal/settings">Update my profile →</Link></aside>
   </section>;
 }
 
@@ -408,7 +427,7 @@ function OverviewTab({ lead }: { lead: DealerVisibleLead }) {
 
 function VehicleCheckTab({ lead }: { lead: DealerVisibleLead }) {
   const check = lead.portal_vehicle_check;
-  if (!check) return <section className={styles.singlePanelGrid}><Panel title="Vehicle Check" link="Not available"><p>Vehicle check not yet available. MotorLeads will show the HPI-style summary once it has been stored.</p></Panel></section>;
+  if (!check) return <section className={styles.singlePanelGrid}><Panel title="Vehicle Check" link="Not available"><p>Vehicle check not yet available. MotorGeeks will show the HPI-style summary once it has been stored.</p></Panel></section>;
   const reportHref = check.report_url ? `/api/autotrader/vehicle-check-report?url=${encodeURIComponent(check.report_url)}` : "";
   return <section className={styles.singlePanelGrid}><Panel title="Vehicle Check" link={check.status}><div className={styles.checkHeader}><strong>{check.clear === false ? "Needs review" : check.clear === true ? "Clear" : check.status}</strong>{reportHref && <a className={styles.rowAction} href={reportHref} target="_blank" rel="noreferrer">View report →</a>}</div><div className={styles.checkGrid}>{check.flags.map(flag => <article className={`${styles.checkResult} ${flag.state === "warning" ? styles.warning : flag.state === "clear" ? styles.clear : ""}`} key={flag.key}><b>{flag.state === "warning" ? "!" : flag.state === "clear" ? "OK" : "?"}</b><div><strong>{flag.label}</strong><span>{flag.detail}</span></div></article>)}</div>{check.details.length > 0 && <div className={styles.factTable}>{check.details.map(item => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>}</Panel></section>;
 }
@@ -532,7 +551,7 @@ function PaymentsPanel() {
 }
 
 function DealershipPanel({ dealer }: { dealer: DealerPortalAccountWithPreferences }) {
-  return <section className={styles.dashboard}><div className={styles.dashboardHeader}><div><h1>My Dealership</h1><p>Company profile and account information held by MotorLeads.</p></div><Link className={styles.blueButton} href="/dealer-portal/settings">Edit permitted details</Link></div><section className={styles.profileGrid}><Panel title="Dealership profile" link="Verified account"><div className={styles.factTable}>{dealerDetails(dealer).map(([label, value]) => <div key={label}><span>{label}</span><strong>{value || "Not supplied"}</strong></div>)}</div></Panel><Panel title="Account status" link="Summary"><div className={styles.statusStack}><div><CheckIcon /><strong>{statusLabel(dealer.account_status)}</strong><p>Portal account state.</p></div><div><TagIcon /><strong>Successful Purchase Fee</strong><p>{formatGbp(dealer.successful_purchase_fee)} per completed purchase.</p></div><div><ClockIcon /><strong>Attribution</strong><p>{dealer.attribution_period_days} days.</p></div></div></Panel></section></section>;
+  return <section className={styles.dashboard}><div className={styles.dashboardHeader}><div><h1>My Dealership</h1><p>Company profile and account information held by MotorGeeks.</p></div><Link className={styles.blueButton} href="/dealer-portal/settings">Edit permitted details</Link></div><section className={styles.profileGrid}><Panel title="Dealership profile" link="Verified account"><div className={styles.factTable}>{dealerDetails(dealer).map(([label, value]) => <div key={label}><span>{label}</span><strong>{value || "Not supplied"}</strong></div>)}</div></Panel><Panel title="Account status" link="Summary"><div className={styles.statusStack}><div><CheckIcon /><strong>{statusLabel(dealer.account_status)}</strong><p>Portal account state.</p></div><div><TagIcon /><strong>Successful Purchase Fee</strong><p>{formatGbp(dealer.successful_purchase_fee)} per completed purchase.</p></div><div><ClockIcon /><strong>Attribution</strong><p>{dealer.attribution_period_days} days.</p></div></div></Panel></section></section>;
 }
 
 function SettingsPanel({ dealer, role, onSaved }: { dealer: DealerPortalAccountWithPreferences; role: DealerPortalUserRole; onSaved: (dealer: DealerPortalAccountWithPreferences) => void }) {
@@ -584,13 +603,13 @@ function SettingsPanel({ dealer, role, onSaved }: { dealer: DealerPortalAccountW
 }
 
 function SupportPanel() {
-  return <section className={styles.dashboard}><div className={styles.dashboardHeader}><div><h1>Help & Support</h1><p>Support for using MotorLeads opportunities and account tools.</p></div><Link className={styles.blueButton} href="/">Back to MotorLeads</Link></div><section className={styles.supportGrid}>{["Claiming opportunities", "Working active leads", "Reporting a purchase", "Successful Purchase Fees", "Managing dealership users", "Buying preferences"].map(topic => <article className={styles.supportCard} key={topic}><HelpIcon /><h2>{topic}</h2><p>Contact MotorLeads support for help with this area.</p></article>)}</section><article className={`${styles.panel} ${styles.supportContact}`}><h2>Contact MotorLeads support</h2><p>Email support@motorleads.co.uk for help with your dealer account, opportunities or billing questions.</p></article></section>;
+  return <section className={styles.dashboard}><div className={styles.dashboardHeader}><div><h1>Help & Support</h1><p>Support for using MotorGeeks opportunities and account tools.</p></div><Link className={styles.blueButton} href="/">Back to MotorGeeks</Link></div><section className={styles.supportGrid}>{["Claiming opportunities", "Working active leads", "Reporting a purchase", "Successful Purchase Fees", "Managing dealership users", "Buying preferences"].map(topic => <article className={styles.supportCard} key={topic}><HelpIcon /><h2>{topic}</h2><p>Contact MotorGeeks support for help with this area.</p></article>)}</section><article className={`${styles.panel} ${styles.supportContact}`}><h2>Contact MotorGeeks support</h2><p>Email support@motorgeeks.co.uk for help with your dealer account, opportunities or billing questions.</p></article></section>;
 }
 
 function DealerV4Shell({ dealer, section, counts, onSignOut, children }: { dealer: DealerPortalAccountWithPreferences; section: PortalSection; counts: { available: number; active: number; purchased: number; lost: number }; onSignOut?: () => void; children: React.ReactNode }) {
   return <main className={styles.app}>
-    <aside className={styles.sidebar}><MotorLeadsLogo /><nav aria-label="Dealer Portal"><NavItem active={section === "dashboard"} href="/dealer-portal" icon={<HomeIcon />} label="Dashboard" /><NavItem active={section === "opportunities"} href="/dealer-portal/opportunities" icon={<DocIcon />} label="Opportunities" badge={String(counts.available)} /><NavItem active={section === "active"} href="/dealer-portal/active" icon={<ClockIcon />} label="Active Leads" badge={String(counts.active)} /><NavItem active={section === "purchased"} href="/dealer-portal/purchased" icon={<CheckIcon />} label="Purchased" badge={String(counts.purchased)} /><NavItem active={section === "lost"} href="/dealer-portal/lost" icon={<ReturnIcon />} label="Lost / Returned" badge={String(counts.lost)} /><NavItem active={section === "payments"} href="/dealer-portal/payments" icon={<TagIcon />} label="Payments" /><NavItem active={section === "dealership"} href="/dealer-portal/dealership" icon={<BuildingIcon />} label="My Dealership" /><NavItem active={section === "settings"} href="/dealer-portal/settings" icon={<GearIcon />} label="Account Settings" /><NavItem active={section === "support"} href="/dealer-portal/support" icon={<HelpIcon />} label="Help & Support" /></nav><Link className={styles.sidebarBack} href="/">← Back to website</Link></aside>
-    <section className={styles.workspace}><header className={styles.topbar} data-dealer-topbar="true"><div className={styles.topbarBrand}><div className={styles.logo}>Motor<span>Leads</span></div><small>Dealer Portal</small></div><div className={styles.topActions}><span>Help</span><span className={styles.profile}>{dealerInitials(dealer.trading_name)}</span><span>{dealer.trading_name}</span>{onSignOut && <button type="button" onClick={onSignOut}>Sign out</button>}</div></header>{children}</section>
+    <aside className={styles.sidebar}><MotorGeeksLogo /><nav aria-label="Dealer Portal"><NavItem active={section === "dashboard"} href="/dealer-portal" icon={<HomeIcon />} label="Dashboard" /><NavItem active={section === "opportunities"} href="/dealer-portal/opportunities" icon={<DocIcon />} label="Opportunities" badge={String(counts.available)} /><NavItem active={section === "active"} href="/dealer-portal/active" icon={<ClockIcon />} label="Active Leads" badge={String(counts.active)} /><NavItem active={section === "purchased"} href="/dealer-portal/purchased" icon={<CheckIcon />} label="Purchased" badge={String(counts.purchased)} /><NavItem active={section === "lost"} href="/dealer-portal/lost" icon={<ReturnIcon />} label="Lost / Returned" badge={String(counts.lost)} /><NavItem active={section === "payments"} href="/dealer-portal/payments" icon={<TagIcon />} label="Payments" /><NavItem active={section === "dealership"} href="/dealer-portal/dealership" icon={<BuildingIcon />} label="My Dealership" /><NavItem active={section === "settings"} href="/dealer-portal/settings" icon={<GearIcon />} label="Account Settings" /><NavItem active={section === "support"} href="/dealer-portal/support" icon={<HelpIcon />} label="Help & Support" /></nav><Link className={styles.sidebarBack} href="/">← Back to website</Link></aside>
+    <section className={styles.workspace}><header className={styles.topbar} data-dealer-topbar="true"><div className={styles.topbarBrand}><MotorGeeksLogo /><small>Dealer Portal</small></div><div className={styles.topActions}><span>Help</span><span className={styles.profile}>{dealerInitials(dealer.trading_name)}</span><span>{dealer.trading_name}</span>{onSignOut && <button type="button" onClick={onSignOut}>Sign out</button>}</div></header>{children}</section>
   </main>;
 }
 
@@ -634,8 +653,18 @@ function V4Loading({ label }: { label: string }) {
   return <main className={styles.loadingApp}><div className={styles.loadingState} role="status" aria-live="polite"><span />{label}</div></main>;
 }
 
-function DealerUnavailable({ error }: { error?: string }) {
-  return <main className={styles.app}><section className={styles.workspace}><section className={styles.dashboard}><EmptyPanel title="Dealer access unavailable" copy={error || "Sign in with a linked dealer login, or ask MotorLeads to set up your dealer account."} /><Link className={styles.blueButton} href="/dealer-login">Go to Dealer Login</Link></section></section></main>;
+function DealerUnavailable({ error, status }: { error?: string; status?: PortalStatus | null }) {
+  if (status?.accountStatus) {
+    return <main className={styles.app}><section className={styles.workspace}><section className={styles.statusPage}>
+      <MotorGeeksLogo variant="wordmarkDark" />
+      <span className={styles.statusBadge}>{statusLabel(status.accountStatus)}</span>
+      <h1>MotorGeeks account status</h1>
+      <p>{dealerStatusMessage(status.accountStatus, status.dealer?.trading_name)}</p>
+      <div className={styles.statusHelp}><h2>Help & Support</h2><p>Contact MotorGeeks support if you need help with your application or dealership access.</p><Link className={styles.blueButton} href="/dealer-portal/support">Help & Support</Link></div>
+      <Link className={styles.outlineButton} href="/">Back to website</Link>
+    </section></section></main>;
+  }
+  return <main className={styles.app}><section className={styles.workspace}><section className={styles.dashboard}><EmptyPanel title="Dealer access unavailable" copy={error || "Sign in with a linked dealer login, or ask MotorGeeks to set up your dealer account."} /><Link className={styles.blueButton} href="/dealer-login">Go to Dealer Login</Link></section></section></main>;
 }
 
 function Input({ label, value, set, type = "text", required = false, disabled = false }: { label: string; value: string; set: (value: string) => void; type?: string; required?: boolean; disabled?: boolean }) {
@@ -763,7 +792,21 @@ function buyingDefaults(dealer: DealerPortalAccountWithPreferences): DealerBuyin
 function geographyDefaults(dealer: DealerPortalAccountWithPreferences): DealerGeographyPreferences { return dealer.geography_preferences ?? { dealer_account_id: dealer.id, england: true, wales: true, scotland: false, northern_ireland: false, republic_of_ireland: false, maximum_radius_miles: null }; }
 function settingLabel(key: string) { return key.replace(/_/g, " ").replace(/\b\w/g, char => char.toUpperCase()); }
 
-function MotorLeadsLogo() { return <div className={styles.logo}>Motor<span>Leads</span><small>Sell smarter. Ride further.</small></div>; }
+function dealerStatusMessage(status: DealerPortalAccount["account_status"], tradingName?: string | null) {
+  const dealer = tradingName ? `${tradingName}'s` : "Your";
+  if (status === "pending") return `${dealer} MotorGeeks dealer application is awaiting review. Lead access and customer data remain locked until approval.`;
+  if (status === "rejected") return `${dealer} MotorGeeks dealer application has not been approved. Lead access and customer data remain unavailable.`;
+  if (status === "suspended") return `${dealer} MotorGeeks Dealer Portal access is currently suspended. Lead access, customer data and notifications are unavailable.`;
+  return `${dealer} MotorGeeks Dealer Portal access is not currently active.`;
+}
+
+function MotorGeeksLogo({ variant = "lockup" }: { variant?: "lockup" | "wordmark" | "wordmarkDark" }) {
+  const src = variant === "wordmark" ? "/brand/motorgeeks-wordmark-light.png" : variant === "wordmarkDark" ? "/brand/motorgeeks-wordmark-dark.png" : "/brand/motorgeeks-lockup-dark.png";
+  return <div className={`${styles.logo} ${variant === "wordmark" || variant === "wordmarkDark" ? styles.logoWordmark : ""}`}><img src={src} alt="MotorGeeks" /></div>;
+}
+function MotorGeeksTick() {
+  return <svg className={styles.softTick} viewBox="0 0 52 42" aria-hidden="true" focusable="false"><path d="M5 22.5c6.2 7.3 9.8 11.2 11.1 11.2 1.2 0 4-4 9.4-10.1C31 17.3 37.7 10 47 5" /></svg>;
+}
 function IconShell({ children }: { children: React.ReactNode }) { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>; }
 function HomeIcon() { return <IconShell><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></IconShell>; }
 function DocIcon() { return <IconShell><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v5h5" /><path d="M9 13h6" /><path d="M9 17h6" /></IconShell>; }

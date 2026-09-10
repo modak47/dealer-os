@@ -4,8 +4,9 @@ import { DealerLoginV4Live } from "@/app/dealer-portal/v4-live-client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const metadata: Metadata = {
-  title: "Dealer Portal Login",
-  description: "Dealer login for motorcycle buying opportunities.",
+  title: "MotorGeeks Dealer Portal Login",
+  description: "Dealer login for MotorGeeks motorcycle buying opportunities.",
+  robots: { index: false, follow: false },
 };
 
 export default function DealerLoginPage() {

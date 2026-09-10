@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dealerLeadSelectClause, getCurrentDealerPortalAccount, redactLeadForDealer } from "@/lib/dealer-portal";
+import { dealerLeadSelectClause, getCurrentDealerPortalAccount, getCurrentDealerPortalMembership, redactLeadForDealer } from "@/lib/dealer-portal";
 import { normaliseVehicleCheck } from "@/lib/autotrader-vehicle-check";
 import { isFullUKPostcode, normaliseUKPostcode } from "@/lib/location";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -542,7 +542,21 @@ function visualDealerPortalFixture() {
 export async function GET(request: Request) {
   if (isVisualTestRequest(request.headers)) return NextResponse.json(visualDealerPortalFixture());
   const session = await getCurrentDealerPortalAccount();
-  if (!session) return NextResponse.json({ error: "Dealer portal access is not available for this user." }, { status: 401 });
+  if (!session) {
+    const membership = await getCurrentDealerPortalMembership();
+    if (membership) {
+      return NextResponse.json({
+        error: "Dealer portal access is not available for this account status.",
+        accountStatus: membership.dealer.account_status,
+        dealer: {
+          id: membership.dealer.id,
+          trading_name: membership.dealer.trading_name,
+          main_email: membership.dealer.main_email,
+        },
+      }, { status: 403 });
+    }
+    return NextResponse.json({ error: "Dealer portal access is not available for this user." }, { status: 401 });
+  }
   const db = getSupabaseAdminClient();
   const [allocationsResult, claimsResult] = await Promise.all([
     db.from("dealer_lead_allocations")

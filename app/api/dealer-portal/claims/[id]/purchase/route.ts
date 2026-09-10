@@ -34,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const purchaseType = claim.status === "lost" ? "dealer_reported_later" : "dealer_reported";
     if (purchaseType === "dealer_reported_later") {
       if (requiresPurchasedLaterDecision(claim)) {
-        return NextResponse.json({ error: "This Purchased Later report is outside the stored attribution period and needs a YesMoto decision before it can be recorded." }, { status: 409 });
+        return NextResponse.json({ error: "This Purchased Later report is outside the stored attribution period and needs a MotorGeeks decision before it can be recorded." }, { status: 409 });
       }
       if (!collectionDate) return NextResponse.json({ error: "Collection date is required for Purchased Later." }, { status: 400 });
       if (mileageAtPurchase === null) return NextResponse.json({ error: "Mileage at purchase is required for Purchased Later." }, { status: 400 });

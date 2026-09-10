@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
 import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
-import { assertSingleDealerAccountForUser, cleanDealerPortalUserEmail, cleanDealerPortalUserRole, findAuthUserByEmail } from "@/lib/dealer-portal-users";
+import { assertDealerPortalUserLimit, assertSingleDealerAccountForUser, cleanDealerPortalUserEmail, cleanDealerPortalUserRole, findAuthUserByEmail } from "@/lib/dealer-portal-users";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +18,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const role = cleanDealerPortalUserRole(body.role);
     if (!email) return NextResponse.json({ error: "Dealer login email is required." }, { status: 400 });
     const db = getSupabaseAdminClient();
-    const account = await db.from("dealer_portal_accounts").select("id,trading_name").eq("id", id).maybeSingle();
+    const account = await db.from("dealer_portal_accounts").select("id,trading_name,account_status").eq("id", id).maybeSingle();
     if (account.error) return NextResponse.json({ error: "Unable to load dealer account." }, { status: 500 });
     if (!account.data) return NextResponse.json({ error: "Dealer account not found." }, { status: 404 });
+    if (account.data.account_status !== "active") return NextResponse.json({ error: "Dealer Portal login access can only be linked for approved active dealer accounts." }, { status: 403 });
 
     let authUser = await findAuthUserByEmail(email);
     let invited = false;
@@ -34,6 +35,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       invited = true;
     }
     await assertSingleDealerAccountForUser(authUser.id, id);
+    await assertDealerPortalUserLimit(id, authUser.id);
 
     const staffUserId = await getCurrentUserId();
     const { data, error } = await db.from("dealer_portal_users").upsert({

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { DealerPortalV4Live } from "../v4-live-client";
 
 export const metadata: Metadata = {
-  title: "Dealer Opportunities",
+  title: "MotorGeeks Dealer Opportunities",
   robots: { index: false, follow: false },
 };
 

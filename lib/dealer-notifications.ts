@@ -2,6 +2,7 @@ import "server-only";
 
 import { getDealerSettings } from "@/lib/dealer-settings";
 import { recordDealerPortalAuditEventBestEffort } from "@/lib/dealer-portal-audit";
+import { motorgeeksBrand } from "@/lib/motorgeeks-brand";
 import {
   activeDealerUserEmailRecipients,
   buildClaimEventPayload,
@@ -52,6 +53,7 @@ type NotifyFeeInput = {
 export async function notifyDealerLeadAllocation(input: NotifyAllocationInput) {
   return bestEffort("dealer lead allocation notification", async () => {
     if (input.allocation.allocation_status !== "available") return [];
+    if (input.dealer.account_status !== "active") return [];
     const distance = distanceFromAllocation(input.allocation);
     const eventType = leadOpportunityEventType(input.allocation.allocation_method);
     const message = buildLeadOpportunityMessage(input.lead, distance);
@@ -273,16 +275,16 @@ async function sendResendEmail(to: string, subject: string, message: string) {
   if (!resendKey) return { ok: false, safeError: "Email provider is not configured.", providerResponse: { code: "not_configured" } };
   const settings = await getDealerSettings();
   const fromAddress = process.env.RESEND_FROM_EMAIL || settings.email_from_address || settings.email;
-  const from = fromAddress.includes("<") ? fromAddress : `${settings.email_from_name || settings.business_name || "YesMoto"} <${fromAddress}>`;
+  const from = fromAddress.includes("<") ? fromAddress : `${settings.email_from_name || settings.business_name || motorgeeksBrand.name} <${fromAddress}>`;
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       from,
       to: [to],
-      reply_to: settings.email_reply_to || settings.email || undefined,
+      reply_to: process.env.RESEND_REPLY_TO_EMAIL || settings.email_reply_to || settings.email || undefined,
       subject,
-      html: `<div style="font-family:Arial,sans-serif;color:#18211d;white-space:pre-line">${escapeHtml(message)}</div>`,
+      html: notificationEmailHtml(subject, message),
     }),
   });
   const provider = await response.json().catch(() => ({ message: "Invalid provider response" }));
@@ -298,6 +300,26 @@ async function sendResendEmail(to: string, subject: string, message: string) {
     providerMessageId: String((provider as { id?: string }).id ?? ""),
     providerResponse: safeProviderResponse(provider),
   };
+}
+
+function notificationEmailHtml(subject: string, message: string) {
+  const lines = message.split("\n");
+  const viewLead = lines.find(line => line.startsWith("View Lead: "))?.replace("View Lead: ", "");
+  const summary = lines.slice(2).filter(line => line && !line.startsWith("View Lead:")).join("\n");
+  return `<div style="margin:0;background:#f4f8fc;padding:24px;font-family:Arial,sans-serif;color:${motorgeeksBrand.colours.deepNavy}">
+    <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #dbe6ef;border-radius:8px;overflow:hidden">
+      <div style="background:${motorgeeksBrand.colours.deepNavy};color:#ffffff;padding:24px 28px">
+        <div style="font-size:28px;font-weight:900;letter-spacing:-.02em">Motor<span style="color:${motorgeeksBrand.colours.motorBlue}">Geeks</span></div>
+        <div style="margin-top:8px;color:#d7e6f5;font-size:11px;font-weight:800;letter-spacing:.12em">${motorgeeksBrand.strapline}</div>
+      </div>
+      <div style="padding:28px">
+        <h1 style="margin:0 0 12px;color:${motorgeeksBrand.colours.deepNavy};font-size:24px;line-height:1.15">${escapeHtml(subject)}</h1>
+        <p style="margin:0 0 18px;color:#30455f">A new lead matches your dealer preferences.</p>
+        <div style="border:1px solid #dbe6ef;border-radius:8px;padding:18px;background:#f8fbff;white-space:pre-line">${escapeHtml(summary || "Vehicle details are not available yet.")}</div>
+        ${viewLead ? `<p style="margin:24px 0 0"><a href="${escapeHtml(viewLead)}" style="display:inline-block;background:${motorgeeksBrand.colours.motorBlue};color:#ffffff;padding:13px 20px;border-radius:6px;text-decoration:none;font-weight:800">View Lead</a></p>` : ""}
+      </div>
+    </div>
+  </div>`;
 }
 
 async function markAllocationNotified(allocationId: string, shouldMark: boolean) {

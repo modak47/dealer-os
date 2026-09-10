@@ -129,8 +129,9 @@ function vehicleFacts(opportunity: MockOpportunity) {
   ];
 }
 
-export function MotorLeadsPreviewLogo() {
-  return <div className={styles.logo}>Motor<span>Leads</span><small>Sell smarter. Ride further.</small></div>;
+export function MotorGeeksPreviewLogo({ variant = "lockup" }: { variant?: "lockup" | "wordmark" }) {
+  const src = variant === "wordmark" ? "/brand/motorgeeks-wordmark-light.png" : "/brand/motorgeeks-lockup-dark.png";
+  return <div className={`${styles.logo} ${variant === "wordmark" ? styles.logoWordmark : ""}`}><img src={src} alt="MotorGeeks" /></div>;
 }
 
 export function DealerLoginV4Preview() {
@@ -138,7 +139,7 @@ export function DealerLoginV4Preview() {
     <section className={styles.loginHero}>
       <Link className={styles.loginBack} href="/">← Back to website</Link>
       <div className={styles.loginCopy}>
-        <MotorLeadsPreviewLogo />
+        <MotorGeeksPreviewLogo />
         <h1>Dealer access to quality motorcycle <span>opportunities</span></h1>
         <p>Join a network of verified motorcycle dealers and get access to genuine seller opportunities across the UK.</p>
         <ul>
@@ -152,7 +153,7 @@ export function DealerLoginV4Preview() {
     <section className={styles.loginLower}>
       <article className={styles.loginCard}>
         <h2>Dealer login</h2>
-        <p>Log in to access your MotorLeads dealer portal.</p>
+        <p>Log in to access your MotorGeeks dealer portal.</p>
         <label className={styles.field}>Email address<input placeholder="yourname@dealership.co.uk" type="email" /></label>
         <label className={`${styles.field} ${styles.password}`}>Password<input placeholder="Enter your password" type="password" /><span>◉</span></label>
         <div className={styles.loginOptions}>
@@ -171,7 +172,7 @@ export function DealerLoginV4Preview() {
         <Benefit icon={<SupportIcon />} title="Support when you need it">Our team is here to help if you have any questions.</Benefit>
         <div className={styles.quote}>
           <p>“A straightforward way to connect with genuine sellers. Great platform.”</p>
-          <p>– MotorLeads verified dealer preview</p>
+          <p>– MotorGeeks verified dealer preview</p>
         </div>
         <p className={`${styles.scribble} ${styles.lowerScribble}`}>More opportunities ahead.</p>
       </aside>
@@ -548,7 +549,7 @@ export function DealerDealershipV4Preview() {
   return <DealerV4Shell active="My Dealership">
     <section className={styles.dashboard}>
       <div className={styles.dashboardHeader}>
-        <div><h1>My Dealership</h1><p>Company profile and account information held by MotorLeads.</p></div>
+        <div><h1>My Dealership</h1><p>Company profile and account information held by MotorGeeks.</p></div>
         <button className={styles.blueButton} type="button">Edit profile</button>
       </div>
       <section className={styles.profileGrid}>
@@ -597,13 +598,13 @@ export function DealerSupportV4Preview() {
   return <DealerV4Shell active="Help & Support">
     <section className={styles.dashboard}>
       <div className={styles.dashboardHeader}>
-        <div><h1>Help & Support</h1><p>Support for using MotorLeads opportunities and account tools.</p></div>
-        <Link className={styles.blueButton} href="/">Back to MotorLeads</Link>
+        <div><h1>Help & Support</h1><p>Support for using MotorGeeks opportunities and account tools.</p></div>
+        <Link className={styles.blueButton} href="/">Back to MotorGeeks</Link>
       </div>
       <section className={styles.supportGrid}>
         {["Claiming opportunities", "Working active leads", "Reporting a purchase", "Successful Purchase Fees", "Managing dealership users", "Buying preferences"].map((topic) => <article className={styles.supportCard} key={topic}><HelpIcon /><h2>{topic}</h2><p>Guidance for common dealer portal tasks and account questions.</p></article>)}
       </section>
-      <article className={`${styles.panel} ${styles.supportContact}`}><h2>Contact MotorLeads support</h2><p>Email support@motorleads.co.uk for help with your dealer account, opportunities or billing questions.</p></article>
+      <article className={`${styles.panel} ${styles.supportContact}`}><h2>Contact MotorGeeks support</h2><p>Email support@motorgeeks.co.uk for help with your dealer account, opportunities or billing questions.</p></article>
     </section>
   </DealerV4Shell>;
 }
@@ -630,7 +631,7 @@ type NavSection = "Dashboard" | "Opportunities" | "Active Leads" | "Purchased" |
 function DealerV4Shell({ active, children }: { active: NavSection; children: React.ReactNode }) {
   return <main className={styles.app}>
     <aside className={styles.sidebar}>
-      <MotorLeadsPreviewLogo />
+      <MotorGeeksPreviewLogo />
       <nav aria-label="Dealer Portal preview">
         <NavItem active={active === "Dashboard"} href="/dealer-portal-v4-preview" icon={<HomeIcon />} label="Dashboard" />
         <NavItem active={active === "Opportunities"} href="/dealer-portal-v4-preview/opportunities" icon={<DocIcon />} label="Opportunities" badge="3" />
@@ -646,7 +647,7 @@ function DealerV4Shell({ active, children }: { active: NavSection; children: Rea
     </aside>
     <section className={styles.workspace}>
       <header className={styles.topbar}>
-        <div className={styles.topbarBrand}><div className={styles.logo}>Motor<span>Leads</span></div><small>Dealer Portal</small></div>
+        <div className={styles.topbarBrand}><MotorGeeksPreviewLogo /><small>Dealer Portal</small></div>
         <div className={styles.topActions}><span className={styles.bell}>◦<b>3</b></span><span>Help</span><span className={styles.profile}>○</span><span>Dealership Name ▾</span></div>
       </header>
       {children}

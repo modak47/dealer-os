@@ -1,25 +1,20 @@
 .logo {
-  color: #ffffff;
-  font-family: var(--display), Arial, sans-serif;
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -.02em;
-  line-height: .9;
+  width: 186px;
+  max-width: 100%;
+  min-width: 0;
+  line-height: 0;
+  flex: 0 0 auto;
 }
 
-.logo span {
-  color: #1594ff;
-}
-
-.logo small {
+.logo img {
   display: block;
-  margin-top: 6px;
-  color: rgba(255, 255, 255, .82);
-  font-family: Arial, sans-serif;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .11em;
-  text-transform: uppercase;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.logoWordmark {
+  width: 142px;
 }
 
 .loginPage {
@@ -78,7 +73,7 @@
 }
 
 .loginCopy h1 span {
-  color: #1594ff;
+  color: #0085F5;
 }
 
 .loginCopy p {
@@ -100,22 +95,26 @@
 .loginCopy li {
   display: flex;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
   color: #ffffff;
   font-size: 16px;
   font-weight: 500;
 }
 
-.loginCopy li::before {
-  content: "✓";
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 3px solid #1594ff;
-  border-radius: 50%;
-  color: #1594ff;
-  font-weight: 900;
+.softTick {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 23px;
+  margin-top: -1px;
+  overflow: visible;
+}
+
+.softTick path {
+  fill: none;
+  stroke: #0085F5;
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .scribble {
@@ -136,7 +135,7 @@
   height: 4px;
   margin-top: 13px;
   border-radius: 999px;
-  background: #1594ff;
+  background: #0085F5;
   transform: rotate(-7deg);
 }
 
@@ -151,7 +150,7 @@
   grid-template-columns: minmax(360px, 455px) minmax(300px, 1fr);
   gap: 34px;
   max-width: 1240px;
-  margin: -66px auto 0;
+  margin: -28px auto 0;
   padding: 0 42px 34px;
 }
 
@@ -231,7 +230,7 @@
 
 .loginOptions a,
 .loginNetwork {
-  color: #006ee6;
+  color: #006fd0;
   font-weight: 650;
 }
 
@@ -294,7 +293,7 @@
   align-content: start;
   padding: 22px 24px 165px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .9) 0 50%, rgba(255, 255, 255, .3) 72%, rgba(244, 248, 252, 0)),
+    linear-gradient(180deg, rgba(255, 255, 255, .98) 0 58%, rgba(255, 255, 255, .9) 76%, rgba(244, 248, 252, .78)),
     url("/images/style-categories/adventure.png") center bottom / 100% auto no-repeat;
 }
 
@@ -308,7 +307,7 @@
 .benefitItem svg {
   width: 34px;
   height: 34px;
-  color: #0b86ff;
+  color: #0085F5;
 }
 
 .benefitItem strong {
@@ -346,7 +345,7 @@
 
 .app {
   display: grid;
-  grid-template-columns: 182px minmax(0, 1fr);
+  grid-template-columns: 214px minmax(0, 1fr);
   min-height: 100vh;
   background: #f4f8fc;
   color: #082249;
@@ -358,16 +357,25 @@
   flex-direction: column;
   min-width: 0;
   min-height: 100vh;
-  padding: 23px 15px 22px;
-  overflow: hidden;
-  background: linear-gradient(180deg, #082c4d, #031c33);
+  padding: 24px 18px 22px;
+  overflow: visible;
+  background: linear-gradient(180deg, #061326, #061326);
   color: #ffffff;
+}
+
+.sidebar .logo {
+  width: 188px;
+  max-width: 100%;
+}
+
+.sidebar .logoWordmark {
+  width: 186px;
 }
 
 .sidebar nav {
   display: grid;
   gap: 7px;
-  margin-top: 30px;
+  margin-top: 34px;
   max-width: 100%;
 }
 
@@ -391,7 +399,7 @@
 }
 
 .navItem.active {
-  background: #0b86ff;
+  background: #0085F5;
   color: #ffffff;
 }
 
@@ -420,6 +428,58 @@
   background: #f7fbff;
 }
 
+.statusPage {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  width: min(620px, calc(100% - 32px));
+  margin: 64px auto;
+  padding: 28px;
+  border: 1px solid #dce8f2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #09224a;
+  box-shadow: 0 18px 44px rgba(8, 34, 73, .11);
+}
+
+.statusPage h1,
+.statusPage h2,
+.statusPage p {
+  margin: 0;
+}
+
+.statusPage h1 {
+  font-size: 28px;
+  line-height: 1.08;
+}
+
+.statusPage p {
+  color: #4f6985;
+  line-height: 1.5;
+}
+
+.statusBadge {
+  justify-self: start;
+  padding: 6px 9px;
+  border: 1px solid #bdd4ea;
+  border-radius: 999px;
+  background: #ecf7ff;
+  color: #006fd0;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.statusHelp {
+  display: grid;
+  gap: 9px;
+  margin-top: 6px;
+  padding: 16px;
+  border: 1px solid #dce8f2;
+  border-radius: 8px;
+  background: #f7fbff;
+}
+
 .topbar {
   position: sticky;
   top: 0;
@@ -427,20 +487,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 62px;
-  padding: 0 26px;
-  background: linear-gradient(90deg, #05213b, #082c4d);
+  height: 72px;
+  padding: 0 28px;
+  background: linear-gradient(90deg, #05213b, #061326);
   color: #ffffff;
 }
 
 .topbarBrand {
   display: flex;
-  gap: 20px;
-  align-items: baseline;
+  gap: 22px;
+  align-items: center;
+  min-width: 0;
 }
 
 .topbarBrand .logo {
-  font-size: 24px;
+  width: 190px;
+}
+
+.topbarBrand .logoWordmark {
+  width: 170px;
 }
 
 .topbarBrand small {
@@ -456,6 +521,7 @@
   color: #ffffff;
   font-size: 13px;
   font-weight: 600;
+  min-width: 0;
 }
 
 .bell {
@@ -539,7 +605,7 @@
 .metric svg {
   width: 31px;
   height: 31px;
-  color: #0b86ff;
+  color: #0085F5;
 }
 
 .metric strong {
@@ -593,7 +659,7 @@
 }
 
 .panelHeader a {
-  color: #006ee6;
+  color: #006fd0;
   font-size: 13px;
   font-weight: 700;
   text-decoration: underline;
@@ -675,7 +741,7 @@
 .clickableRow:hover,
 .clickableRow:focus-visible {
   background: #f6fbff;
-  box-shadow: inset 3px 0 0 #0b86ff;
+  box-shadow: inset 3px 0 0 #0085F5;
   outline: none;
 }
 
@@ -725,7 +791,7 @@
   min-height: 36px;
   padding: 0 13px;
   border-radius: 4px;
-  background: #0b86ff;
+  background: #0085F5;
   color: #ffffff;
   font-size: 12px;
   font-weight: 700;
@@ -832,7 +898,7 @@
   height: 9px;
   margin-top: 4px;
   border-radius: 50%;
-  background: #0b86ff;
+  background: #0085F5;
 }
 
 .dot.green {
@@ -875,7 +941,7 @@
   flex: 0 0 auto;
   width: 34px;
   height: 34px;
-  color: #0b86ff;
+  color: #0085F5;
 }
 
 .toolbar {
@@ -935,7 +1001,7 @@
 }
 
 .viewToggle .active {
-  background: #0b86ff;
+  background: #0085F5;
   color: #ffffff;
 }
 
@@ -986,7 +1052,7 @@
 }
 
 .rowAction {
-  color: #006ee6;
+  color: #006fd0;
   font-size: 12px;
   font-weight: 750;
   text-decoration: none;
@@ -995,7 +1061,7 @@
 .breadcrumb {
   display: inline-flex;
   margin-bottom: 16px;
-  color: #006ee6;
+  color: #006fd0;
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
@@ -1054,7 +1120,7 @@
 .claimBox .blueButton {
   width: 100%;
   border: 0;
-  background: #0b86ff;
+  background: #0085F5;
 }
 
 .summaryCells {
@@ -1268,12 +1334,12 @@
 .leadTabs button:focus-visible,
 .thumbnails button:focus-visible,
 .lightbox button:focus-visible {
-  outline: 2px solid #0b86ff;
+  outline: 2px solid #0085F5;
   outline-offset: 2px;
 }
 
 .leadTabs .active {
-  background: #0b86ff;
+  background: #0085F5;
   color: #ffffff;
 }
 
@@ -1442,7 +1508,7 @@
 .mileageChart svg {
   width: 100%;
   height: auto;
-  color: #0b86ff;
+  color: #0085F5;
 }
 
 .mileageChart path:first-child {
@@ -1452,7 +1518,7 @@
 
 .mileageChart polyline {
   fill: none;
-  stroke: #0b86ff;
+  stroke: #0085F5;
   stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1460,7 +1526,7 @@
 
 .mileageChart circle {
   fill: #ffffff;
-  stroke: #0b86ff;
+  stroke: #0085F5;
   stroke-width: 3;
 }
 
@@ -1491,7 +1557,7 @@
 }
 
 .motTests summary::marker {
-  color: #0b86ff;
+  color: #0085F5;
 }
 
 .motTests summary strong {
@@ -1557,7 +1623,7 @@
   width: 38px;
   height: 38px;
   margin-bottom: 10px;
-  color: #0b86ff;
+  color: #0085F5;
 }
 
 .mapPreview iframe {
@@ -1609,14 +1675,14 @@
 .customerLocked svg {
   width: 34px;
   height: 34px;
-  color: #0b86ff;
+  color: #0085F5;
 }
 
 .lockedWide .blueButton {
   width: auto;
   min-width: 180px;
   border: 0;
-  background: #0b86ff;
+  background: #0085F5;
   color: #ffffff;
 }
 
@@ -1657,7 +1723,7 @@
   min-height: 36px;
   padding: 0 13px;
   border-radius: 5px;
-  background: #0b86ff;
+  background: #0085F5;
   color: #ffffff;
   font-weight: 750;
   text-decoration: none;
@@ -1680,9 +1746,9 @@
 }
 
 .workflowChips .active {
-  border-color: #0b86ff;
+  border-color: #0085F5;
   background: #eaf5ff;
-  color: #006ee6;
+  color: #006fd0;
 }
 
 .leadStats {
@@ -1735,7 +1801,7 @@
   height: 22px;
   border-radius: 50%;
   background: #eaf5ff;
-  color: #006ee6;
+  color: #006fd0;
   font-size: 11px;
   font-weight: 800;
 }
@@ -1781,7 +1847,7 @@
 
 .mockForm .blueButton {
   border: 0;
-  background: #0b86ff;
+  background: #0085F5;
 }
 
 .terminalActions {
@@ -1839,7 +1905,7 @@
 }
 
 .simpleRow a {
-  color: #006ee6;
+  color: #006fd0;
   font-weight: 750;
   text-decoration: none;
 }
@@ -1875,7 +1941,7 @@
 .statusStack svg {
   width: 28px;
   height: 28px;
-  color: #0b86ff;
+  color: #0085F5;
 }
 
 .statusStack strong {
@@ -1938,7 +2004,7 @@
   width: 28px;
   height: 28px;
   margin-bottom: 16px;
-  color: #0b86ff;
+  color: #0085F5;
 }
 
 .supportCard h2 {
@@ -2075,7 +2141,7 @@
   margin: 0;
   border: 0;
   background: transparent;
-  color: #0b86ff;
+  color: #0085F5;
   font-weight: 750;
 }
 
@@ -2083,7 +2149,7 @@
   width: 12px;
   height: 12px;
   border: 2px solid #cfe0ef;
-  border-top-color: #0b86ff;
+  border-top-color: #0085F5;
   border-radius: 50%;
   animation: spin .8s linear infinite;
 }
@@ -2249,7 +2315,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #0b86ff;
+  background: #0085F5;
 }
 
 .mileageGraph span,
@@ -2489,8 +2555,16 @@
     width: 100%;
     max-width: 100vw;
     min-height: auto;
-    padding: 14px;
-    overflow-x: hidden;
+    padding: 14px 16px 12px;
+    overflow: visible;
+  }
+
+  .sidebar .logo {
+    width: 184px;
+  }
+
+  .sidebar .logoWordmark {
+    width: 184px;
   }
 
   .sidebar nav {
@@ -2515,8 +2589,20 @@
 
   .topbar {
     height: auto;
-    min-height: 56px;
+    min-height: 66px;
     padding: 12px 16px;
+  }
+
+  .topbarBrand {
+    gap: 14px;
+  }
+
+  .topbarBrand .logo {
+    width: 178px;
+  }
+
+  .topbarBrand .logoWordmark {
+    width: 162px;
   }
 
   .topActions span:not(.bell):not(.profile) {
@@ -2636,7 +2722,19 @@
 
 @media (max-width: 430px) {
   .logo {
-    font-size: 24px;
+    width: 166px;
+  }
+
+  .logoWordmark {
+    width: 124px;
+  }
+
+  .topbarBrand .logo {
+    width: 156px;
+  }
+
+  .topbarBrand .logoWordmark {
+    width: 148px;
   }
 
   .loginCopy h1 {

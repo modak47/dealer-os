@@ -10,6 +10,8 @@ export default function robots(): MetadataRoute.Robots {
         "/admin/",
         "/api/",
         "/portal/",
+        "/dealer-login/",
+        "/dealer-portal/",
         "/dealer-contacts/",
         "/website-leads/",
         "/_next/",

@@ -34,6 +34,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         dealerUserId: userId,
         eventData: { changed_fields: Object.keys(changes), changes },
       });
+      if (changes.account_status) {
+        await recordDealerPortalAuditEvent({
+          eventType: "dealer_account_decision",
+          dealerAccountId: id,
+          dealerUserId: userId,
+          eventData: {
+            decision: data.account_status,
+            previous_status: changes.account_status.previous,
+            decided_at: new Date().toISOString(),
+          },
+        });
+      }
     }
     await saveDealerPreferencePayloads(id, body, userId);
     return NextResponse.json({ account: await withDealerPreferences(data as DealerPortalAccount) as DealerPortalAccountWithPreferences });

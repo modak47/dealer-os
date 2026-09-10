@@ -78,6 +78,60 @@ describe("dealer roles and account management security", () => {
     assert.match(adminRelease, /requireStaffUser\(\)/);
   });
 
+  it("keeps rejected dealers out of the active access and notification paths", () => {
+    const types = source("types/dealer-portal.ts");
+    const helper = source("lib/dealer-portal.ts");
+    const releaseRoute = source("app/api/dealer-portal/admin/release/route.ts");
+    const leadsRoute = source("app/api/dealer-portal/leads/route.ts");
+    const notifications = source("lib/dealer-notifications.ts");
+    const migration = source("supabase/migrations/20260909000100_dealer_account_rejected_status.sql");
+    assert.match(types, /"rejected"/);
+    assert.match(helper, /dealer\.account_status !== "active"/);
+    assert.match(releaseRoute, /\.eq\("account_status", "active"\)/);
+    assert.match(leadsRoute, /accountStatus: membership\.dealer\.account_status/);
+    assert.match(notifications, /input\.dealer\.account_status !== "active"/);
+    assert.match(migration, /'rejected'/);
+  });
+
+  it("creates public dealer applications as pending accounts without granting access", () => {
+    const route = source("apps/motorleads/app/api/dealer-access/route.ts");
+    const form = source("apps/motorleads/app/components/simple-forms.tsx");
+    assert.match(route, /createPendingDealerApplication/);
+    assert.match(route, /dealer_portal_accounts/);
+    assert.match(route, /account_status:\s*"pending"/);
+    assert.match(route, /dealer_application_submitted/);
+    assert.doesNotMatch(route, /dealer_portal_users/);
+    assert.match(form, /Application received/);
+    assert.match(form, /awaiting review/);
+    assert.doesNotMatch(form, /does not automatically create a Dealer Portal account/);
+  });
+
+  it("records dealer status decisions and only links logins for active accounts", () => {
+    const updateRoute = source("app/api/dealer-portal/admin/accounts/[id]/route.ts");
+    const userRoute = source("app/api/dealer-portal/admin/accounts/[id]/users/route.ts");
+    const adminPage = source("app/admin/dealer-portal/page.tsx");
+    assert.match(updateRoute, /dealer_account_decision/);
+    assert.match(updateRoute, /decided_at/);
+    assert.match(userRoute, /account_status"\)/);
+    assert.match(userRoute, /account\.data\.account_status !== "active"/);
+    assert.match(adminPage, /savedAccount\.account_status === "active"/);
+    assert.match(adminPage, /Active \/ Approved/);
+    assert.match(adminPage, /Approve/);
+    assert.match(adminPage, /Reject/);
+    assert.match(adminPage, /Suspend/);
+  });
+
+  it("enforces the one main plus three additional dealer user maximum", () => {
+    const helper = source("lib/dealer-portal-users.ts");
+    const dealerRoute = source("app/api/dealer-portal/users/route.ts");
+    const staffRoute = source("app/api/dealer-portal/admin/accounts/[id]/users/route.ts");
+    assert.match(helper, /assertDealerPortalUserLimit/);
+    assert.match(helper, /maxUsers = 4/);
+    assert.match(helper, /one main account and three additional users/);
+    assert.match(dealerRoute, /inviteOrLinkDealerPortalUser/);
+    assert.match(staffRoute, /assertDealerPortalUserLimit\(id, authUser\.id\)/);
+  });
+
   it("keeps lead-working routes available to both dealer roles while staying dealership-scoped", () => {
     const claimRoute = source("app/api/dealer-portal/leads/[id]/claim/route.ts");
     const noteRoute = source("app/api/dealer-portal/claims/[id]/notes/route.ts");
