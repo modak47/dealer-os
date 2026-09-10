@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { signedMarketplacePhotoUrls } from "@/lib/marketplace-photos";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText, combineLeadImages, isValidLeadStatus, safeNumber } from "@/lib/website-leads";
 import type { WebsiteLead, WebsiteLeadUpdate } from "@/types/website-lead";
@@ -48,11 +49,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id: rawId } = await params;
   const id = parseId(rawId);
   if (!id) return NextResponse.json({ error: "Invalid lead ID." }, { status: 400 });
-  const { data, error } = await getSupabaseAdminClient().from("website_leads").select("*").eq("id", id).maybeSingle();
+  const db = getSupabaseAdminClient();
+  const { data, error } = await db.from("website_leads").select("*").eq("id", id).maybeSingle();
   if (error) return NextResponse.json({ error: "Unable to load website lead." }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Lead not found." }, { status: 404 });
   const lead = data as WebsiteLead;
-  return NextResponse.json({ lead: { ...lead, resolved_images: combineLeadImages(lead) } });
+  const photoUrls = await signedMarketplacePhotoUrls(db, [id]);
+  return NextResponse.json({ lead: { ...lead, resolved_images: [...(photoUrls.get(id) ?? []), ...combineLeadImages(lead)] } });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -63,11 +66,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const body = await request.json() as Record<string, unknown>;
     const updates = buildUpdates(body);
     if (!Object.keys(updates).length) return NextResponse.json({ error: "No editable fields supplied." }, { status: 400 });
-    const { data, error } = await getSupabaseAdminClient().from("website_leads").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id).select("*").maybeSingle();
+    const db = getSupabaseAdminClient();
+    const { data, error } = await db.from("website_leads").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id).select("*").maybeSingle();
     if (error) return NextResponse.json({ error: "Unable to update website lead." }, { status: 500 });
     if (!data) return NextResponse.json({ error: "Lead not found." }, { status: 404 });
     const lead = data as WebsiteLead;
-    return NextResponse.json({ lead: { ...lead, resolved_images: combineLeadImages(lead) } });
+    const photoUrls = await signedMarketplacePhotoUrls(db, [id]);
+    return NextResponse.json({ lead: { ...lead, resolved_images: [...(photoUrls.get(id) ?? []), ...combineLeadImages(lead)] } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid lead update." }, { status: 400 });
   }

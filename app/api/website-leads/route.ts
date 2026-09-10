@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { leadLocationUpdate, lookupLeadLocation } from "@/lib/location";
+import { signedMarketplacePhotoUrls } from "@/lib/marketplace-photos";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAutomaticVehicleCheckForWebsiteLead } from "@/lib/website-lead-auto-check";
 import { cleanText, combineLeadImages, isValidLeadStatus, safeNumber } from "@/lib/website-leads";
@@ -128,7 +129,9 @@ async function websiteLeadSummary(searchParams: URLSearchParams) {
     latestQuery,
   ]);
   if (latestResult.error) throw latestResult.error;
-  const latestLeads = ((latestResult.data ?? []) as WebsiteLead[]).map(lead => ({ ...lead, resolved_images: combineLeadImages(lead) }));
+  const latestLeadRows = (latestResult.data ?? []) as WebsiteLead[];
+  const photoUrls = await signedMarketplacePhotoUrls(supabase, latestLeadRows.map(lead => Number(lead.id)));
+  const latestLeads = latestLeadRows.map(lead => ({ ...lead, resolved_images: [...(photoUrls.get(Number(lead.id)) ?? []), ...combineLeadImages(lead)] }));
   return { total, new: newCount, pendingValuations, receivedToday, receivedThisWeek, purchasedThisMonth, sourceCounts: { bikebuyeruk: bikeBuyerUk, sellyourmotorbike: sellYourMotorbike, motorcyclebuyer: motorcycleBuyer }, sourceLabels, latestLeads };
 }
 
@@ -144,7 +147,8 @@ export async function GET(request: Request) {
   }
   const limit = Number(searchParams.get("limit") ?? 0);
   const sort = searchParams.get("sort") ?? "newest";
-  let query = applyLeadFilters(leadQuery(getSupabaseAdminClient().from("website_leads").select(defaultSelect)), searchParams);
+  const db = getSupabaseAdminClient();
+  let query = applyLeadFilters(leadQuery(db.from("website_leads").select(defaultSelect)), searchParams);
   if (sort === "oldest") query = query.order("id", { ascending: true });
   else if (sort === "highest_margin") query = query.order("estimated_margin", { ascending: false, nullsFirst: false });
   else if (sort === "highest_offer") query = query.order("suggested_offer", { ascending: false, nullsFirst: false });
@@ -152,7 +156,9 @@ export async function GET(request: Request) {
   if (Number.isFinite(limit) && limit > 0) query = query.limit(Math.min(limit, 500));
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Unable to load website leads." }, { status: 500 });
-  const leads = ((data ?? []) as WebsiteLead[]).map(lead => ({ ...lead, resolved_images: combineLeadImages(lead) }));
+  const leadRows = (data ?? []) as WebsiteLead[];
+  const photoUrls = await signedMarketplacePhotoUrls(db, leadRows.map(lead => Number(lead.id)));
+  const leads = leadRows.map(lead => ({ ...lead, resolved_images: [...(photoUrls.get(Number(lead.id)) ?? []), ...combineLeadImages(lead)] }));
   return NextResponse.json({ leads });
 }
 
