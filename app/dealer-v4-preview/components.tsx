@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import styles from "./v4-preview.module.css";
 
+const motorgeeksWebsiteUrl = "https://motorgeeks.co.uk";
+
 const bikeRows = [
   { id: "honda-cb650r", date: "15 Apr 2025", make: "Honda CBR650R", year: "2021", mileage: "7,200", location: "Guildford", status: "New", image: "/images/style-categories/roadster.png" },
   { id: "yamaha-mt-07", date: "14 Apr 2025", make: "Yamaha MT-07", year: "2020", mileage: "11,850", location: "Chelmsford", status: "New", image: "/images/style-categories/125cc.png" },
@@ -137,7 +139,7 @@ export function MotorGeeksPreviewLogo({ variant = "lockup" }: { variant?: "locku
 export function DealerLoginV4Preview() {
   return <main className={styles.loginPage}>
     <section className={styles.loginHero}>
-      <Link className={styles.loginBack} href="/">← Back to website</Link>
+      <Link className={styles.loginBack} href={motorgeeksWebsiteUrl}>← Back to website</Link>
       <div className={styles.loginCopy}>
         <MotorGeeksPreviewLogo />
         <h1>Dealer access to quality motorcycle <span>opportunities</span></h1>
@@ -599,7 +601,7 @@ export function DealerSupportV4Preview() {
     <section className={styles.dashboard}>
       <div className={styles.dashboardHeader}>
         <div><h1>Help & Support</h1><p>Support for using MotorGeeks opportunities and account tools.</p></div>
-        <Link className={styles.blueButton} href="/">Back to MotorGeeks</Link>
+        <Link className={styles.blueButton} href={motorgeeksWebsiteUrl}>Back to MotorGeeks</Link>
       </div>
       <section className={styles.supportGrid}>
         {["Claiming opportunities", "Working active leads", "Reporting a purchase", "Successful Purchase Fees", "Managing dealership users", "Buying preferences"].map((topic) => <article className={styles.supportCard} key={topic}><HelpIcon /><h2>{topic}</h2><p>Guidance for common dealer portal tasks and account questions.</p></article>)}
@@ -643,7 +645,7 @@ function DealerV4Shell({ active, children }: { active: NavSection; children: Rea
         <NavItem active={active === "Account Settings"} href="/dealer-portal-v4-preview/settings" icon={<GearIcon />} label="Account Settings" />
         <NavItem active={active === "Help & Support"} href="/dealer-portal-v4-preview/support" icon={<HelpIcon />} label="Help & Support" />
       </nav>
-      <Link className={styles.sidebarBack} href="/">← Back to website</Link>
+      <Link className={styles.sidebarBack} href={motorgeeksWebsiteUrl}>← Back to website</Link>
     </aside>
     <section className={styles.workspace}>
       <header className={styles.topbar}>
