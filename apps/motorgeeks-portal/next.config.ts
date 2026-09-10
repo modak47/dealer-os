@@ -5,6 +5,10 @@ const dealerOsOrigin = (
   process.env.NEXT_PUBLIC_DEALEROS_PORTAL_ORIGIN ||
   "https://dealer-os-ten.vercel.app"
 ).replace(/\/+$/, "");
+const motorgeeksSiteOrigin = (
+  process.env.NEXT_PUBLIC_MOTORGEEKS_SITE_URL ||
+  "https://motorgeeks.co.uk"
+).replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
   turbopack: {
@@ -14,7 +18,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/",
-        destination: "/dealer-login",
+        destination: motorgeeksSiteOrigin,
         permanent: false,
       },
     ];
