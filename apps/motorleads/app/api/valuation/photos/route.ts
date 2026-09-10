@@ -15,6 +15,28 @@ const allowed = new Map([
 const maxFiles = 20;
 const maxBytes = 15 * 1024 * 1024;
 
+export async function GET() {
+  try {
+    const { draft } = await ensureDraft();
+    const db = getSupabaseAdmin();
+    const { data, error } = await db
+      .from("lead_photos")
+      .select("*")
+      .eq("draft_id", draft.id)
+      .neq("status", "removed")
+      .order("sort_order", { ascending: true });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const photos = [];
+    for (const photo of data ?? []) {
+      const signed = await db.storage.from(photo.storage_bucket).createSignedUrl(photo.storage_path, 60 * 15);
+      photos.push({ ...photo, preview_url: signed.data?.signedUrl ?? null });
+    }
+    return NextResponse.json({ photos });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load photos." }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { draft } = await ensureDraft();
@@ -45,7 +67,8 @@ export async function POST(request: Request) {
         sort_order: existingCount + index,
       }).select("*").single();
       if (row.error) return NextResponse.json({ error: row.error.message }, { status: 500 });
-      uploaded.push(row.data);
+      const signed = await db.storage.from(photoBucket).createSignedUrl(path, 60 * 15);
+      uploaded.push({ ...row.data, preview_url: signed.data?.signedUrl ?? null });
     }
     await db.from("seller_valuation_drafts").update({ photo_count: existingCount + uploaded.length }).eq("id", draft.id);
     return NextResponse.json({ photos: uploaded });

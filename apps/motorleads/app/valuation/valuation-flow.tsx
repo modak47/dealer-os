@@ -11,6 +11,12 @@ type Seller = FormRecord;
 
 const steps = ["Your motorcycle", "Condition & history", "Photos", "Offers"];
 const photoGuidance = ["Front", "Rear", "Left side", "Right side", "Dashboard", "Damage", "Service history"];
+type UploadedPhoto = {
+  id?: string;
+  preview_url?: string | null;
+  original_filename?: string | null;
+  sort_order?: number | null;
+};
 
 export function ValuationFlow({ initialRegistration = "" }: { initialRegistration?: string }) {
   const [step, setStep] = useState(1);
@@ -20,7 +26,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
   const [seller, setSeller] = useState<Seller>({ consent: true });
   const [lookup, setLookup] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
-  const [photos, setPhotos] = useState<Array<Record<string, unknown>>>([]);
+  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState<{ reference: string; secureLinkSent: boolean } | null>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -34,6 +40,9 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
       setVehicle({ registration: draft.registration || initialRegistration, ...(draft.vehicle_snapshot || {}) });
       setCondition(current => ({ ...current, ...(draft.condition_snapshot || {}) }));
       setSeller(current => ({ ...current, ...(draft.seller_snapshot || {}) }));
+      return fetch("/api/valuation/photos");
+    }).then(r => r?.json()).then(payload => {
+      if (Array.isArray(payload?.photos)) setPhotos(payload.photos);
     }).catch(() => null);
   }, [initialRegistration]);
 
@@ -171,6 +180,12 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
         <div className="mg-photo-guidance">{photoGuidance.map(item => <span key={item}>{item}</span>)}</div>
         <label className="mg-uploader"><input type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={event => upload(event.target.files)} /><b>{uploading ? "Uploading..." : "Choose photos"}</b><small>JPG, PNG, WEBP, HEIC or HEIF. Max 15MB each.</small></label>
         <div className="mg-photo-count">{photos.length ? `${photos.length} photos added` : "No photos added yet"}</div>
+        {photos.length > 0 && <div className="mg-photo-preview-grid" aria-label="Uploaded photo previews">
+          {photos.map((photo, index) => <figure key={photo.id || `${photo.original_filename}-${index}`}>
+            {photo.preview_url ? <img src={photo.preview_url} alt={photo.original_filename || `Uploaded motorcycle photo ${index + 1}`} /> : <span>No preview</span>}
+            <figcaption>{photo.original_filename || `Photo ${index + 1}`}</figcaption>
+          </figure>)}
+        </div>}
         <button className="mg-secondary" type="button" onClick={() => setCondition({ ...condition, photosSkipped: true })}>Upload photos later</button>
       </div>
       <JourneySide />
