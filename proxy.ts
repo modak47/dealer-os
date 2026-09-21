@@ -9,7 +9,7 @@ const protectedApiPrefixes=["/api/admin/shadow-mode","/api/dealer-portal/admin",
 export async function proxy(request:NextRequest){
   const pathname=request.nextUrl.pathname;
   const isLogin=pathname==="/admin";
-  const isAdmin=pathname.startsWith("/admin/")||pathname==="/market-intelligence"||pathname==="/workflow"||pathname==="/workshop"||pathname==="/valeting"||pathname==="/photos";
+  const isAdmin=pathname==="/website-leads"||pathname.startsWith("/website-leads/")||pathname.startsWith("/admin/")||pathname==="/market-intelligence"||pathname==="/workflow"||pathname==="/workshop"||pathname==="/valeting"||pathname==="/photos";
   const isProtectedApi=protectedApiPaths.has(pathname)||protectedApiPrefixes.some(prefix=>pathname===prefix||pathname.startsWith(`${prefix}/`))||pathname.startsWith("/api/stock/")||(pathname==="/api/stock"&&request.method!=="GET");
   if(!isLogin&&!isAdmin&&!isProtectedApi)return NextResponse.next();
   if(isVisualTestRequest(request.headers))return NextResponse.next();
@@ -35,4 +35,4 @@ export async function proxy(request:NextRequest){
   return response;
 }
 
-export const config={matcher:["/admin/:path*","/market-intelligence","/workflow","/workshop","/valeting","/photos","/api/admin/shadow-mode/:path*","/api/dealer-portal/admin/:path*","/api/vrm-lookup","/api/hpi-test","/api/postcode-lookup","/api/market-intelligence","/api/website-pages","/api/workflow/:path*","/api/stock-attachments/:path*","/api/opportunities/:path*","/api/retail-check/:path*","/api/retail-history/:path*","/api/scanner-status/:path*","/api/run-opportunity-scan","/api/makes/:path*","/api/models/:path*","/api/stock/:path*","/api/crm/:path*"]};
+export const config={matcher:["/website-leads/:path*","/admin/:path*","/market-intelligence","/workflow","/workshop","/valeting","/photos","/api/admin/shadow-mode/:path*","/api/dealer-portal/admin/:path*","/api/vrm-lookup","/api/hpi-test","/api/postcode-lookup","/api/market-intelligence","/api/website-pages","/api/workflow/:path*","/api/stock-attachments/:path*","/api/opportunities/:path*","/api/retail-check/:path*","/api/retail-history/:path*","/api/scanner-status/:path*","/api/run-opportunity-scan","/api/makes/:path*","/api/models/:path*","/api/stock/:path*","/api/crm/:path*"]};

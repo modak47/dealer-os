@@ -1,3 +1,4 @@
+import { requireWebsiteLeadStaff } from "@/lib/auth/website-lead-staff";
 import { NextResponse } from "next/server";
 import { signedMarketplacePhotoUrls } from "@/lib/marketplace-photos";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -46,6 +47,7 @@ function buildUpdates(body: Record<string, unknown>): WebsiteLeadUpdate {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!await requireWebsiteLeadStaff(true)) return NextResponse.json({ error: "Staff access required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   const { id: rawId } = await params;
   const id = parseId(rawId);
   if (!id) return NextResponse.json({ error: "Invalid lead ID." }, { status: 400 });
@@ -59,6 +61,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!await requireWebsiteLeadStaff(false)) return NextResponse.json({ error: "Staff access required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   const { id: rawId } = await params;
   const id = parseId(rawId);
   if (!id) return NextResponse.json({ error: "Invalid lead ID." }, { status: 400 });

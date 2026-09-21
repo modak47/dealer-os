@@ -64,9 +64,11 @@ describe("dealer roles and account management security", () => {
     assert.match(helper, /\.from\("dealer_users"\)/);
     assert.match(helper, /\.eq\("id",user\.id\)/);
     assert.match(helper, /\.eq\("active",true\)/);
-    assert.match(helper, /\["dealer_admin","dealer_user"\]\.includes\(String\(data\.role\)\)/);
-    const migration = source("supabase/migrations/20260904000100_harden_staff_access_against_dealer_portal_users.sql");
-    assert.match(migration, /not in \('dealer_admin', 'dealer_user'\)/);
+    assert.match(helper, /isInternalStaffMembership\(data\)/);
+    assert.match(source("lib/auth/staff-policy.ts"), /internalStaffRoles = \["team_member"\]/);
+    const migration = source("supabase/migrations/20260921000200_website_lead_review_pagination.sql");
+    assert.match(migration, /role in \('team_member'\)/);
+    assert.match(migration, /select public\.staff_actor_can_access\(auth\.uid\(\)\)/);
   });
 
   it("protects dealer portal staff APIs in routes and proxy", () => {

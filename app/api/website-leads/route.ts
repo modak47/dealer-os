@@ -1,26 +1,15 @@
+import { requireWebsiteLeadStaff } from "@/lib/auth/website-lead-staff";
 import { NextResponse } from "next/server";
 import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { leadLocationUpdate, lookupLeadLocation } from "@/lib/location";
-import { signedMarketplacePhotoUrls } from "@/lib/marketplace-photos";
+import { loadLeadList } from "@/lib/website-lead-list-server";
+import { londonDay, londonMidnight, shiftDay } from "@/lib/website-lead-list";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createAutomaticVehicleCheckForWebsiteLead } from "@/lib/website-lead-auto-check";
-import { cleanText, combineLeadImages, isValidLeadStatus, safeNumber } from "@/lib/website-leads";
-import type { WebsiteLead, WebsiteLeadStatus } from "@/types/website-lead";
+import { cleanText, isValidLeadStatus, safeNumber } from "@/lib/website-leads";
+import type { WebsiteLeadStatus } from "@/types/website-lead";
 
 export const dynamic = "force-dynamic";
-
-const defaultSelect = "*";
-const listSelect = "id,reg,make,model,price,website,status,valuation_status,date,created_at,images,Images,image1,image2,image3,image4,image5,image6,image7,image8,image9,image10,retail_check_id,stock_bike_id,purchase_agreed_at,latest_referral_id,latest_referred_dealer_id,latest_referred_dealer_name,latest_referred_at,referral_count,retail_estimate,suggested_offer,estimated_margin,postcode,normalised_postcode,latitude,longitude,location_display_name,location_town,geocoding_status,geocoding_provider,location_checked_at,location_lookup_error,distance_from_yesmoto_miles,driving_distance_miles,estimated_drive_minutes";
-const sourceLabels: Record<string, string> = { bikebuyeruk: "Bike Buyer UK", sellyourmotorbike: "Sell Your Motorbike", motorcyclebuyer: "Motorcycle Buyer" };
-
-type LeadQueryResult = { data?: unknown; error?: { message?: string; code?: string } | null; count?: number | null };
-type LeadQuery = PromiseLike<LeadQueryResult> & {
-  eq(column: string, value: unknown): LeadQuery;
-  in(column: string, values: unknown[]): LeadQuery;
-  gte(column: string, value: unknown): LeadQuery;
-  order(column: string, options: { ascending?: boolean; nullsFirst?: boolean }): LeadQuery;
-  limit(count: number): LeadQuery;
-};
 
 function imageValue(body: Record<string, unknown>, key: string): string | null {
   return cleanText(body[key], 1000);
@@ -84,82 +73,25 @@ function cleanPayload(body: Record<string, unknown>) {
   };
 }
 
-function leadQuery(query: unknown): LeadQuery {
-  return query as LeadQuery;
-}
-
-function applyLeadFilters(query: LeadQuery, searchParams: URLSearchParams) {
-  const status = searchParams.get("status");
-  const valuationStatus = searchParams.get("valuation_status");
-  const website = searchParams.get("website");
-  if (status) query = query.eq("status", status);
-  if (valuationStatus) query = query.eq("valuation_status", valuationStatus);
-  if (website) query = query.eq("website", website);
-  return query;
-}
-
-async function countLeads(searchParams: URLSearchParams, extra?: (query: LeadQuery) => LeadQuery) {
-  let query = applyLeadFilters(leadQuery(getSupabaseAdminClient().from("website_leads").select("id", { count: "exact", head: true })), searchParams);
-  if (extra) query = extra(query);
-  const { count, error } = await query;
-  if (error) throw error;
-  return count ?? 0;
-}
-
-async function websiteLeadSummary(searchParams: URLSearchParams) {
-  const now = new Date();
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfWeek = new Date(startOfToday);
-  startOfWeek.setDate(startOfToday.getDate() - ((startOfToday.getDay() + 6) % 7));
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const latestLimit = Math.min(Math.max(Number(searchParams.get("limit") ?? 5) || 5, 1), 20);
-  const supabase = getSupabaseAdminClient();
-  const latestQuery = applyLeadFilters(leadQuery(supabase.from("website_leads").select(listSelect)), searchParams).order("id", { ascending: false }).limit(latestLimit);
-  const [total, newCount, pendingValuations, receivedToday, receivedThisWeek, purchasedThisMonth, bikeBuyerUk, sellYourMotorbike, motorcycleBuyer, latestResult] = await Promise.all([
-    countLeads(searchParams),
-    countLeads(searchParams, query => query.eq("status", "new")),
-    countLeads(searchParams, query => query.in("valuation_status", ["pending", "processing", "in_progress"])),
-    countLeads(searchParams, query => query.gte("date", startOfToday.toISOString())),
-    countLeads(searchParams, query => query.gte("date", startOfWeek.toISOString())),
-    countLeads(searchParams, query => query.eq("status", "purchased").gte("purchased_at", startOfMonth.toISOString())),
-    countLeads(searchParams, query => query.eq("website", "bikebuyeruk")),
-    countLeads(searchParams, query => query.eq("website", "sellyourmotorbike")),
-    countLeads(searchParams, query => query.eq("website", "motorcyclebuyer")),
-    latestQuery,
-  ]);
-  if (latestResult.error) throw latestResult.error;
-  const latestLeadRows = (latestResult.data ?? []) as WebsiteLead[];
-  const photoUrls = await signedMarketplacePhotoUrls(supabase, latestLeadRows.map(lead => Number(lead.id)));
-  const latestLeads = latestLeadRows.map(lead => ({ ...lead, resolved_images: [...(photoUrls.get(Number(lead.id)) ?? []), ...combineLeadImages(lead)] }));
-  return { total, new: newCount, pendingValuations, receivedToday, receivedThisWeek, purchasedThisMonth, sourceCounts: { bikebuyeruk: bikeBuyerUk, sellyourmotorbike: sellYourMotorbike, motorcyclebuyer: motorcycleBuyer }, sourceLabels, latestLeads };
-}
-
 export async function GET(request: Request) {
+  if (!await requireWebsiteLeadStaff(true)) return NextResponse.json({ error: "Staff access required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   const searchParams = new URL(request.url).searchParams;
-  if (searchParams.get("summary") === "true") {
-    try {
-      return NextResponse.json({ summary: await websiteLeadSummary(searchParams) });
-    } catch (error) {
-      console.error("Website leads summary failed.", { message: error instanceof Error ? error.message : "Unknown error" });
-      return NextResponse.json({ error: "Unable to load website leads summary." }, { status: 500 });
+  try {
+    if (searchParams.get("summary") === "true" || searchParams.get("counts") === "true") {
+      const day = londonDay();
+      const dow = new Date(`${day}T12:00:00Z`).getUTCDay();
+      const { data, error } = await getSupabaseAdminClient().rpc("staff_website_leads_counts", {
+        p_today: londonMidnight(day), p_week: londonMidnight(shiftDay(day, -((dow + 6) % 7))), p_month: londonMidnight(`${day.slice(0, 7)}-01`),
+      });
+      if (error) throw new Error("Website Leads migration required or counts unavailable.");
+      const latest = searchParams.get("summary") === "true" ? await loadLeadList(new URLSearchParams({ limit: "5" })) : null;
+      return NextResponse.json({ summary: { ...data, latestLeads: latest?.leads ?? [] } }, { headers: { "Cache-Control": "private, no-store" } });
     }
+    return NextResponse.json(await loadLeadList(searchParams), { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to load website leads.";
+    return NextResponse.json({ error: message }, { status: /cursor|Invalid|Start date/.test(message) ? 400 : 503, headers: { "Cache-Control": "private, no-store" } });
   }
-  const limit = Number(searchParams.get("limit") ?? 0);
-  const sort = searchParams.get("sort") ?? "newest";
-  const db = getSupabaseAdminClient();
-  let query = applyLeadFilters(leadQuery(db.from("website_leads").select(defaultSelect)), searchParams);
-  if (sort === "oldest") query = query.order("id", { ascending: true });
-  else if (sort === "highest_margin") query = query.order("estimated_margin", { ascending: false, nullsFirst: false });
-  else if (sort === "highest_offer") query = query.order("suggested_offer", { ascending: false, nullsFirst: false });
-  else query = query.order("id", { ascending: false });
-  if (Number.isFinite(limit) && limit > 0) query = query.limit(Math.min(limit, 500));
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: "Unable to load website leads." }, { status: 500 });
-  const leadRows = (data ?? []) as WebsiteLead[];
-  const photoUrls = await signedMarketplacePhotoUrls(db, leadRows.map(lead => Number(lead.id)));
-  const leads = leadRows.map(lead => ({ ...lead, resolved_images: [...(photoUrls.get(Number(lead.id)) ?? []), ...combineLeadImages(lead)] }));
-  return NextResponse.json({ leads });
 }
 
 export async function POST(request: Request) {

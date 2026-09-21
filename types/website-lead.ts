@@ -9,6 +9,11 @@ export type WebsiteLeadSource = typeof WEBSITE_LEAD_SOURCES[number] | string;
 export type WebsiteLead = {
   id: number;
   public_id?: string | null;
+  received_at?: string | null;
+  received_date_basis?: string | null;
+  portal_reviewed_at?: string | null;
+  portal_ready_at?: string | null;
+  archived_at?: string | null;
   external_submission_id?: string | null;
   lead_source?: WebsiteLeadSource | null;
   form_name?: string | null;

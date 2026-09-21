@@ -1,3 +1,4 @@
+import { requireWebsiteLeadStaff } from "@/lib/auth/website-lead-staff";
 import { NextResponse } from "next/server";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
@@ -27,6 +28,7 @@ function shareOptions(value: unknown): ReferralShareOptions {
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] || char));
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!await requireWebsiteLeadStaff(true)) return NextResponse.json({ error: "Staff access required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   if (!await requireStaffUser()) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   const { id: rawId } = await params;
   const id = parseLeadId(rawId);
@@ -37,6 +39,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!await requireWebsiteLeadStaff(false)) return NextResponse.json({ error: "Staff access required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   try {
     if (!await requireStaffUser()) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
     const { id: rawId } = await params;

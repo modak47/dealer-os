@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatGbp, formatLeadDate, statusLabel } from "@/lib/website-leads";
-import type { WebsiteLead } from "@/types/website-lead";
+import type { LeadListRow } from "@/lib/website-lead-list";
 
 type WebsiteLeadSummary = {
   total: number;
@@ -13,7 +13,7 @@ type WebsiteLeadSummary = {
   receivedThisWeek: number;
   purchasedThisMonth: number;
   sourceCounts: Record<"bikebuyeruk" | "sellyourmotorbike" | "motorcyclebuyer", number>;
-  latestLeads: WebsiteLead[];
+  latestLeads: LeadListRow[];
 };
 
 export function WebsiteLeadsOverview() {
@@ -45,12 +45,12 @@ export function WebsiteLeadsOverview() {
       <div className="overview-source-counts">{sourceCounts.map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}</div>
     </div>
     {!summary.latestLeads.length ? <div className="overview-website-state">No website leads yet.</div> : <div className="overview-latest-leads">{summary.latestLeads.map(lead => <Link href={`/website-leads/${lead.id}`} key={lead.id}>
-      <span className="overview-lead-thumb">{lead.resolved_images?.[0] ? <img src={lead.resolved_images[0]} alt="" /> : <i />}</span>
+      <span className="overview-lead-thumb">{lead.thumbnail_url ? <img src={lead.thumbnail_url} alt="" loading="lazy" /> : <i />}</span>
       <b>{lead.reg || "No reg"}<small>{[lead.make, lead.model].filter(Boolean).join(" ") || "Bike details pending"}</small></b>
       <em>{lead.price || formatGbp(null)}</em>
-      <span>{lead.website || "unknown"}</span>
+      <span>{lead.lead_source || "unknown"}</span>
       <span>{statusLabel(lead.status)}</span>
-      <time>{formatLeadDate(lead.date || lead.created_at)}</time>
+      <time>{formatLeadDate(lead.received_at)}</time>
     </Link>)}</div>}
   </section>;
 }

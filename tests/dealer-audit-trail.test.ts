@@ -53,11 +53,11 @@ describe("dealer portal V1 lifecycle audit coverage", () => {
   });
 
   it("keeps release, allocation, exclusion and re-release traceable", () => {
-    assert.match(releaseRoute, /event_type: "lead_released_to_dealers"/);
-    assert.match(releaseRoute, /eventType: "lead_rereleased_to_dealers"/);
-    assert.match(releaseRoute, /eventType: allocation\.allocation_status === "excluded" \? "dealer_allocation_excluded" : "dealer_allocation_created"/);
-    assert.match(releaseRoute, /match_reasons_ref: "dealer_lead_allocations\.match_reasons"/);
-    assert.match(releaseRoute, /previous_dealer_reclaim_override_recorded/);
+    assert.match(releaseRoute, /rpc\("staff_release_website_lead"/);
+    const atomicRelease = source("supabase/migrations/20260921000200_website_lead_review_pagination.sql");
+    for (const event of ["lead_released_to_dealers", "lead_rereleased_to_dealers", "dealer_allocation_excluded", "dealer_allocation_created", "previous_dealer_reclaim_override_recorded"]) assert.ok(atomicRelease.includes(event));
+    assert.match(atomicRelease, /dealer_lead_allocations\.match_reasons/);
+    assert.match(atomicRelease, /for update/);
   });
 
   it("retains failed claims, successful claims and safe customer unlock history", () => {

@@ -1,3 +1,4 @@
+import { requireWebsiteLeadStaff } from "@/lib/auth/website-lead-staff";
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/current-user";
 import { cleanLocationText, leadLocationUpdate, lookupLeadLocation, stockLocationUpdate } from "@/lib/location";
@@ -27,6 +28,7 @@ function optionalDate(value: unknown, label: string) {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!await requireWebsiteLeadStaff(false)) return NextResponse.json({ error: "Staff access required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   try {
     const { id: rawId } = await params;
     const id = parseId(rawId);

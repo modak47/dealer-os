@@ -61,7 +61,7 @@ describe("dealer lost and return lifecycle", () => {
   it("requires and audits explicit staff override for a selected previous dealer", () => {
     assert.match(releaseRoute, /allow_previous_dealer_reclaim/);
     assert.match(releaseRoute, /previous_dealer_reclaim_override/);
-    assert.match(releaseRoute, /previous_dealer_reclaim_override_recorded/);
+    assert.match(source("supabase/migrations/20260921000200_website_lead_review_pagination.sql"), /previous_dealer_reclaim_override_recorded/);
     assert.match(releaseRoute, /previous_dealer_override_ids/);
   });
 

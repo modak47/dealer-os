@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { Children, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
+import { formatLeadDate, statusLabel } from "@/lib/website-leads";
 import type { DealerBuyingPreferences, DealerFeeLedgerEntry, DealerGeographyPreferences, DealerLeadClaim, DealerLeadNote, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPurchase, DealerPurchaseFee } from "@/types/dealer-portal";
-import type { WebsiteLead } from "@/types/website-lead";
+import { LeadBrowser } from "@/app/website-leads/lead-browser";
 
 type RelatedDealer = { id: string; trading_name: string; successful_purchase_fee?: number | null } | null;
 type RelatedLead = { id: number; reg?: string | null; make?: string | null; model?: string | null; year?: string | null; mileage?: string | null; status?: string | null; postcode?: string | null; location_town?: string | null } | null;
@@ -86,15 +86,9 @@ function splitArrayText(value: string) {
 
 export default function DealerPortalAdminPage() {
   const [accounts, setAccounts] = useState<DealerPortalAccountWithPreferences[]>([]);
-  const [leads, setLeads] = useState<WebsiteLead[]>([]);
   const [overview, setOverview] = useState<AdminOverview>({ claims: [], notes: [], purchases: [], fees: [], ledger: [] });
   const [editing, setEditing] = useState<Partial<DealerPortalAccountWithPreferences> | null>(null);
   const [access, setAccess] = useState(emptyAccess);
-  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
-  const [releaseQuery, setReleaseQuery] = useState("");
-  const [selectedDealers, setSelectedDealers] = useState<string[]>([]);
-  const [method, setMethod] = useState<"matching_pool" | "direct" | "dealer_group">("matching_pool");
-  const [allowPreviousDealerReclaim, setAllowPreviousDealerReclaim] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
@@ -105,18 +99,14 @@ export default function DealerPortalAdminPage() {
   async function load() {
     setLoading(true);
     setError("");
-    const [accountResponse, leadResponse, overviewResponse] = await Promise.all([
+    const [accountResponse, overviewResponse] = await Promise.all([
       fetch("/api/dealer-portal/admin/accounts", { cache: "no-store" }),
-      fetch("/api/website-leads?limit=100", { cache: "no-store" }),
       fetch("/api/dealer-portal/admin/overview", { cache: "no-store" }),
     ]);
     const accountPayload = await accountResponse.json();
-    const leadPayload = await leadResponse.json();
     const overviewPayload = await overviewResponse.json();
     if (accountResponse.ok) setAccounts(accountPayload.accounts ?? []);
     else setError(accountPayload.error || "Unable to load dealer portal accounts.");
-    if (leadResponse.ok) setLeads(leadPayload.leads ?? []);
-    else setError(leadPayload.error || "Unable to load website leads.");
     if (overviewResponse.ok) setOverview({ claims: overviewPayload.claims ?? [], notes: overviewPayload.notes ?? [], purchases: overviewPayload.purchases ?? [], fees: overviewPayload.fees ?? [], ledger: overviewPayload.ledger ?? [] });
     else setError(overviewPayload.error || "Unable to load dealer portal overview.");
     setLoading(false);
@@ -134,22 +124,10 @@ export default function DealerPortalAdminPage() {
     rejected: accounts.filter(account => account.account_status === "rejected"),
     suspended: accounts.filter(account => account.account_status === "suspended"),
   }), [accounts]);
-  const portalLeads = useMemo(() => leads.filter(lead => String(lead.status ?? "").startsWith("dealer_")), [leads]);
-  const releaseableLeads = useMemo(() => leads.filter(lead => !["purchased", "internal_buying", "purchase_agreed", "dealer_claimed", "dealer_purchased"].includes(String(lead.status ?? ""))), [leads]);
-  const releaseQueue = useMemo(() => {
-    const search = releaseQuery.trim().toLowerCase();
-    return releaseableLeads.filter(lead => {
-      const text = [lead.id, lead.reg, lead.make, lead.model, lead.year, lead.mileage, lead.price, lead.location_town, lead.postcode, lead.status].join(" ").toLowerCase();
-      return !search || text.includes(search);
-    }).slice(0, 18);
-  }, [releaseQuery, releaseableLeads]);
-  const selectedLeads = useMemo(() => releaseableLeads.filter(lead => selectedLeadIds.includes(String(lead.id))), [releaseableLeads, selectedLeadIds]);
   const pendingFees = useMemo(() => overview.fees.filter(fee => fee.status !== "paid" && fee.status !== "void"), [overview.fees]);
   const pendingFeeTotal = useMemo(() => pendingFees.reduce((total, fee) => total + (Number(fee.outstanding_amount ?? fee.fee_amount) || 0), 0), [pendingFees]);
   const kpis = [
     ["Active Dealers", activeAccounts.length],
-    ["Portal Leads", portalLeads.length],
-    ["Available to Release", releaseableLeads.length],
     ["Claims", overview.claims.length],
     ["Purchases", overview.purchases.length],
     [`Fees Pending (${pendingFees.length})`, money(pendingFeeTotal)],
@@ -214,42 +192,6 @@ export default function DealerPortalAdminPage() {
     setSaving(false);
   }
 
-  async function releaseLead(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedLeadIds.length) return;
-    setSaving(true);
-    setError("");
-    setNotice("");
-    const failures: string[] = [];
-    let allocationCount = 0;
-    for (const websiteLeadId of selectedLeadIds) {
-      const response = await fetch("/api/dealer-portal/admin/release", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          website_lead_id: websiteLeadId,
-          allocation_method: method,
-          dealer_account_ids: method === "matching_pool" ? [] : selectedDealers,
-          allow_previous_dealer_reclaim: method !== "matching_pool" && allowPreviousDealerReclaim,
-        }),
-      });
-      const payload = await response.json();
-      if (response.ok) allocationCount += payload.allocations?.length ?? 0;
-      else failures.push(`#${websiteLeadId}: ${payload.error || "Unable to release lead."}`);
-    }
-    if (!failures.length) {
-      setNotice(`${selectedLeadIds.length} lead(s) released to ${allocationCount} dealer portal allocation(s).`);
-      setSelectedLeadIds([]);
-      setSelectedDealers([]);
-      setAllowPreviousDealerReclaim(false);
-      await load();
-    } else {
-      setError(`Released with ${failures.length} failure(s). ${failures.join(" ")}`);
-      await load();
-    }
-    setSaving(false);
-  }
-
   async function setAccountStatus(account: DealerPortalAccountWithPreferences, accountStatus: DealerPortalAccount["account_status"]) {
     setSaving(true);
     setError("");
@@ -286,48 +228,17 @@ export default function DealerPortalAdminPage() {
     setBackfilling(false);
   }
 
-  function toggleDealer(id: string) {
-    setSelectedDealers(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
-  }
-
-  function toggleLead(id: string) {
-    setSelectedLeadIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
-  }
-
-  function selectVisibleQueue() {
-    setSelectedLeadIds(current => Array.from(new Set([...current, ...releaseQueue.map(lead => String(lead.id))])));
-  }
-
   return <main className="admin-page dealer-portal-admin-page">
-    <div className="admin-heading"><div><h1>Dealer Portal</h1><p>Manage dealer buying accounts and release website leads for claim-based access.</p></div><div className="quick-actions"><Link href="/dealer-login" target="_blank">Dealer Login</Link><button className="admin-secondary" onClick={() => void backfillVehicleChecks()} disabled={backfilling}>{backfilling ? "Checking..." : "Run Missing Vehicle Checks"}</button><button className="admin-primary" onClick={() => startEditing(emptyAccount)}>Add Portal Dealer</button></div></div>
+    <div className="admin-heading"><div><h1>Dealer Portal</h1><p>Review leads and release direct claims or MotorGeeks dealer-offer opportunities.</p></div><div className="quick-actions"><Link href="/dealer-login" target="_blank">Dealer Login</Link><button className="admin-secondary" onClick={() => void backfillVehicleChecks()} disabled={backfilling}>{backfilling ? "Checking..." : "Run Missing Vehicle Checks"}</button><button className="admin-primary" onClick={() => startEditing(emptyAccount)}>Add Portal Dealer</button></div></div>
     <section className="website-kpis">{kpis.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</section>
     {error && <div className="website-state error compact">{error}</div>}{notice && <div className="website-state success compact">{notice}</div>}
     <section className="dealer-admin-workspace">
       <nav className="dealer-admin-tabs" aria-label="Dealer portal admin sections">
-        <button className={activeTab === "daily" ? "active" : ""} type="button" onClick={() => setActiveTab("daily")}><span>Daily</span><b>{portalLeads.length}</b></button>
+        <button className={activeTab === "daily" ? "active" : ""} type="button" onClick={() => setActiveTab("daily")}><span>Lead Queue</span></button>
         <button className={activeTab === "dealers" ? "active" : ""} type="button" onClick={() => setActiveTab("dealers")}><span>Dealers</span><b>{accounts.length}</b></button>
         <button className={activeTab === "oversight" ? "active" : ""} type="button" onClick={() => setActiveTab("oversight")}><span>Oversight</span><b>{overview.claims.length + overview.purchases.length}</b></button>
       </nav>
-      {activeTab === "daily" && <section className="dealer-admin-panel dealer-admin-daily">
-        <form className="website-detail-card dealer-release-card" onSubmit={releaseLead}>
-          <header><div><h2>Leads Ready to Release</h2><p>Pick from the visible queue before releasing to dealers.</p></div><span>{releaseableLeads.length} ready</span></header>
-          <div className="dealer-release-search"><input value={releaseQuery} onChange={event => setReleaseQuery(event.target.value)} placeholder="Search reg, bike, location or price" aria-label="Search releasable leads" /><button className="secondary" type="button" onClick={selectVisibleQueue} disabled={!releaseQueue.length}>Select visible</button>{releaseQuery && <button className="ghost" type="button" onClick={() => setReleaseQuery("")}>Clear</button>}</div>
-          <div className="dealer-release-queue">
-            {loading ? <p>Loading leads...</p> : !releaseQueue.length ? <p>No releasable leads match this search.</p> : releaseQueue.map(lead => <ReleaseQueueRow lead={lead} selected={selectedLeadIds.includes(String(lead.id))} saving={saving} key={lead.id} onSelect={() => toggleLead(String(lead.id))} />)}
-          </div>
-          <div className="dealer-release-controls">
-            <div className="dealer-release-selected"><span>Selected</span><b>{selectedLeads.length ? `${selectedLeads.length} lead(s): ${selectedLeads.slice(0, 3).map(lead => `#${lead.id} ${lead.reg || "No reg"}`).join(", ")}${selectedLeads.length > 3 ? "..." : ""}` : "No leads selected"}</b>{selectedLeads.length > 0 && <button type="button" onClick={() => setSelectedLeadIds([])}>Clear selection</button>}</div>
-            <label><span>Distribution</span><select value={method} onChange={event => setMethod(event.target.value as typeof method)}><option value="matching_pool">Open matching pool</option><option value="direct">Specific dealer</option><option value="dealer_group">Dealer group</option></select></label>
-            {method !== "matching_pool" && <div className="dealer-picker">{activeAccounts.map(account => <label key={account.id}><input type="checkbox" checked={selectedDealers.includes(account.id)} onChange={() => toggleDealer(account.id)} />{account.trading_name}</label>)}</div>}
-            {method !== "matching_pool" && <label className="dealer-reclaim-override"><input type="checkbox" checked={allowPreviousDealerReclaim} onChange={event => setAllowPreviousDealerReclaim(event.target.checked)} /><span>Allow selected previous dealer to reclaim if they had Lost or Returned this lead</span></label>}
-            <div className="website-actions dealer-release-actions"><button className="dealer-release-submit" disabled={saving || !selectedLeadIds.length || (method !== "matching_pool" && !selectedDealers.length)}>{saving ? "Releasing..." : selectedLeadIds.length > 1 ? `Release ${selectedLeadIds.length} Leads` : "Release to Portal"}</button><Link href="/dealer-login" target="_blank">Open Dealer Login</Link></div>
-          </div>
-        </form>
-        <section className="website-detail-card status-actions dealer-recent-leads">
-          <header><div><h2>Recent Portal Leads</h2><p>Latest leads released, claimed, returned or purchased through the portal.</p></div><Link href="/website-leads">All Website Leads</Link></header>
-          {!portalLeads.length ? <p>No website leads have been released to the dealer portal yet.</p> : <div className="referral-history-list">{portalLeads.slice(0, 10).map(lead => <article key={lead.id}><header><div><b>#{lead.id} {lead.reg || "No reg"} · {[lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle"}</b><span>{statusLabel(lead.status)} · {formatLeadDate(lead.date || lead.created_at)}</span></div><Link href={`/website-leads/${lead.id}`}>Open</Link></header><dl><div><dt>Mileage</dt><dd>{formatMileage(lead.mileage)}</dd></div><div><dt>Location</dt><dd>{lead.location_town || lead.postcode || "Not set"}</dd></div></dl></article>)}</div>}
-        </section>
-      </section>}
+      {activeTab === "daily" && <section className="dealer-admin-panel"><LeadBrowser queue dealers={activeAccounts} /></section>}
       {activeTab === "dealers" && <section className="dealer-admin-panel">
         <section className="website-detail-card dealer-portal-accounts">
           <header><div><h2>Portal Dealers</h2><p>Dealer accounts are hidden from the daily view to keep this page cleaner.</p></div><button className="admin-primary" onClick={() => startEditing(emptyAccount)}>Add Portal Dealer</button></header>
@@ -414,36 +325,6 @@ function AdminNumberPreference({ label, value, set }: { label: string; value: nu
 
 function AdminCheckbox({ label, checked, set }: { label: string; checked: boolean; set: (value: boolean) => void }) {
   return <label><input type="checkbox" checked={checked} onChange={event => set(event.target.checked)} /><span>{label}</span></label>;
-}
-
-function ReleaseQueueRow({ lead, selected, saving, onSelect }: { lead: WebsiteLead; selected: boolean; saving: boolean; onSelect: () => void }) {
-  const price = safeNumber(lead.price);
-  const title = [lead.make, lead.model].filter(Boolean).join(" ") || "Motorcycle";
-  const location = lead.location_town || lead.postcode || "Location not set";
-  const checkStatus = lead.vehicle_check_status === "checked" ? "Check done" : lead.vehicle_check_status === "failed" ? "Check failed" : lead.reg ? "Check pending" : "No reg";
-  const marketplace = lead.opportunity_mode === "marketplace_offer";
-  const profile = safeRecord(lead.seller_profile);
-  const sellerProgress = safeRecord(lead.seller_progress);
-  const profileFields = ["firstName", "lastName", "email", "mobile", "postcode"].filter(key => Boolean(profile[key])).length;
-  const source = marketplace ? "MotorGeeks" : lead.website || lead.lead_source || "Website";
-  return <article className={selected ? "selected" : ""}>
-    <button className="dealer-release-toggle" type="button" disabled={saving} onClick={onSelect}><span>{selected ? "Remove" : "Select"}</span></button>
-    <div className="dealer-release-bike"><b>#{lead.id} {lead.reg || "No reg"}</b><strong>{lead.year ? `${lead.year} ` : ""}{title}</strong><small>{source} · {marketplace ? "Marketplace Offer" : "Direct claim"} · {statusLabel(lead.status)} · {formatLeadDate(lead.date || lead.created_at)}</small></div>
-    <dl>
-      <div><dt>Source</dt><dd>{source}</dd></div>
-      <div><dt>Mode</dt><dd>{marketplace ? "Marketplace Offer" : "Direct Claim"}</dd></div>
-      <div><dt>Location</dt><dd>{location}</dd></div>
-      <div><dt>Mileage</dt><dd>{formatMileage(lead.mileage)}</dd></div>
-      <div><dt>Asking</dt><dd>{price === null ? "Not set" : formatGbp(price)}</dd></div>
-      <div><dt>Vehicle Check</dt><dd>{checkStatus}</dd></div>
-      {marketplace && <><div><dt>Seller profile</dt><dd>{profileFields}/5 fields</dd></div><div><dt>Marketplace</dt><dd>{statusLabel(lead.marketplace_status || "submitted")}</dd></div><div><dt>Photos</dt><dd>{sellerProgress.photosSkipped ? "Skipped for now" : "Uploaded photos linked privately"}</dd></div></>}
-    </dl>
-    <Link className="dealer-release-open" href={`/website-leads/${lead.id}`}>Open</Link>
-  </article>;
-}
-
-function safeRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function OverviewPanel({ title, empty, children }: { title: string; empty: string; children: ReactNode }) {

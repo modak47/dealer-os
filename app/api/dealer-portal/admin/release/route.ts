@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
-import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
+import { releaseBlockReason, type ReleaseState } from "@/lib/website-lead-release";
 import { notifyDealerLeadAllocation } from "@/lib/dealer-notifications";
 import { dealerPreviouslyHandledClaim } from "@/lib/dealer-portal-lifecycle";
 import { allocationReasonPayload, allocationStatusForEligibility, evaluateDealerEligibility, excludedReasonPayload } from "@/lib/dealer-matching";
 import { withDealerPreferencesList } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText } from "@/lib/website-leads";
-import type { DealerLeadClaimStatus, DealerPortalAccount } from "@/types/dealer-portal";
+import type { DealerLeadAllocation, DealerLeadClaimStatus, DealerPortalAccount } from "@/types/dealer-portal";
 
 export const dynamic = "force-dynamic";
 
 const releaseLeadSelect = [
   "id",
+  "updated_at",
+  "portal_ready_at",
+  "archived_at",
+  "marketplace_accepted_offer_id",
   "status",
   "make",
   "model",
@@ -57,13 +61,15 @@ export async function POST(request: Request) {
     const method = cleanText(body.allocation_method, 40) || "matching_pool";
     if (!["direct", "dealer_group", "matching_pool"].includes(method)) return NextResponse.json({ error: "Allocation method is invalid." }, { status: 400 });
     const requestedDealerIds = stringArray(body.dealer_account_ids);
+    if ((method === "direct" && requestedDealerIds.length !== 1) || (method === "dealer_group" && !requestedDealerIds.length)) return NextResponse.json({ error: "Choose the required dealer accounts." }, { status: 400 });
     const requestedOverrideIds = new Set(stringArray(body.previous_dealer_override_ids));
     const allowSelectedPreviousDealerReclaim = body.allow_previous_dealer_reclaim === true || body.allow_previous_dealer_reclaim === "true";
     const db = getSupabaseAdminClient();
     const { data: lead, error: leadError } = await db.from("website_leads").select(releaseLeadSelect).eq("id", websiteLeadId).maybeSingle();
     if (leadError) return NextResponse.json({ error: "Unable to load website lead." }, { status: 500 });
     if (!lead) return NextResponse.json({ error: "Website lead not found." }, { status: 404 });
-    const releaseLead = lead as unknown as Record<string, unknown>;
+    const blocked = releaseBlockReason(lead as unknown as ReleaseState);
+    if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
     const dealerQuery = db.from("dealer_portal_accounts").select("*").eq("account_status", "active");
     const dealerResult = requestedDealerIds.length ? await dealerQuery.in("id", requestedDealerIds) : await dealerQuery;
     if (dealerResult.error) return NextResponse.json({ error: "Unable to load dealer portal accounts." }, { status: 500 });
@@ -108,8 +114,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
     const userId = await getCurrentUserId();
-    const now = new Date().toISOString();
-    await db.from("dealer_lead_allocations").update({ allocation_status: "withdrawn", updated_at: now, updated_by: userId }).eq("website_lead_id", websiteLeadId).eq("allocation_status", "available");
+
     const allocations = evaluatedDealers.map(({ dealer, eligibility }) => ({
       previousDealer: previousDealerIds.has(dealer.id),
       reclaimOverride: overrideDealerIds.has(dealer.id),
@@ -133,65 +138,15 @@ export async function POST(request: Request) {
       created_by: userId,
       updated_by: userId,
     }));
-    const { data: inserted, error: allocationError } = await db.from("dealer_lead_allocations").insert(allocations).select("*");
-    if (allocationError) return NextResponse.json({ error: `Unable to release lead: ${allocationError.message}` }, { status: 500 });
-    const marketplace = releaseLead.opportunity_mode === "marketplace_offer";
-    const status = marketplace ? releaseLead.status : requestedDealerIds.length === 1 && method === "direct" ? "dealer_allocated" : "dealer_pool_available";
-    const leadUpdate = marketplace
-      ? { marketplace_status: "live_to_dealers", marketplace_released_at: now, updated_at: now }
-      : { status, updated_at: now };
-    const { error: updateError } = await db.from("website_leads").update(leadUpdate).eq("id", websiteLeadId);
-    if (updateError) return NextResponse.json({ error: "Allocations were recorded, but the lead status could not be updated." }, { status: 500 });
-    await db.from("dealer_portal_audit_events").insert({
-      website_lead_id: websiteLeadId,
-      dealer_user_id: userId,
-      event_type: "lead_released_to_dealers",
-      event_data: {
-        allocation_method: method,
-        opportunity_mode: releaseLead.opportunity_mode,
-        marketplace_release: marketplace,
-        dealer_count: dealers.length,
-        available_count: availableDealers.length,
-        excluded_count: evaluatedDealers.length - availableDealers.length,
-        previous_dealer_excluded_ids: [...previousDealerIds].filter(id => !overrideDealerIds.has(id)),
-        previous_dealer_override_ids: [...overrideDealerIds],
-      },
+    const { data: committed, error: commitError } = await db.rpc("staff_release_website_lead", {
+      p_id: websiteLeadId, p_actor: userId, p_expected_updated_at: (lead as unknown as { updated_at: string }).updated_at,
+      p_method: method, p_allocations: allocations,
     });
-    if ((previousClaims.data ?? []).length) {
-      await recordDealerPortalAuditEvent({
-        eventType: "lead_rereleased_to_dealers",
-        websiteLeadId,
-        dealerUserId: userId,
-        eventData: {
-          allocation_method: method,
-          previous_claim_count: previousClaims.data?.length ?? 0,
-          available_count: availableDealers.length,
-        },
-      });
-    }
-    await Promise.all((inserted ?? []).map(allocation => recordDealerPortalAuditEvent({
-      eventType: allocation.allocation_status === "excluded" ? "dealer_allocation_excluded" : "dealer_allocation_created",
-      websiteLeadId,
-      dealerAccountId: allocation.dealer_account_id,
-      dealerUserId: userId,
-      eventData: {
-        allocation_id: allocation.id,
-        allocation_method: allocation.allocation_method,
-        allocation_status: allocation.allocation_status,
-        match_reasons_ref: "dealer_lead_allocations.match_reasons",
-        excluded_reasons_ref: allocation.allocation_status === "excluded" ? "dealer_lead_allocations.excluded_reasons" : null,
-      },
-    })));
-    if (overrideDealerIds.size) {
-      await db.from("dealer_portal_audit_events").insert({
-        website_lead_id: websiteLeadId,
-        dealer_user_id: userId,
-        event_type: "previous_dealer_reclaim_override_recorded",
-        event_data: { dealer_account_ids: [...overrideDealerIds], allocation_method: method },
-      });
-    }
+    if (commitError) return NextResponse.json({ error: commitError.code === "PGRST202" ? "Website Leads migration required." : commitError.message }, { status: 409 });
+    const inserted = (committed?.allocations ?? []) as DealerLeadAllocation[];
+    const status = committed?.status;
     const dealerById = new Map(dealers.map(dealer => [dealer.id, dealer]));
-    await Promise.all((inserted ?? [])
+    const notifications = await Promise.allSettled((inserted ?? [])
       .filter(allocation => allocation.allocation_status === "available")
       .map(allocation => {
         const dealer = dealerById.get(String(allocation.dealer_account_id));
@@ -200,6 +155,7 @@ export async function POST(request: Request) {
       .filter(Boolean));
     return NextResponse.json({
       allocations: inserted ?? [],
+      notificationWarnings: notifications.filter(result => result.status === "rejected").length,
       status,
       eligibility: evaluatedDealers.map(item => ({
         dealer_account_id: item.dealer.id,

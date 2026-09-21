@@ -39,6 +39,11 @@ describe("MotorGeeks marketplace offer contract", () => {
     assert.doesNotMatch(migration, /opportunity\.offer_amount/);
   });
 
+  it("loads each offer's originating lead without confusing the accepted-offer relationship", () => {
+    assert.match(offerLeadsRoute, /from\("dealer_offers"\)\s*\.select\("\*,lead:website_leads!dealer_offers_website_lead_id_fkey\(\*\)"\)/);
+    assert.match(offerLeadsRoute, /\.eq\("dealer_account_id", session\.dealer\.id\)/);
+  });
+
   it("stores seller access hashes and uses tokenless seller sessions", () => {
     assert.match(migration, /seller_access_tokens/);
     assert.match(migration, /token_hash text not null unique/);

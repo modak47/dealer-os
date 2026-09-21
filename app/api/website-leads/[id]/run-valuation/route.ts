@@ -1,3 +1,4 @@
+import { requireWebsiteLeadStaff } from "@/lib/auth/website-lead-staff";
 import { NextResponse } from "next/server";
 import { createRetailCheck, extractRetailCheckWebsiteLeadUpdates, waitForRetailCheck } from "@/lib/retail-checks";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -17,6 +18,7 @@ async function failLead(id: number, message: string) {
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!await requireWebsiteLeadStaff(false)) return NextResponse.json({ error: "Staff access required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   const { id: rawId } = await params;
   const id = parseId(rawId);
   if (!id) return NextResponse.json({ error: "Invalid lead ID." }, { status: 400 });

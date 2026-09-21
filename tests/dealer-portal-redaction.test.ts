@@ -209,7 +209,7 @@ describe("dealer portal leads route security boundaries", () => {
   });
 
   it("builds unclaimed and claimed responses through the redaction helper", () => {
-    assert.match(routeSource, /redactLeadForDealer\(\{ \.\.\.lead, resolved_images: combineLeadImages\(lead\) \}, false\)/);
-    assert.match(routeSource, /redactLeadForDealer\(\{ \.\.\.lead, resolved_images: combineLeadImages\(lead\) \}, unlocked\)/);
+    assert.match(routeSource, /redactLeadForDealer\(\{ \.\.\.lead, resolved_images: dealerImageUrls\(lead\.id, combineLeadImages\(lead\)\) \}, false\)/);
+    assert.match(routeSource, /redactLeadForDealer\(\{ \.\.\.lead, resolved_images: dealerImageUrls\(lead\.id, combineLeadImages\(lead\)\) \}, unlocked\)/);
   });
 });

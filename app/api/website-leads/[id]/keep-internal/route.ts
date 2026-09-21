@@ -1,3 +1,4 @@
+import { requireWebsiteLeadStaff } from "@/lib/auth/website-lead-staff";
 import { NextResponse } from "next/server";
 import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
@@ -13,6 +14,7 @@ function parseId(value: string) {
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!await requireWebsiteLeadStaff(false)) return NextResponse.json({ error: "Staff access required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   try {
     if (!await requireStaffUser()) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
     const { id: rawId } = await params;

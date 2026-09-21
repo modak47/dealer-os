@@ -1,3 +1,4 @@
+import { dealerImageUrls } from "@/lib/dealer-image-urls";
 import { NextResponse } from "next/server";
 import { dealerLeadSelectClause, getCurrentDealerPortalAccount, getCurrentDealerPortalMembership, redactLeadForDealer } from "@/lib/dealer-portal";
 import { normaliseVehicleCheck } from "@/lib/autotrader-vehicle-check";
@@ -589,7 +590,7 @@ export async function GET(request: Request) {
     if (!lead || activeClaimByLead.has(Number(row.website_lead_id))) continue;
     if (lead.opportunity_mode === "marketplace_offer") continue;
     if (!dealerVisibleAvailableStatuses.has(String(lead.status ?? ""))) continue;
-    const redacted = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, false) as DealerVisibleLead;
+    const redacted = redactLeadForDealer({ ...lead, resolved_images: dealerImageUrls(lead.id, combineLeadImages(lead)) }, false) as DealerVisibleLead;
     available.push({ ...redacted, ...await dealerLeadMeta(lead, session.dealer, false), portal_vehicle_check: dealerVehicleCheck(lead), portal_allocation_id: String(row.id), customer_unlocked: false });
   }
   const claimed: DealerVisibleLead[] = [];
@@ -597,7 +598,7 @@ export async function GET(request: Request) {
     const lead = relatedLead(claim.lead);
     if (!lead) continue;
     const unlocked = Boolean(claim.customer_details_unlocked_at);
-    const visible = redactLeadForDealer({ ...lead, resolved_images: combineLeadImages(lead) }, unlocked) as DealerVisibleLead;
+    const visible = redactLeadForDealer({ ...lead, resolved_images: dealerImageUrls(lead.id, combineLeadImages(lead)) }, unlocked) as DealerVisibleLead;
     claimed.push({ ...visible, ...await dealerLeadMeta(lead, session.dealer, unlocked), portal_vehicle_check: dealerVehicleCheck(lead), portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked });
   }
   return NextResponse.json({ dealer: session.dealer, role: session.role, available, claimed });

@@ -1,3 +1,4 @@
+import { dealerImageUrls } from "@/lib/dealer-image-urls";
 import { NextResponse } from "next/server";
 import { getCurrentDealerPortalAccount, redactLeadForDealer } from "@/lib/dealer-portal";
 import { signedMarketplacePhotoUrls } from "@/lib/marketplace-photos";
@@ -89,7 +90,7 @@ export async function GET(request: Request) {
       .eq("allocation_status", "available")
       .order("allocated_at", { ascending: false }),
     db.from("dealer_offers")
-      .select("*,lead:website_leads(*)")
+      .select("*,lead:website_leads!dealer_offers_website_lead_id_fkey(*)")
       .eq("dealer_account_id", session.dealer.id)
       .order("submitted_at", { ascending: false }),
     db.from("marketplace_fee_settings").select("successful_purchase_fee").eq("id", true).maybeSingle(),
@@ -106,7 +107,7 @@ export async function GET(request: Request) {
   function safeLead(lead: WebsiteLead) {
     return redactLeadForDealer({
       ...lead,
-      resolved_images: [...(photoUrls.get(Number(lead.id)) ?? []), ...combineLeadImages(lead)],
+      resolved_images: [...(photoUrls.get(Number(lead.id)) ?? []), ...dealerImageUrls(lead.id, combineLeadImages(lead))],
     }, false);
   }
 
