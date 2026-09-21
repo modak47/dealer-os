@@ -13,6 +13,12 @@
   object-fit: contain;
 }
 
+.sidebar .sidebarLogo img {
+  aspect-ratio: 5.1;
+  height: auto;
+  object-fit: cover;
+}
+
 .logoWordmark {
   width: 142px;
 }
