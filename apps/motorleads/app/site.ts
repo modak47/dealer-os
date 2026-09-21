@@ -13,7 +13,7 @@ export const site = {
     white: "#FFFFFF",
   },
   assets: {
-    lockupDark: "/brand/motorgeeks-lockup-complete.png",
+    lockupDark: "/brand/motorgeeks-original-transparent.png",
     lockupLight: "/brand/motorgeeks-lockup-light.png",
     wordmarkDark: "/brand/motorgeeks-wordmark-dark.png",
     wordmarkLight: "/brand/motorgeeks-wordmark-light.png",
