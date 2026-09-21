@@ -4611,3 +4611,4 @@ body .dealer-portal-redesign.dealer-portal-redesign .dealer-lead-controls-compac
 .website-book-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 .website-book-grid label,.website-book-grid input,.website-book-grid select,.website-book-grid textarea{min-width:0;max-width:100%}
 @media(max-width:850px){.website-book-grid{grid-template-columns:minmax(0,1fr)}.website-book-modal>header{grid-template-columns:minmax(0,1fr);height:auto}.website-book-modal>header>button{width:100%}}
+.website-map-prompt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;height:100%;padding:20px;text-align:center;color:#8c979e}.website-map-prompt p{margin:0}.website-map-prompt .website-actions{margin:0;justify-content:center}

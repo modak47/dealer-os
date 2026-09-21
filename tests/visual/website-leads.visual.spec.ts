@@ -83,8 +83,14 @@ test.describe("Website Leads and release workspace @visual",()=>{
   await expect(page.locator('.website-thumbs img')).toHaveCount(2);
   expect(await page.locator('.website-main-image img').evaluate((img:HTMLImageElement)=>img.complete&&img.naturalWidth>0)).toBe(true);
   await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.locator('.website-map-preview').getByRole('button',{name:'Show location map',exact:true})).toBeVisible();
+  await expect(page.locator('.website-map-preview')).not.toContainText('Resolved');
+  await expect(page.locator('.website-map-prompt')).toHaveCSS('display','flex');
+  await page.locator('.website-map-preview').scrollIntoViewIfNeeded();
+  await page.screenshot({path:`${directory}/map-prompt-${width}.png`});
   await page.route('**/maps**',route=>route.fulfill({contentType:'text/html',body:'<p>Location map fixture</p>'}));
   await page.getByRole('button',{name:'Show location map',exact:true}).click();await expect(page.locator('iframe')).toHaveCount(1);
+  await expect(page.frameLocator('iframe[title="Customer location map"]').getByText('Location map fixture')).toBeVisible();
   await page.getByRole('button',{name:'Book Into Stock',exact:true}).click();await expect(page.getByRole('heading',{name:'Book into stock',exact:false})).toBeVisible();
   const geometry = await page.locator('.website-book-modal').evaluate(modal=>{
    const header=modal.querySelector('header')!.getBoundingClientRect(), first=modal.querySelector('.website-book-grid label')!.getBoundingClientRect();
