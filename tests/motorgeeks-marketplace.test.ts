@@ -48,7 +48,7 @@ describe("MotorGeeks marketplace offer contract", () => {
     assert.match(migration, /seller_access_tokens/);
     assert.match(migration, /token_hash text not null unique/);
     assert.match(marketplaceLib, /tokenHash\(token\)/);
-    assert.match(marketplaceLib, /seller_magic_link/);
+    assert.match(marketplaceLib, /mg_consume_link/); // Atomic token consumption is exercised in seller-handlers/database integration tests.
     assert.match(marketplaceLib, /seller_session/);
     assert.match(sellerAcceptRoute, /acceptSellerOffer/);
   });

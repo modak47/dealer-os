@@ -1,3 +1,4 @@
+import { dealerAccountResponse, dealerAccountSelect } from "@/lib/dealer-account-public";
 import { NextResponse } from "next/server";
 import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { cleanDealerSelfAccountPayload, dealerSelfAccountChangeSummary, getCurrentDealerPortalAccount, isDealerPortalAdmin, saveDealerPreferencePayloads, withDealerPreferences } from "@/lib/dealer-portal";
@@ -18,7 +19,7 @@ export async function PATCH(request: Request) {
       .from("dealer_portal_accounts")
       .update(accountPayload)
       .eq("id", session.dealer.id)
-      .select("*")
+      .select(dealerAccountSelect)
       .maybeSingle();
     if (error) return NextResponse.json({ error: `Unable to update dealer account: ${error.message}` }, { status: 500 });
     if (!data) return NextResponse.json({ error: "Dealer account not found." }, { status: 404 });
@@ -32,7 +33,7 @@ export async function PATCH(request: Request) {
       });
     }
     await saveDealerPreferencePayloads(session.dealer.id, body, session.userId);
-    return NextResponse.json({ dealer: await withDealerPreferences(data as DealerPortalAccount) as DealerPortalAccountWithPreferences });
+    return NextResponse.json({ dealer: dealerAccountResponse(await withDealerPreferences(data as DealerPortalAccount) as DealerPortalAccountWithPreferences) });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to update dealer account." }, { status: 400 });
   }

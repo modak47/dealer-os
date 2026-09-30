@@ -1,4 +1,5 @@
 import "server-only";
+import { dealerAccountSelect } from "./dealer-account-public";
 
 import { getCurrentUserId } from "@/lib/current-user";
 import { changedFieldSummary, recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
@@ -24,7 +25,7 @@ export async function getCurrentDealerPortalMembership() {
   if (!userId) return null;
   const { data, error } = await getSupabaseAdminClient()
     .from("dealer_portal_users")
-    .select("role,dealer:dealer_portal_accounts(*)")
+    .select(`role,dealer:dealer_portal_accounts(${dealerAccountSelect})`)
     .eq("user_id", userId)
     .eq("active", true)
     .maybeSingle();

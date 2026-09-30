@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MotorGeeksLogo } from "../components/brand";
 import { formatRegistration } from "../lib/text";
 import { sellerLeadFromSession } from "../lib/marketplace";
+import { SellerPhotoControls, SellerPhotoSummary } from "../components/seller-photo-controls";
 import { AcceptOfferButton } from "./accept-offer-button";
 
 export const metadata: Metadata = {
@@ -18,8 +19,8 @@ export default async function SellerPortalPage() {
         <MotorGeeksLogo />
         <span>Secure seller area</span>
         <h1>Your secure session has expired.</h1>
-        <p>Use the latest MotorGeeks link from your email, or start a new valuation.</p>
-        <Link href="/valuation">Start a valuation</Link>
+        <p>Use your latest secure link or request a replacement to return to the same profile.</p>
+        <Link href="/seller/recover">Request a secure link</Link>
       </div>
     </main>;
   }
@@ -37,6 +38,7 @@ export default async function SellerPortalPage() {
         <a href="#photos">Photos</a>
         <a href="#offers">Offers</a>
         <a href="#help">Help</a>
+        <form action="/api/seller/logout" method="post"><button type="submit">Sign out</button></form>
       </nav>
     </aside>
     <section>
@@ -51,7 +53,7 @@ export default async function SellerPortalPage() {
 
       <div className="mg-status-rail">
         <article className="done"><b>Profile</b><span>Submitted</span></article>
-        <article className={context.photos.length ? "done" : ""}><b>Photos</b><span>{context.photos.length ? `${context.photos.length} added` : "Can add later"}</span></article>
+        <SellerPhotoSummary initialCount={context.photos.length} rail />
         <article className={currentOffers.length ? "done" : ""}><b>Offers</b><span>{currentOffers.length ? `${currentOffers.length} received` : "Waiting for dealers"}</span></article>
       </div>
 
@@ -67,10 +69,8 @@ export default async function SellerPortalPage() {
 
       <section className="mg-seller-card" id="photos">
         <h2>Photos</h2>
-        <p>{context.photos.length ? `${context.photos.length} photos are attached to your motorcycle profile.` : "No photos have been added yet. We will still review your profile, but photos help dealers make better offers."}</p>
-        {context.photos.length > 0 && <div className="mg-seller-photo-grid">
-          {context.photos.map(photo => photo.signed_url ? <img src={photo.signed_url} alt={photo.photo_label || photo.original_filename || "Motorcycle photo"} key={photo.id} /> : null)}
-        </div>}
+        <SellerPhotoSummary initialCount={context.photos.length} />
+        <SellerPhotoControls endpoint="/api/seller/photos" />
       </section>
 
       <section className="mg-seller-card" id="offers">

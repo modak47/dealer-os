@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { SellerPhotoControls } from "../components/seller-photo-controls";
+import { sellerValidation, type SellerForm } from "../lib/seller-input";
 import { MotorGeeksTick } from "../components/brand";
 
 type FormRecord = Record<string, string | number | boolean | null | undefined | Record<string, unknown>>;
@@ -11,145 +13,135 @@ type Seller = FormRecord;
 
 const steps = ["Your motorcycle", "Condition & history", "Photos", "Offers"];
 const photoGuidance = ["Front", "Rear", "Left side", "Right side", "Dashboard", "Damage", "Service history"];
-const maxUploadBytes = 4 * 1024 * 1024;
-const maxPhotoEdge = 1800;
-type UploadedPhoto = {
-  id?: string;
-  preview_url?: string | null;
-  original_filename?: string | null;
-  sort_order?: number | null;
-};
-
 export function ValuationFlow({ initialRegistration = "" }: { initialRegistration?: string }) {
   const [step, setStep] = useState(1);
   const [registration, setRegistration] = useState(initialRegistration);
   const [vehicle, setVehicle] = useState<Vehicle>({ registration: initialRegistration });
-  const [condition, setCondition] = useState<Condition>({ overallCondition: "Good", serviceHistory: "Full history", running: "yes", writtenOff: "no", outstandingFinance: "no", mechanicalFaults: "no", cosmeticDamage: "no" });
-  const [seller, setSeller] = useState<Seller>({ consent: true });
+  const [condition, setCondition] = useState<Condition>({});
+  const [seller, setSeller] = useState<Seller>({ consent: false });
   const [lookup, setLookup] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
-  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [removingPhotoId, setRemovingPhotoId] = useState("");
-  const [submitted, setSubmitted] = useState<{ reference: string; secureLinkSent: boolean } | null>(null);
+  const [submitted, setSubmitted] = useState<{ reference: string; emailStatus?: string } | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saveState, setSaveState] = useState("Loading saved answers…");
+  const revision = useRef(0);
+  const stopped = useRef(false);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef<SellerForm>({});
+  const acknowledged = useRef("");
+  const initialLookupDone = useRef(false);
+  latest.current = { currentStep: step, registration, vehicle, condition, seller };
 
   useEffect(() => {
-    fetch("/api/valuation/draft").then(r => r.json()).then(payload => {
+    let alive = true;
+    fetch("/api/valuation/draft").then(async response => {
+      const payload = await response.json();
+      if (!response.ok || !payload.draft) throw new Error(payload.error || "Could not restore your answers. Reload to retry.");
+      if (!alive) return;
       const draft = payload.draft;
-      if (!draft) return;
+      revision.current = Number(draft.revision);
       setStep(Number(draft.current_step || 1));
       setRegistration(draft.registration || initialRegistration);
       setVehicle({ registration: draft.registration || initialRegistration, ...(draft.vehicle_snapshot || {}) });
-      setCondition(current => ({ ...current, ...(draft.condition_snapshot || {}) }));
-      setSeller(current => ({ ...current, ...(draft.seller_snapshot || {}) }));
-      return fetch("/api/valuation/photos");
-    }).then(r => r?.json()).then(payload => {
-      if (Array.isArray(payload?.photos)) setPhotos(payload.photos);
-    }).catch(() => null);
+      setCondition(draft.condition_snapshot || {});
+      setSeller({ consent: false, ...(draft.seller_snapshot || {}) });
+      if (draft.website_lead_id) {
+        stopped.current = true;
+        const resumed = await request("/api/valuation/submit", {});
+        if (!alive) return;
+        setSubmitted(resumed);
+      }
+      setSaveState("Saved");
+      setHydrated(true);
+    }).catch(error => { if (alive) setMessage(error.message); });
+    return () => { alive = false; };
   }, [initialRegistration]);
 
+  function enqueue<T,>(operation: () => Promise<T>): Promise<T> {
+    const task = queue.current.then(operation);
+    queue.current = task.catch(() => undefined);
+    return task;
+  }
+  async function request(url: string, body: unknown, method = "POST") {
+    const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || payload.errors?.join(" ") || "Could not save. Please retry.");
+    return payload;
+  }
+  function save(input: SellerForm) {
+    return enqueue(async () => {
+      if (stopped.current || acknowledged.current === JSON.stringify(input)) return;
+      setSaveState("Saving…");
+      try {
+        const payload = await request("/api/valuation/draft", { ...input, version: revision.current }, "PATCH");
+        revision.current = Number(payload.draft.revision);
+        acknowledged.current = JSON.stringify(input);
+        setSaveState("Saved");
+      } catch (error) {
+        setSaveState("Could not save — Retry");
+        throw error;
+      }
+    });
+  }
   useEffect(() => {
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(() => {
-      fetch("/api/valuation/draft", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentStep: step, registration, vehicle, condition, seller }),
-      }).catch(() => null);
-    }, 450);
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-  }, [step, registration, vehicle, condition, seller]);
+    if (!hydrated || busy || submitted || stopped.current) return;
+    autosaveTimer.current = setTimeout(() => { void save(latest.current).catch(error => setMessage(error.message)); }, 450);
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
+    // Queue and revision live in refs; form changes are the only save triggers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, busy, submitted, step, registration, vehicle, condition, seller]);
 
   useEffect(() => {
-    if (initialRegistration) void runLookup(initialRegistration);
+    if (!hydrated || initialLookupDone.current) return;
+    initialLookupDone.current = true;
+    if (initialRegistration && !latest.current.vehicle?.make && !stopped.current) void runLookup(initialRegistration);
+    // Restore completes before the optional first lookup; subsequent lookups are explicit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hydrated, initialRegistration]);
 
   const vehicleTitle = useMemo(() => [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "your motorcycle", [vehicle]);
-
   async function runLookup(value = registration) {
-    setLookup("loading");
-    setMessage("");
-    const response = await fetch("/api/valuation/lookup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ registration: value }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload.error) {
-      setLookup("error");
-      setMessage(payload.error || "We could not look up that registration. You can enter details manually.");
-      setVehicle(current => ({ ...current, registration: value }));
-      return;
-    }
-    setLookup("success");
-    setVehicle({ ...payload.vehicle, registration: payload.vehicle.registration || value });
-    setRegistration(payload.vehicle.registration || value);
-  }
-
-  async function upload(files: FileList | null) {
-    if (!files?.length) return;
-    setUploading(true);
-    setMessage("");
+    if (!hydrated || busy || !value.trim()) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    setBusy(true); setLookup("loading"); setMessage("");
     try {
-      const prepared = await Promise.all(Array.from(files).map(preparePhotoForUpload));
-      const oversized = prepared.find(file => file.size > maxUploadBytes);
-      if (oversized) {
-        setMessage(`${oversized.name} is too large to upload. Please choose a smaller photo or screenshot.`);
-        return;
-      }
-      const uploadedPhotos: UploadedPhoto[] = [];
-      for (const file of prepared) {
-        const body = new FormData();
-        body.append("photos", file);
-        const response = await fetch("/api/valuation/photos", { method: "POST", body });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.error || `Photo upload failed for ${file.name}. Please try a smaller photo.`);
-        uploadedPhotos.push(...(payload.photos || []));
-      }
-      setPhotos(current => [...current, ...uploadedPhotos]);
+      await save(latest.current);
+      const payload = await enqueue(() => request("/api/valuation/lookup", { registration: value, version: revision.current }));
+      revision.current = Number(payload.version);
+      setLookup("success");
+      setVehicle({ ...payload.vehicle, registration: payload.vehicle.registration || value });
+      setRegistration(payload.vehicle.registration || value);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Photo upload failed. Please try a smaller photo.");
-    } finally {
-      setUploading(false);
-    }
+      setLookup("error"); setMessage(error instanceof Error ? error.message : "Lookup failed. Manual entry is available.");
+    } finally { setBusy(false); }
   }
-
-  async function removePhoto(photo: UploadedPhoto) {
-    if (!photo.id || removingPhotoId) return;
-    setRemovingPhotoId(photo.id);
-    setMessage("");
-    try {
-      const response = await fetch(`/api/valuation/photos?id=${encodeURIComponent(photo.id)}`, { method: "DELETE" });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || "Unable to remove that photo.");
-      setPhotos(current => current.filter(item => item.id !== photo.id));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to remove that photo.");
-    } finally {
-      setRemovingPhotoId("");
-    }
+  function next() {
+    const errors = sellerValidation(latest.current, step);
+    if (errors.length) { setMessage(errors.join(" ")); return; }
+    setMessage(""); setStep(step + 1);
   }
-
   async function submit() {
-    setMessage("");
-    const response = await fetch("/api/valuation/submit", { method: "POST" });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setMessage((payload.errors || [payload.error || "Unable to submit your motorcycle profile."]).join(" "));
-      return;
-    }
-    setSubmitted(payload);
+    if (busy || !hydrated) return;
+    const errors = sellerValidation(latest.current);
+    if (errors.length) { setMessage(errors.join(" ")); return; }
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    setBusy(true); setMessage("");
+    try {
+      // Wait for all earlier saves, then atomically submit the latest visible answers.
+      const payload = await enqueue(() => request("/api/valuation/submit", { ...latest.current, version: revision.current }));
+      stopped.current = true; setSubmitted(payload); setSaveState("Saved");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to submit. Your answers are retained; retry safely.");
+    } finally { setBusy(false); }
   }
 
   if (submitted) {
     return <section className="mg-valuation-complete">
       <div className="mg-success-icon">✓</div>
       <h1>{"You're all done!"}</h1>
-      <p>Your motorcycle profile has been submitted.</p>
+      <p>Your motorcycle profile has been saved.</p>
       <article>
         <b>{vehicleTitle}</b>
         <span>{displayValue(vehicle.year, "Year not set")} · {displayValue(vehicle.engineCapacity || vehicle.engine, "Engine not set")} · {displayValue(vehicle.colour, "Colour not set")}</span>
@@ -161,8 +153,8 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
         <span>Available to dealers</span>
         <span>Offers received</span>
       </div>
-      <p className="mg-info">{submitted.secureLinkSent ? "We've emailed you a secure link to view your motorcycle profile, add photos later or check for offers." : "Your profile is saved. Email sending is not configured in this environment, so no magic link was sent."}</p>
-      <div className="mg-complete-actions"><button onClick={() => setStep(3)}>Add more photos now</button><Link href="/">Back to home</Link></div>
+      <p className="mg-info">{submitted.emailStatus === "accepted" ? "Your secure-link email was accepted by our email provider. Check your inbox and spam folder." : "Your profile is saved. You can open it below, or request a replacement secure link if your email has not arrived."}</p>
+      <div className="mg-complete-actions"><Link href="/seller#photos">Add more photos now</Link><Link href="/seller">Open my profile</Link><Link href="/seller/recover">Request a secure link</Link></div>
     </section>;
   }
 
@@ -171,7 +163,9 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
       <div><span>Step {step} of 4</span><h1>{steps[step - 1]}</h1></div>
       <ol>{steps.map((label, index) => <li className={index + 1 <= step ? "active" : ""} key={label}>{index + 1}</li>)}</ol>
     </header>
-    {message && <p className="mg-form-message">{message}</p>}
+    <p role="status">{saveState} {saveState.startsWith("Could not") && <button type="button" onClick={() => void save(latest.current).then(() => setMessage("")).catch(error => setMessage(error.message))}>Retry save</button>}</p>
+    {message && <p role="alert" className="mg-form-message">{message}</p>}
+    <fieldset disabled={!hydrated || busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
     {step === 1 && <div className="mg-step-grid">
       <div className="mg-form-panel">
         <h2>Your motorcycle</h2>
@@ -209,15 +203,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
         <h2>Add some photos</h2>
         <p>Good photos help dealers give you better offers. You can add up to 20 and continue without them if needed.</p>
         <div className="mg-photo-guidance">{photoGuidance.map(item => <span key={item}>{item}</span>)}</div>
-        <label className="mg-uploader"><input type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={event => upload(event.target.files)} /><b>{uploading ? "Uploading..." : "Choose photos"}</b><small>JPG, PNG and WEBP are resized automatically. HEIC/HEIF must be under 4MB.</small></label>
-        <div className="mg-photo-count">{photos.length ? `${photos.length} ${photos.length === 1 ? "photo" : "photos"} added` : "No photos added yet"}</div>
-        {photos.length > 0 && <div className="mg-photo-preview-grid" aria-label="Uploaded photo previews">
-          {photos.map((photo, index) => <figure key={photo.id || `${photo.original_filename}-${index}`}>
-            <button className="mg-photo-remove" type="button" onClick={() => void removePhoto(photo)} disabled={!photo.id || removingPhotoId === photo.id} aria-label={`Remove ${photo.original_filename || `photo ${index + 1}`}`}>×</button>
-            {photo.preview_url ? <img src={photo.preview_url} alt={photo.original_filename || `Uploaded motorcycle photo ${index + 1}`} /> : <span>No preview</span>}
-            <figcaption>{photo.original_filename || `Photo ${index + 1}`}</figcaption>
-          </figure>)}
-        </div>}
+        {hydrated && <SellerPhotoControls />}
         <button className="mg-secondary" type="button" onClick={() => setCondition({ ...condition, photosSkipped: true })}>Upload photos later</button>
       </div>
       <JourneySide />
@@ -235,8 +221,9 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
     </div>}
     <footer className="mg-step-actions">
       <button type="button" className="mg-secondary" disabled={step === 1} onClick={() => setStep(step - 1)}>Back</button>
-      {step < 4 ? <button type="button" onClick={() => setStep(step + 1)}>Next step →</button> : <button type="button" onClick={submit}>Complete my motorcycle profile →</button>}
+      {step < 4 ? <button type="button" onClick={next}>Next step →</button> : <button type="button" onClick={submit}>Complete my motorcycle profile →</button>}
     </footer>
+    </fieldset>
   </section>;
 }
 
@@ -261,7 +248,7 @@ function TextArea({ label, value, set }: { label: string; value: unknown; set: (
 }
 
 function Select({ label, value, set, options }: { label: string; value: unknown; set: (value: string) => void; options: string[] }) {
-  return <label className="mg-field"><span>{label}</span><select value={value == null || typeof value === "object" ? "" : String(value)} onChange={event => set(event.target.value)}>{options.map(option => <option key={option}>{option}</option>)}</select></label>;
+  return <label className="mg-field"><span>{label}</span><select value={value == null || typeof value === "object" ? "" : String(value)} onChange={event => set(event.target.value)}><option value="">Please choose</option>{options.map(option => <option key={option}>{option}</option>)}</select></label>;
 }
 
 function Radio({ label, value, set, options }: { label: string; value: unknown; set: (value: string) => void; options: [string, string][] }) {
@@ -270,41 +257,4 @@ function Radio({ label, value, set, options }: { label: string; value: unknown; 
 
 function displayValue(value: unknown, fallback: string) {
   return value === null || value === undefined || value === "" || typeof value === "object" ? fallback : String(value);
-}
-
-async function preparePhotoForUpload(file: File) {
-  if (file.size <= maxUploadBytes || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) return file;
-  const dataUrl = await readAsDataUrl(file);
-  const image = await loadImage(dataUrl);
-  const scale = Math.min(1, maxPhotoEdge / Math.max(image.naturalWidth, image.naturalHeight));
-  const width = Math.max(1, Math.round(image.naturalWidth * scale));
-  const height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) return file;
-  context.drawImage(image, 0, 0, width, height);
-  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.82));
-  if (!blob) return file;
-  const safeName = file.name.replace(/\.[^.]+$/, "") || "photo";
-  return new File([blob], `${safeName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
-}
-
-function readAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error(`Could not read ${file.name}. Please try another photo.`));
-    reader.readAsDataURL(file);
-  });
-}
-
-function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Could not prepare that photo. Please try another image."));
-    image.src = src;
-  });
 }

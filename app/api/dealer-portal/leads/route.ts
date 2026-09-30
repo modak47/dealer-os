@@ -1,3 +1,4 @@
+import { dealerAccountResponse } from "@/lib/dealer-account-public";
 import { dealerImageUrls } from "@/lib/dealer-image-urls";
 import { NextResponse } from "next/server";
 import { dealerLeadSelectClause, getCurrentDealerPortalAccount, getCurrentDealerPortalMembership, redactLeadForDealer } from "@/lib/dealer-portal";
@@ -601,5 +602,5 @@ export async function GET(request: Request) {
     const visible = redactLeadForDealer({ ...lead, resolved_images: dealerImageUrls(lead.id, combineLeadImages(lead)) }, unlocked) as DealerVisibleLead;
     claimed.push({ ...visible, ...await dealerLeadMeta(lead, session.dealer, unlocked), portal_vehicle_check: dealerVehicleCheck(lead), portal_claim_id: claim.id, portal_claim_status: claim.status, portal_lost_reason: claim.lost_reason, portal_attribution_expires_at: claim.attribution_expires_at, portal_notes: notesByClaim.get(claim.id) ?? [], customer_unlocked: unlocked });
   }
-  return NextResponse.json({ dealer: session.dealer, role: session.role, available, claimed });
+  return NextResponse.json({ dealer: dealerAccountResponse(session.dealer), role: session.role, available, claimed });
 }

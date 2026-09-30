@@ -108,6 +108,7 @@ function text(value: unknown) {
 }
 
 function number(value: unknown) {
+  if (value === null || value === undefined || (typeof value === "string" && !value.trim()) || typeof value === "boolean") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }

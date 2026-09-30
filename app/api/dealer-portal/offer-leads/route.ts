@@ -1,3 +1,4 @@
+import { dealerAccountResponse } from "@/lib/dealer-account-public";
 import { dealerImageUrls } from "@/lib/dealer-image-urls";
 import { NextResponse } from "next/server";
 import { getCurrentDealerPortalAccount, redactLeadForDealer } from "@/lib/dealer-portal";
@@ -131,7 +132,7 @@ export async function GET(request: Request) {
     }];
   });
   return NextResponse.json({
-    dealer: session.dealer,
+    dealer: dealerAccountResponse(session.dealer),
     available,
     offers: dealerOffers,
     marketplace_fee_amount: feeSettings.data?.successful_purchase_fee ?? 0,

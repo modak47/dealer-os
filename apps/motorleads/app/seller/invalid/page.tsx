@@ -13,8 +13,8 @@ export default function InvalidSellerLinkPage() {
       <div className="mg-seller-empty">
         <span>Secure access</span>
         <h1>This seller link is invalid or has expired.</h1>
-        <p>For privacy, MotorGeeks seller links expire and cannot be guessed. Start a new valuation or contact MotorGeeks if you need help.</p>
-        <Link href="/valuation">Start a new valuation</Link>
+        <p>For privacy, MotorGeeks seller links expire and cannot be guessed. Request a secure link or contact MotorGeeks if you need help.</p>
+        <Link href="/seller/recover">Request a secure link</Link>
       </div>
     </section>
   </PageShell>;

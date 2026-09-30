@@ -1,3 +1,4 @@
+import { dealerAccountResponse } from "@/lib/dealer-account-public";
 import { NextResponse } from "next/server";
 import { getCurrentDealerPortalAccount } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   ]);
   if (fees.error) return NextResponse.json({ error: "Unable to load Successful Purchase Fee history." }, { status: 500 });
   if (ledger.error) return NextResponse.json({ error: "Unable to load account ledger history." }, { status: 500 });
-  return NextResponse.json({ dealer: session.dealer, role: session.role, fees: fees.data ?? [], ledger: ledger.data ?? [] });
+  return NextResponse.json({ dealer: dealerAccountResponse(session.dealer), role: session.role, fees: fees.data ?? [], ledger: ledger.data ?? [] });
 }
 
 function visualPaymentsFixture() {

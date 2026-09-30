@@ -1596,3 +1596,6 @@ h3 {
   .mg-vrm-row button { min-height: 52px; border-radius: 0; }
   .mg-step-actions,.mg-complete-actions { display: grid; gap: 10px; }
 }
+
+/* Seller logout shares the existing navigation styling. */
+.mg-seller-portal > aside button { border: 0; padding: 0; background: transparent; color: white; font: inherit; font-weight: 850; cursor: pointer; }

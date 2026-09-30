@@ -1,23 +1,12 @@
-import { NextResponse } from "next/server";
-import { saveDraft } from "../../../lib/marketplace";
-import { normaliseRegistration } from "../../../lib/text";
-import { lookupByRegistration, VehicleLookupError } from "../../../lib/vehicle-provider";
-
-export const dynamic = "force-dynamic";
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json() as { registration?: unknown };
-    const registration = normaliseRegistration(body.registration);
-    const vehicle = await lookupByRegistration(registration);
-    await saveDraft({ currentStep: 1, registration, vehicle: { ...vehicle, lookupState: "success" } });
-    return NextResponse.json({ vehicle });
-  } catch (error) {
-    if (error instanceof VehicleLookupError) {
-      await saveDraft({ currentStep: 1, registration: "", vehicle: { lookupState: error.code, lookupError: error.message } }).catch(() => null);
-      const expected = ["provider_unavailable", "licensing_blocked", "not_found"].includes(error.code);
-      return NextResponse.json({ error: error.message, code: error.code }, { status: expected ? 200 : error.status });
-    }
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Vehicle lookup failed.", code: "provider_unavailable" });
-  }
-}
+import { ensureDraft } from "../../../lib/marketplace";
+import { tokenHash } from "../../../lib/secure-token";
+import { sellerInput } from "../../../lib/seller-input";
+import { limitSeller,readSellerJson,sameOrigin,sellerFailure,sellerRpc } from "../../../lib/seller-security";
+import { lookupByRegistration,VehicleLookupError } from "../../../lib/vehicle-provider";
+export const dynamic="force-dynamic";
+export async function POST(request:Request){try{
+ sameOrigin(request);await limitSeller('lookup',15);const body=await readSellerJson(request);const {token}=await ensureDraft();
+ const vehicle=await lookupByRegistration(String(body.registration||''));
+ const draft=await sellerRpc('mg_draft_operation',{p_hash:tokenHash(token),p_action:'provider',p_data:{version:body.version,evidence:{registration:vehicle.registration,lookupRaw:vehicle.lookupRaw,checkRaw:vehicle.checkRaw,lookupCompletedAt:new Date().toISOString()}}});
+ return Response.json({vehicle:sellerInput({vehicle}).vehicle,version:draft.revision,lookupStatus:'found',vehicleCheckStatus:'not_checked'});
+ }catch(e){if(e instanceof VehicleLookupError)return Response.json({error:e.message,code:e.code},{status:e.status});return sellerFailure(e);}}
