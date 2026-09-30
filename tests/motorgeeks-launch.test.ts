@@ -30,6 +30,11 @@ describe("MotorGeeks launch completion", () => {
     assert.doesNotMatch(source("apps/motorleads/app/components/site-shell.tsx"), /className="ml-socials"/);
   });
 
+  it("keeps MotorGeeks portal metadata independent from the YesMoto title template", () => {
+    assert.match(source("app/dealer-login/page.tsx"), /title: \{ absolute: "MotorGeeks Dealer Portal Login" \}/);
+    assert.match(source("app/dealer-portal/layout.tsx"), /template: "%s"/);
+  });
+
   it("keeps private seller routes out of public indexing", () => {
     assert.match(source("apps/motorleads/app/robots.ts"), /"\/seller\/"/);
     assert.match(source("apps/motorleads/app/not-found.tsx"), /Back to MotorGeeks/);
