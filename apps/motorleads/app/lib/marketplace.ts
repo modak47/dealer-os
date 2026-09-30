@@ -5,7 +5,7 @@ import { createToken, tokenHash } from "./secure-token";
 import { getSupabaseAdmin } from "./supabase-server";
 import { sellerInput, sellerValidation, type SellerForm } from "./seller-input";
 import { deliveryToken, limitSeller, SellerError, sellerRpc } from "./seller-security";
-import { sendSellerDelivery } from "./seller-delivery";
+import { sendOfferAcceptedNotifications, sendSellerDelivery } from "./seller-delivery";
 export const draftCookie="mg_valuation_draft";
 export const sellerSessionCookie="mg_seller_session";
 export const pendingLinkCookie="mg_pending_seller_link";
@@ -64,5 +64,7 @@ export async function verifySellerMagicToken(token:string){
 export async function acceptSellerOffer(offerId:string){
  const context=await sellerLeadFromSession();if(!context)return {ok:false as const,status:401,error:'Your secure seller session has expired.'};
  const {data,error}=await getSupabaseAdmin().rpc('seller_accept_marketplace_offer',{p_website_lead_id:context.lead.id,p_offer_id:offerId});
- return error?{ok:false as const,status:409,error:error.message}:{ok:true as const,offer:data};
+ if(error)return {ok:false as const,status:409,error:error.message};
+ await sendOfferAcceptedNotifications(Number(context.lead.id),offerId).catch(()=>undefined);
+ return {ok:true as const,offer:data};
 }

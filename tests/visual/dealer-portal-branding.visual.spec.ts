@@ -24,3 +24,32 @@ for (const [width, height] of [[1440,900],[1280,800],[768,1024],[390,844]]) {
     await page.screenshot({path:`design-references/current/portal-branding/dashboard-${width}.png`});
   });
 }
+
+for (const [width, height] of [[1440,900],[1280,800],[1024,768],[768,1024],[430,932],[390,844]]) {
+  test(`marketplace offer journey stays distinct and usable at ${width} @visual`, async ({ page }) => {
+    await page.setViewportSize({width,height});
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+
+    await page.goto('/dealer-portal/offer-leads');
+    await expect(page.getByRole('heading',{name:'Offer Leads'}).first()).toBeVisible();
+    await expect(page.getByText('Make an offer, not claim')).toBeVisible();
+    await expect(page.getByText('Honda CBR650R').first()).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+
+    await page.goto('/dealer-portal/offer-leads/9901');
+    await expect(page.getByRole('heading',{name:/Honda CBR650R/}).first()).toBeVisible();
+    await expect(page.getByText('Your offer',{exact:true})).toBeVisible();
+    await expect(page.getByText('No offer submitted yet',{exact:true})).toBeVisible();
+    await expect(page.getByText('Variant',{exact:true})).toBeVisible();
+    await expect(page.getByText('Fuel',{exact:true})).toBeVisible();
+    await expect(page.getByRole('tab',{name:/Customer/})).toHaveCount(0);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+
+    await page.goto('/dealer-portal/my-offers');
+    await expect(page.getByRole('heading',{name:'My Offers',level:1})).toBeVisible();
+    await expect(page.getByText('Yamaha MT-09').first()).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+}

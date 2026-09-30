@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { recordDealerNotificationEvent } from "@/lib/dealer-notifications";
+import { notifySellerMarketplaceOffer, recordDealerNotificationEvent } from "@/lib/dealer-notifications";
 import { getCurrentDealerPortalAccount } from "@/lib/dealer-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText, safeNumber } from "@/lib/website-leads";
@@ -42,6 +42,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     dealerUserId: session.userId,
     websiteLeadId: id,
     payload: { offer_id: (data as { id?: string }).id, amount_pence: Math.round(amount * 100) },
+    createdBy: session.userId,
+  });
+  await notifySellerMarketplaceOffer({
+    offerId: String((data as { id?: string }).id || ""),
+    websiteLeadId: id,
+    dealerAccountId: session.dealer.id,
     createdBy: session.userId,
   });
   return NextResponse.json({ offer: data });

@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { LegalPage } from "../components/legal";
 import { absoluteUrl } from "../site";
 
-export const metadata: Metadata = { title: "Cookies", description: "Draft MotorGeeks cookie notice for owner and legal review.", alternates: { canonical: absoluteUrl("/cookies") } };
+export const metadata: Metadata = { title: "Cookies", description: "How MotorGeeks uses essential browser storage and cookies.", alternates: { canonical: absoluteUrl("/cookies") } };
 
 export default function CookiesPage() {
-  return <LegalPage title="Cookies" intro="This draft cookie notice reflects the intended V1 MotorGeeks website. It should be reviewed before launch and updated if analytics, advertising or optional tracking tools are added." sections={[
+  return <LegalPage title="Cookies" intro="This notice explains how MotorGeeks uses essential cookies and similar browser technologies." sections={[
     {
       title: "What cookies are",
       body: [

@@ -29,7 +29,7 @@ export default async function SellerPortalPage() {
   const offers = context.offers as Array<Record<string, unknown> & { dealer?: { trading_name?: string | null } | null }>;
   const accepted = offers.find(offer => offer.status === "accepted");
   const currentOffers = offers.filter(offer => ["submitted", "viewed", "accepted"].includes(String(offer.status)));
-  const status = String(lead.marketplace_status || "submitted").replace(/_/g, " ");
+  const status = sellerStatus(String(lead.marketplace_status || "submitted"), currentOffers.length > 0);
   return <main className="mg-seller-portal">
     <aside>
       <MotorGeeksLogo />
@@ -48,8 +48,13 @@ export default async function SellerPortalPage() {
           <h1>Your {String(lead.make || "motorcycle")} {String(lead.model || "")}</h1>
           <p>{formatRegistration(lead.reg)} · {String(lead.year || "Year not set")} · {lead.mileage ? `${Number(lead.mileage).toLocaleString("en-GB")} miles` : "Mileage not set"}</p>
         </div>
-        <b>{status}</b>
+        <b>{status.label}</b>
       </header>
+
+      <div className={`mg-seller-notice ${accepted ? "accepted" : ""}`}>
+        <strong>{accepted ? "Your offer has been accepted" : status.heading}</strong>
+        <p>{accepted ? "The selected dealer can now contact you to confirm the motorcycle, payment and handover arrangements." : status.copy}</p>
+      </div>
 
       <div className="mg-status-rail">
         <article className="done"><b>Profile</b><span>Submitted</span></article>
@@ -62,6 +67,11 @@ export default async function SellerPortalPage() {
         <dl>
           <div><dt>Registration</dt><dd>{formatRegistration(lead.reg)}</dd></div>
           <div><dt>Make/model</dt><dd>{[lead.make, lead.model].filter(Boolean).join(" ") || "Not set"}</dd></div>
+          <div><dt>Year</dt><dd>{String(lead.year || "Not set")}</dd></div>
+          <div><dt>Engine</dt><dd>{String(lead.engine || "Not set")}</dd></div>
+          <div><dt>Mileage</dt><dd>{lead.mileage ? `${Number(lead.mileage).toLocaleString("en-GB")} miles` : "Not set"}</dd></div>
+          <div><dt>Condition</dt><dd>{String(lead.bike_condition || "Not set")}</dd></div>
+          <div><dt>History</dt><dd>{String(lead.service || lead.history || "Not set")}</dd></div>
           <div><dt>Colour</dt><dd>{String(lead.colour || "Not set")}</dd></div>
           <div><dt>MOT</dt><dd>{String(lead.mot || "Not returned")}</dd></div>
         </dl>
@@ -82,7 +92,7 @@ export default async function SellerPortalPage() {
             <h3>{(Number(offer.amount_pence) / 100).toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 })}</h3>
             <p>{typeof offer.note === "string" && offer.note ? offer.note : "Subject to the motorcycle being as described."}</p>
             <small>{offer.dealer?.trading_name ? `${offer.dealer.trading_name} · MotorGeeks verified dealer` : "MotorGeeks verified dealer"}</small>
-            <AcceptOfferButton offerId={String(offer.id)} disabled={Boolean(accepted)} />
+            {offer.status === "accepted" ? <p className="mg-offer-next">The dealer will contact you using the details on your profile.</p> : <AcceptOfferButton offerId={String(offer.id)} disabled={Boolean(accepted)} />}
           </article>)}
         </div>
       </section>
@@ -94,4 +104,13 @@ export default async function SellerPortalPage() {
       </section>
     </section>
   </main>;
+}
+
+function sellerStatus(value: string, hasOffers: boolean) {
+  if (value === "offer_accepted" || value === "purchase_pending") return { label: "Offer accepted", heading: "Your chosen dealer is ready for the next step", copy: "The dealer can now contact you to arrange the purchase and handover." };
+  if (value === "offer_received" || hasOffers) return { label: "Offers received", heading: "You have a dealer offer to review", copy: "Compare the offer details below. You remain in control and do not have to accept an offer." };
+  if (value === "live_to_dealers") return { label: "Available to dealers", heading: "Your motorcycle is with matched dealers", copy: "Approved dealers can review the motorcycle details and make blind offers. We will show any offers here." };
+  if (value === "under_review") return { label: "Under review", heading: "MotorGeeks is reviewing your profile", copy: "We are checking the motorcycle details before matching it with suitable approved dealers." };
+  if (value === "cancelled") return { label: "Closed", heading: "This marketplace profile is closed", copy: "Contact MotorGeeks if you think this status is incorrect or you need help." };
+  return { label: "Profile submitted", heading: "Your motorcycle profile has been received", copy: "MotorGeeks will review the details before matching it with suitable approved dealers." };
 }

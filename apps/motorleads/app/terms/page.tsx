@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { LegalPage } from "../components/legal";
 import { absoluteUrl } from "../site";
 
-export const metadata: Metadata = { title: "Terms & Conditions", description: "Draft MotorGeeks terms for owner and legal review.", alternates: { canonical: absoluteUrl("/terms") } };
+export const metadata: Metadata = { title: "Terms & Conditions", description: "Terms for using the MotorGeeks motorcycle marketplace and dealer service.", alternates: { canonical: absoluteUrl("/terms") } };
 
 export default function TermsPage() {
-  return <LegalPage title="Terms & Conditions" intro="These draft terms describe the intended V1 MotorGeeks public website and enquiry service. They require owner and legal review before being treated as final terms." sections={[
+  return <LegalPage title="Terms & Conditions" intro="These terms describe the MotorGeeks website, seller marketplace and dealer access service." sections={[
     {
       title: "About MotorGeeks",
       body: [
@@ -44,8 +44,8 @@ export default function TermsPage() {
     {
       title: "Liability and changes",
       body: [
-        "MotorGeeks aims to keep the website available and accurate, but availability and content may change. Legal wording should confirm the final liability position before launch.",
-        "These terms may be updated as the service develops. The public version should show the terms that apply at the time of use."
+        "MotorGeeks aims to keep the website available and accurate, but cannot guarantee uninterrupted availability and may update the service or its content.",
+        "These terms may be updated as the service develops. The version published on this website applies at the time of use."
       ]
     }
   ]} />;

@@ -38,6 +38,7 @@ const marketplace=require('../apps/motorleads/app/lib/marketplace');
 const security=require('../apps/motorleads/app/lib/seller-security');
 const delivery=require('../apps/motorleads/app/lib/seller-delivery');
 const deliveryRetries=require('../apps/motorleads/app/api/internal/seller-deliveries/route');
+const marketplaceNotifications=require('../apps/motorleads/app/api/internal/marketplace-notifications/route');
 loader._load=original;
 const request=(path:string,body:unknown,method='POST')=>new Request(`http://localhost${path}`,{method,headers:{origin:'http://localhost','content-type':'application/json'},body:JSON.stringify(body)});
 const form={version:0,currentStep:4,vehicle:{registration:'TEST123',make:'Honda',model:'CB500',year:'2020',lookupRaw:{trusted:true},checkRaw:{clear:true}},condition:{mileage:'1200',registeredKeeper:'yes',overallCondition:'Good',serviceHistory:'Unknown',running:'yes',writtenOff:'no',outstandingFinance:'no',mechanicalFaults:'no',cosmeticDamage:'no'},seller:{firstName:'Test',lastName:'Seller',email:'api@example.invalid',mobile:'07123456789',postcode:'SW1A 1AA',consent:true}};
@@ -80,7 +81,16 @@ test('actual seller HTTP handlers with isolated PostgreSQL and local mail sink',
   const attemptsAfter=(await db.query<any>('select coalesce(sum(attempts),0)::int as n from seller_email_deliveries')).rows[0].n;
   assert.equal(attemptsAfter,attemptsBefore);
   const valid=await deliveryRetries.GET(new Request('http://localhost/api/internal/seller-deliveries',{headers:{authorization:`Bearer ${process.env.CRON_SECRET}`}}));
-  assert.equal(valid.status,200);assert.equal(typeof (await valid.json()).checked,'number');
+ assert.equal(valid.status,200);assert.equal(typeof (await valid.json()).checked,'number');
+ });
+ await t.test('marketplace notifications reject missing and incorrect internal secrets',async()=>{
+  delete process.env.MOTORGEEKS_INTERNAL_SECRET;
+  const payload=JSON.stringify({event:'offer_received',websiteLeadId:lead,offerId:'00000000-0000-4000-8000-000000000001'});
+  const unconfigured=await marketplaceNotifications.POST(new Request('http://localhost/api/internal/marketplace-notifications',{method:'POST',headers:{'content-type':'application/json'},body:payload}));
+  assert.equal(unconfigured.status,401);
+  process.env.MOTORGEEKS_INTERNAL_SECRET='controlled-internal-secret-for-tests';
+  const incorrect=await marketplaceNotifications.POST(new Request('http://localhost/api/internal/marketplace-notifications',{method:'POST',headers:{authorization:'Bearer incorrect','content-type':'application/json'},body:payload}));
+  assert.equal(incorrect.status,401);
  });
  await t.test('replacement is generic; preview does not consume; explicit POST opens original profile; reuse fails',()=>context.run(B,async()=>{
   const known=await recovery.POST(request('/api/seller/recover',{email:form.seller.email}));const unknown=await recovery.POST(request('/api/seller/recover',{email:'absent@example.invalid'}));assert.equal(known.status,200);assert.deepEqual(await known.json(),await unknown.json());

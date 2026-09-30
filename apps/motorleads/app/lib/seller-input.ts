@@ -1,5 +1,5 @@
 export type SellerForm = { currentStep?: number; version?: number; registration?: string; vehicle?: Record<string, unknown>; condition?: Record<string, unknown>; seller?: Record<string, unknown> };
-const vehicleKeys = ["registration", "make", "model", "year", "derivative", "engineCapacity", "colour"];
+const vehicleKeys = ["registration", "make", "model", "year", "derivative", "engineCapacity", "fuelType", "colour"];
 const conditionKeys = ["mileage", "previousOwners", "spareKeys", "registeredKeeper", "overallCondition", "serviceHistory", "running", "writtenOff", "writeOffCategory", "outstandingFinance", "mechanicalFaults", "faultDescription", "cosmeticDamage", "damageDescription", "lastServiceDate", "mileageAtLastService", "motExpiry", "motAdvisories", "fittedExtras", "photosSkipped"];
 const sellerKeys = ["firstName", "lastName", "email", "mobile", "postcode", "consent"];
 function pick(value: unknown, keys: string[]) {

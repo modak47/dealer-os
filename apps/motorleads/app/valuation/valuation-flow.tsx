@@ -144,7 +144,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
       <p>Your motorcycle profile has been saved.</p>
       <article>
         <b>{vehicleTitle}</b>
-        <span>{displayValue(vehicle.year, "Year not set")} · {displayValue(vehicle.engineCapacity || vehicle.engine, "Engine not set")} · {displayValue(vehicle.colour, "Colour not set")}</span>
+        <span>{[displayValue(vehicle.year, "Year not set"), vehicle.derivative, vehicle.engineCapacity && `${vehicle.engineCapacity}cc`, vehicle.fuelType, displayValue(vehicle.colour, "Colour not set")].filter(Boolean).join(" · ")}</span>
         <strong>Reference: {submitted.reference}</strong>
       </article>
       <div className="mg-progress-cards">
@@ -171,7 +171,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
         <h2>Your motorcycle</h2>
         <p>{"Enter your registration and we'll look up the details. You can correct anything that does not look right."}</p>
         <div className="mg-vrm-row"><span>UK</span><input value={registration} onChange={event => setRegistration(event.target.value.toUpperCase())} placeholder="GY23 FFW" /><button type="button" onClick={() => runLookup()}>{lookup === "loading" ? "Looking..." : "Look up reg"}</button></div>
-        {lookup === "success" && <div className="mg-found-box"><MotorGeeksTick /><div><b>We found your motorcycle</b><strong>{vehicleTitle}</strong><span>{[vehicle.year, vehicle.engineCapacity && `${vehicle.engineCapacity}cc`, vehicle.colour, vehicle.motExpiry && `MOT ${vehicle.motExpiry}`].filter(Boolean).join(" · ")}</span></div></div>}
+        {lookup === "success" && <div className="mg-found-box"><MotorGeeksTick /><div><b>We found your motorcycle</b><strong>{vehicleTitle}</strong><span>{[vehicle.year, vehicle.derivative, vehicle.engineCapacity && `${vehicle.engineCapacity}cc`, vehicle.fuelType, vehicle.colour, vehicle.motExpiry && `MOT ${vehicle.motExpiry}`].filter(Boolean).join(" · ")}</span></div></div>}
         {lookup === "error" && <div className="mg-warning-box">Lookup unavailable. Your progress is safe and manual entry is available.</div>}
         <ManualVehicle vehicle={vehicle} setVehicle={setVehicle} />
         <Field label="Mileage" value={condition.mileage} set={v => setCondition({ ...condition, mileage: v })} required />
@@ -231,7 +231,8 @@ function ManualVehicle({ vehicle, setVehicle }: { vehicle: Vehicle; setVehicle: 
   return <details className="mg-manual">
     <summary>No registration, import, private plate or wrong result? Edit details manually</summary>
     <div className="mg-three"><Field label="Make" value={vehicle.make} set={v => setVehicle({ ...vehicle, make: v })} /><Field label="Model" value={vehicle.model} set={v => setVehicle({ ...vehicle, model: v })} /><Field label="Year" value={vehicle.year} set={v => setVehicle({ ...vehicle, year: v })} /></div>
-    <div className="mg-two"><Field label="Variant / engine" value={vehicle.derivative || vehicle.engineCapacity} set={v => setVehicle({ ...vehicle, derivative: v, engineCapacity: v })} /><Field label="Colour" value={vehicle.colour} set={v => setVehicle({ ...vehicle, colour: v })} /></div>
+    <div className="mg-two"><Field label="Variant / model version" value={vehicle.derivative} set={v => setVehicle({ ...vehicle, derivative: v })} /><Field label="Engine capacity (cc)" value={vehicle.engineCapacity} set={v => setVehicle({ ...vehicle, engineCapacity: v })} /></div>
+    <div className="mg-two"><Field label="Fuel type" value={vehicle.fuelType} set={v => setVehicle({ ...vehicle, fuelType: v })} /><Field label="Colour" value={vehicle.colour} set={v => setVehicle({ ...vehicle, colour: v })} /></div>
   </details>;
 }
 

@@ -8,7 +8,7 @@ export const steps = [
   ["Tell us about your motorcycle", "Enter your registration and answer a few simple questions.", "form"],
   ["Add condition and photos", "Clear details help interested dealers understand your bike.", "camera"],
   ["We match suitable dealers", "Your motorcycle can be reviewed by relevant verified dealers.", "users"],
-  ["Connect with a buyer", "An interested dealer can claim the opportunity and contact you.", "handshake"]
+  ["Choose an offer", "Compare dealer offers and decide whether one works for you.", "handshake"]
 ] as const;
 
 export const faqs = [
@@ -89,7 +89,6 @@ export function DealerProofSection() {
     <div className="ml-shell">
       <div><span>Built for trust</span><h2>A motorcycle-first way to reach genuine buyers.</h2><p>MotorGeeks is shaped around the information dealers actually need: bike details, condition, photos, history and location.</p></div>
       <div className="ml-proof-panel">
-        <div className="ml-proof-rating"><b>Trusted motorcycle network</b><span>Dealer logos and independent review ratings will be shown once final commercial approvals and verified sources are in place.</span></div>
         <div className="ml-proof-cards"><article><Icon name="shield" /><b>Verified dealer network</b><p>Approved buyers only.</p></article><article><Icon name="bike" /><b>Motorcycle-specific</b><p>Built around bike details, photos, MOT and condition.</p></article><article><Icon name="lock" /><b>Secure by design</b><p>Contact details are protected until the right point in the process.</p></article></div>
       </div>
     </div>

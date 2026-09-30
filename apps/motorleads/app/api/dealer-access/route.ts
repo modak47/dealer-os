@@ -58,7 +58,31 @@ async function supabaseInsert<T>(table: string, payload: Record<string, unknown>
   return Array.isArray(data) ? data[0] as T : null;
 }
 
+async function findExistingDealerApplication(email: string) {
+  const config = supabaseConfig();
+  if (!config) throw new Error("Dealer application storage is not configured.");
+  const query = new URLSearchParams({
+    select: "id,trading_name,account_status",
+    main_email: `eq.${email}`,
+    account_status: "in.(pending,active)",
+    order: "created_at.desc",
+    limit: "1"
+  });
+  const response = await fetch(`${config.url}/rest/v1/dealer_portal_accounts?${query}`, {
+    headers: { apikey: config.key, Authorization: `Bearer ${config.key}` },
+    cache: "no-store"
+  });
+  const data = await response.json().catch(() => null) as Array<{ id: string; trading_name: string; account_status: string }> | { message?: string } | null;
+  if (!response.ok) {
+    const message = data && !Array.isArray(data) && data.message ? data.message : "Supabase lookup failed.";
+    throw new Error(message);
+  }
+  return Array.isArray(data) ? data[0] ?? null : null;
+}
+
 async function createPendingDealerApplication(input: { dealership: string; name: string; email: string; telephone: string; postcode: string; website: string; message: string }) {
+  const existing = await findExistingDealerApplication(input.email);
+  if (existing) return { ...existing, duplicate: true };
   const account = await supabaseInsert<{ id: string; trading_name: string; account_status: string }>("dealer_portal_accounts", {
     trading_name: input.dealership,
     main_contact: input.name,
@@ -86,7 +110,7 @@ async function createPendingDealerApplication(input: { dealership: string; name:
       }
     });
   }
-  return account;
+  return account ? { ...account, duplicate: false } : null;
 }
 
 export async function POST(request: Request) {
@@ -126,6 +150,7 @@ export async function POST(request: Request) {
 
     const isDealerAccess = enquiryType === "Dealer access";
     const dealerAccount = isDealerAccess ? await createPendingDealerApplication({ dealership, name, email, telephone, postcode, website, message }) : null;
+    if (dealerAccount?.duplicate) return NextResponse.json({ ok: true, status: "pending", existing: true });
 
     const resendKey = process.env.RESEND_API_KEY;
     const to = process.env.MOTORGEEKS_ENQUIRY_RECIPIENT || process.env.MOTORLEADS_ENQUIRY_RECIPIENT;

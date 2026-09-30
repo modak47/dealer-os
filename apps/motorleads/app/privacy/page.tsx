@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { LegalPage } from "../components/legal";
 import { absoluteUrl } from "../site";
 
-export const metadata: Metadata = { title: "Privacy Policy", description: "Draft MotorGeeks privacy policy for owner and legal review.", alternates: { canonical: absoluteUrl("/privacy") } };
+export const metadata: Metadata = { title: "Privacy Policy", description: "How MotorGeeks handles personal information for sellers, dealers and website visitors.", alternates: { canonical: absoluteUrl("/privacy") } };
 
 export default function PrivacyPage() {
-  return <LegalPage title="Privacy Policy" intro="This draft explains how MotorGeeks expects to handle personal information for the V1 public website and enquiry service. It should be reviewed and approved by the business owner and legal adviser before launch." sections={[
+  return <LegalPage title="Privacy Policy" intro="This policy explains how MotorGeeks handles personal information when you use our website, submit a motorcycle or apply for dealer access." sections={[
     {
       title: "Information we collect",
       body: [
@@ -23,7 +23,7 @@ export default function PrivacyPage() {
     {
       title: "Sharing information",
       body: [
-        "Where a seller uses MotorGeeks, relevant motorcycle and seller information may be shared with appropriate motorcycle dealers as part of introducing the opportunity and enabling follow-up.",
+        "Where a seller uses MotorGeeks, relevant motorcycle and opportunity information may be shared with selected motorcycle dealers. Seller contact details are made available only to the dealer whose offer the seller accepts.",
         "We do not sell personal information for unrelated marketing. We may share information with service providers who help us run the website, email delivery, hosting, security or business administration."
       ]
     },
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
     {
       title: "Contact",
       body: [
-        "For privacy questions, data requests or concerns, contact MotorGeeks using the contact form on this website or by emailing the privacy contact address approved by the business owner before launch."
+        "For privacy questions, data requests or concerns, contact MotorGeeks using the contact form on this website or email info@motorgeeks.co.uk."
       ]
     }
   ]} />;

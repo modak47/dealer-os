@@ -102,6 +102,8 @@ describe("dealer roles and account management security", () => {
     assert.match(route, /dealer_portal_accounts/);
     assert.match(route, /account_status:\s*"pending"/);
     assert.match(route, /dealer_application_submitted/);
+    assert.match(route, /findExistingDealerApplication/);
+    assert.match(route, /in\.\(pending,active\)/);
     assert.doesNotMatch(route, /dealer_portal_users/);
     assert.match(form, /Application received/);
     assert.match(form, /awaiting review/);

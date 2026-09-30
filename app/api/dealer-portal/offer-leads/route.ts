@@ -22,6 +22,8 @@ function visualMarketplaceFixture() {
     model: "CBR650R",
     year: "2023",
     engine: "649",
+    portal_derivative: "ABS",
+    portal_fuel_type: "Petrol",
     colour: "Red",
     mileage: "2400",
     owners: "1",
@@ -106,10 +108,16 @@ export async function GET(request: Request) {
   const photoUrls = await signedMarketplacePhotoUrls(db, leadIds);
 
   function safeLead(lead: WebsiteLead) {
-    return redactLeadForDealer({
+    const vehicle = lead.seller_vehicle_snapshot && typeof lead.seller_vehicle_snapshot === "object" ? lead.seller_vehicle_snapshot : {};
+    const redacted = redactLeadForDealer({
       ...lead,
       resolved_images: [...(photoUrls.get(Number(lead.id)) ?? []), ...dealerImageUrls(lead.id, combineLeadImages(lead))],
     }, false);
+    return {
+      ...redacted,
+      portal_derivative: safeVehicleText(vehicle.derivative),
+      portal_fuel_type: safeVehicleText(vehicle.fuelType),
+    };
   }
 
   const available = ((allocations.data ?? []) as unknown as Array<Record<string, unknown>>).flatMap(row => {
@@ -137,4 +145,8 @@ export async function GET(request: Request) {
     offers: dealerOffers,
     marketplace_fee_amount: feeSettings.data?.successful_purchase_fee ?? 0,
   });
+}
+
+function safeVehicleText(value: unknown) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 120) || null : null;
 }

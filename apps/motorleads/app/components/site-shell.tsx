@@ -30,7 +30,7 @@ export function SiteHeader() {
 export function SiteFooter() {
   return <footer className="ml-footer">
     <div className="ml-shell ml-footer-grid">
-      <div><MotorGeeksLogo /><p>Helping motorcycle owners connect with genuine motorcycle dealers across the UK.</p><div className="ml-socials"><span>f</span><span>ig</span><span>▶</span><span>in</span></div></div>
+      <div><MotorGeeksLogo /><p>Helping motorcycle owners connect with genuine motorcycle dealers across the UK.</p></div>
       <nav><h2>Quick links</h2>{nav.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}</nav>
       <nav><h2>Legal</h2><Link href="/privacy">Privacy Policy</Link><Link href="/terms">Terms & Conditions</Link><Link href="/cookies">Cookies</Link></nav>
       <div><h2>Stay in touch</h2><p>Questions about selling a motorcycle or joining the dealer network?</p><Link href="/contact">Contact MotorGeeks →</Link></div>

@@ -50,6 +50,13 @@ type NotifyFeeInput = {
   createdBy?: string | null;
 };
 
+type NotifySellerOfferInput = {
+  offerId: string;
+  websiteLeadId: number;
+  dealerAccountId: string;
+  createdBy?: string | null;
+};
+
 export async function notifyDealerLeadAllocation(input: NotifyAllocationInput) {
   return bestEffort("dealer lead allocation notification", async () => {
     if (input.allocation.allocation_status !== "available") return [];
@@ -143,6 +150,38 @@ export async function recordDealerNotificationEvent(input: RecordEventInput) {
     sent_at: new Date().toISOString(),
     created_by: input.createdBy ?? null,
   }));
+}
+
+export async function notifySellerMarketplaceOffer(input: NotifySellerOfferInput) {
+  return bestEffort("seller marketplace offer notification", async () => {
+    const secret = process.env.MOTORGEEKS_INTERNAL_SECRET;
+    if (!secret) {
+      await recordDealerPortalAuditEventBestEffort({
+        eventType: "marketplace_offer_received_notification",
+        websiteLeadId: input.websiteLeadId,
+        dealerAccountId: input.dealerAccountId,
+        dealerUserId: input.createdBy ?? null,
+        eventData: { offer_id: input.offerId, status: "not_configured" },
+      });
+      return { status: "not_configured" };
+    }
+    const response = await fetch("https://motorgeeks.co.uk/api/internal/marketplace-notifications", {
+      method: "POST",
+      signal: AbortSignal.timeout(8000),
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "offer_received", offerId: input.offerId, websiteLeadId: input.websiteLeadId }),
+    });
+    const provider = await response.json().catch(() => ({}));
+    const status = response.ok ? String((provider as { status?: string }).status || "accepted") : "failed";
+    await recordDealerPortalAuditEventBestEffort({
+      eventType: "marketplace_offer_received_notification",
+      websiteLeadId: input.websiteLeadId,
+      dealerAccountId: input.dealerAccountId,
+      dealerUserId: input.createdBy ?? null,
+      eventData: { offer_id: input.offerId, status, provider_message_id: response.ok ? (provider as { providerId?: string }).providerId ?? null : null },
+    });
+    return { status };
+  });
 }
 
 export async function notifySuccessfulPurchaseFeeCreated(input: NotifyFeeInput) {

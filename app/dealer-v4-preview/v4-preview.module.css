@@ -2541,6 +2541,13 @@
     padding-inline: 8px;
   }
 
+  .marketplaceHead,
+  .marketplaceRow {
+    grid-template-columns: minmax(200px, 1.4fr) 90px 120px 105px 94px 88px 120px;
+    gap: 8px;
+    padding-inline: 8px;
+  }
+
   .rowAction {
     font-size: 11px;
   }

@@ -103,6 +103,8 @@ export type WebsiteLead = {
   seller_profile?: Record<string, unknown> | null;
   seller_condition?: Record<string, unknown> | null;
   seller_vehicle_snapshot?: Record<string, unknown> | null;
+  portal_derivative?: string | null;
+  portal_fuel_type?: string | null;
   seller_progress?: Record<string, unknown> | null;
   images: string[] | null;
   status: WebsiteLeadStatus | string | null;
