@@ -7,7 +7,7 @@ for (const [width, height] of [[1440,900],[1280,800],[768,1024],[390,844]]) {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/api/dealer-portal/leads', route => route.fulfill({json:{dealer:{id:'qa',trading_name:'DWB Trading',account_status:'active'},role:'dealer_user',available:[],claimed:[]}}));
-    await page.route('**/api/dealer-portal/offer-leads', route => route.fulfill({json:{available:[],offers:[],marketplace_fee_amount:0}}));
+    await page.route('**/api/dealer-portal/offer-leads', route => route.fulfill({json:{available:[],offers:[],marketplace_fee_bands:[]}}));
     await page.goto('/dealer-portal');
     await expect(page.getByRole('heading',{name:'Welcome back, DWB Trading'})).toBeVisible();
     await expect(page.getByRole('img',{name:'MotorGeeks',exact:true})).toHaveCount(1);

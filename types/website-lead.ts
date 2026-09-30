@@ -98,6 +98,9 @@ export type WebsiteLead = {
   marketplace_accepted_offer_id?: string | null;
   marketplace_accepted_at?: string | null;
   marketplace_fee_amount?: number | null;
+  marketplace_fee_default_amount?: number | null;
+  marketplace_fee_override_amount?: number | null;
+  marketplace_fee_calculated_at?: string | null;
   accepted_offer_amount?: number | null;
   accepted_offer_dealer_account_id?: string | null;
   seller_profile?: Record<string, unknown> | null;

@@ -39,6 +39,11 @@ export const dealerSafeLeadFields = [
   "updated_at",
   "location_town",
   "status",
+  "opportunity_mode",
+  "marketplace_status",
+  "marketplace_accepted_at",
+  "accepted_offer_amount",
+  "marketplace_fee_amount",
 ] as const;
 
 export const dealerClaimedCustomerLeadFields = [
@@ -111,6 +116,13 @@ export const yesMotoInternalLeadFields = [
   "consent_terms",
   "consent_source",
   "submitted_at",
+  "marketplace_fee_default_amount",
+  "marketplace_fee_band_id",
+  "marketplace_fee_calculated_at",
+  "marketplace_fee_override_amount",
+  "marketplace_fee_override_reason",
+  "marketplace_fee_overridden_by",
+  "marketplace_fee_overridden_at",
 ] as const;
 
 export const dealerRouteSourceOnlyLeadFields = [

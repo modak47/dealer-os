@@ -51,6 +51,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const leadResult = await db.from("website_leads").select("opportunity_mode,marketplace_fee_amount,marketplace_status").eq("id", claim.website_lead_id).maybeSingle();
     if (leadResult.error) return NextResponse.json({ error: "Unable to check lead fee type." }, { status: 500 });
     const marketplacePurchase = leadResult.data?.opportunity_mode === "marketplace_offer";
+    if (marketplacePurchase) {
+      if (body.confirmed_purchased !== true) return NextResponse.json({ error: "You must confirm that the motorcycle was actually purchased." }, { status: 400 });
+      const result = await db.rpc("record_marketplace_purchase", {
+        p_claim_id: claim.id,
+        p_dealer_account_id: session.dealer.id,
+        p_dealer_user_id: session.userId,
+        p_purchase_price: purchasePrice,
+        p_purchase_date: purchaseDate,
+        p_collection_date: collectionDate,
+        p_mileage_at_purchase: mileageAtPurchase === null ? null : Math.round(mileageAtPurchase),
+        p_notes: notes,
+        p_confirmed: true,
+      });
+      if (result.error) return NextResponse.json({ error: `Unable to record marketplace purchase: ${result.error.message}` }, { status: 400 });
+      const payload = result.data as { purchase?: { id: string }; fee?: { id: string; fee_amount: number }; duplicate?: boolean } | null;
+      if (!payload?.purchase || !payload.fee) return NextResponse.json({ error: "Marketplace purchase did not return a complete result." }, { status: 500 });
+      if (payload.duplicate) return NextResponse.json({ error: "Purchase has already been reported for this claim.", purchase: payload.purchase, fee: payload.fee }, { status: 409 });
+      const notificationLead = await db.from("website_leads").select("id,make,model,year,mileage,location_town").eq("id", claim.website_lead_id).maybeSingle();
+      await Promise.all([
+        recordDealerNotificationEvent({ eventType: "purchase_reported", dealerAccountId: session.dealer.id, dealerUserId: session.userId, websiteLeadId: claim.website_lead_id, claimId: claim.id, purchaseId: payload.purchase.id, payload: { claim_id: claim.id, purchase_id: payload.purchase.id, purchase_type: "dealer_reported" }, createdBy: session.userId }),
+        notifySuccessfulPurchaseFeeCreated({ dealer: session.dealer, lead: notificationLead.data ?? null, purchaseId: payload.purchase.id, feeId: payload.fee.id, websiteLeadId: claim.website_lead_id, claimId: claim.id, feeAmount: Number(payload.fee.fee_amount), createdBy: session.userId }),
+      ]);
+      return NextResponse.json({ purchase: payload.purchase, fee: payload.fee }, { status: 201 });
+    }
     const { data: purchase, error: purchaseError } = await db.from("dealer_purchases").insert({
       website_lead_id: claim.website_lead_id,
       claim_id: claim.id,
@@ -64,12 +88,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       reported_by: session.userId,
     }).select("*").single();
     if (purchaseError) return NextResponse.json({ error: `Unable to record purchase: ${purchaseError.message}` }, { status: 500 });
-    const marketplaceFee = marketplacePurchase
-      ? await db.rpc("marketplace_purchase_fee_amount", { p_website_lead_id: claim.website_lead_id, p_dealer_account_id: session.dealer.id })
-      : { data: null, error: null };
-    if (marketplaceFee.error) return NextResponse.json({ error: `Purchase recorded, but marketplace fee could not be calculated: ${marketplaceFee.error.message}` }, { status: 500 });
-    let feeAmount = Number(session.dealer.successful_purchase_fee ?? 50);
-    if (marketplacePurchase) feeAmount = Number(marketplaceFee.data ?? 0);
+    const feeAmount = Number(session.dealer.successful_purchase_fee ?? 50);
     const feeNumbers = calculateFeeAmounts({
       fee_amount: feeAmount,
       credit_amount: 0,
@@ -89,21 +108,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       paid_amount: feeNumbers.paid_amount,
       outstanding_amount: feeNumbers.outstanding_amount,
       status: feeNumbers.status,
-      notes: marketplacePurchase ? "MotorGeeks marketplace Successful Purchase Fee created from dealer portal purchase report." : "Successful Purchase Fee created from dealer portal purchase report.",
+      notes: "Successful Purchase Fee created from dealer portal purchase report.",
     }).select("*").single();
     if (feeError) return NextResponse.json({ error: `Purchase recorded, but fee could not be created: ${feeError.message}` }, { status: 500 });
     const now = new Date().toISOString();
     const nextStatus = purchaseType === "dealer_reported_later" ? "purchased_later" : "purchased";
     const [claimUpdate, leadUpdate, noteInsert, auditInsert, ledgerInsert] = await Promise.all([
       db.from("dealer_lead_claims").update({ status: nextStatus, outcome_at: now }).eq("id", claim.id),
-      db.from("website_leads").update({ status: "dealer_purchased", ...(marketplacePurchase ? { marketplace_status: "purchased" } : {}), purchased_at: now, updated_at: now }).eq("id", claim.website_lead_id),
+      db.from("website_leads").update({ status: "dealer_purchased", purchased_at: now, updated_at: now }).eq("id", claim.website_lead_id),
       db.from("dealer_lead_notes").insert({
         website_lead_id: claim.website_lead_id,
         claim_id: claim.id,
         dealer_account_id: session.dealer.id,
         dealer_user_id: session.userId,
         note_type: "status",
-        body: `Purchase reported at ${purchasePrice.toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 })}. ${marketplacePurchase ? "Marketplace Successful Purchase Fee" : "Successful Purchase Fee"} created.`,
+        body: `Purchase reported at ${purchasePrice.toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 })}. Successful Purchase Fee created.`,
       }),
       db.from("dealer_portal_audit_events").insert({
         website_lead_id: claim.website_lead_id,
@@ -144,7 +163,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           purchase_id: purchase.id,
           fee_id: fee.id,
           configured_fee_amount: feeAmount,
-          fee_source: marketplacePurchase ? "marketplace_fee_settings" : "dealer_account",
+          fee_source: "dealer_account",
         },
       }),
     ]);

@@ -6,6 +6,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { createPortal } from "react-dom";
 import { directionsUrl, googleMapsUrl, staticMapUrl } from "@/lib/location-ui";
 import { dealerLostReasons } from "@/lib/dealer-portal-lifecycle";
+import { marketplaceFeeForPrice, type MarketplaceFeeBand } from "@/lib/marketplace-fees";
 import { createClient } from "@/lib/supabase/client";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
 import type { DealerBuyingPreferences, DealerFeeLedgerEntry, DealerGeographyPreferences, DealerLeadClaimStatus, DealerLeadNote, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPortalUserRole, DealerPortalUserSummary, DealerPurchase, DealerPurchaseFee, DealerVisibleLead } from "@/types/dealer-portal";
@@ -18,7 +19,7 @@ type PortalData = {
   claimed: DealerVisibleLead[];
   marketplaceAvailable: MarketplaceAvailableLead[];
   marketplaceOffers: MarketplaceOffer[];
-  marketplaceFeeAmount: number;
+  marketplaceFeeBands: MarketplaceFeeBand[];
 };
 type PortalStatus = {
   accountStatus?: DealerPortalAccount["account_status"];
@@ -31,7 +32,7 @@ type LeadTab = "overview" | "vehicle-check" | "mot" | "location" | "customer";
 type DealerAccountFee = DealerPurchaseFee & { purchase?: Pick<DealerPurchase, "purchase_type" | "purchase_price" | "purchase_date" | "reported_at"> | null; lead?: { id: number; reg?: string | null; make?: string | null; model?: string | null; year?: string | null; mileage?: string | null } | null };
 type DealerPaymentsPayload = { fees: DealerAccountFee[]; ledger: DealerFeeLedgerEntry[] };
 type MarketplaceAvailableLead = { allocation_id: string; lead: DealerVisibleLead; marketplace_fee_amount: number | null };
-type MarketplaceOffer = { id: string; lead_id?: number; website_lead_id: number; amount_pence: number; note: string | null; status: string; submitted_at: string; revised_at: string | null; accepted_at?: string | null; lead?: DealerVisibleLead | null };
+type MarketplaceOffer = { id: string; lead_id?: number; website_lead_id: number; amount_pence: number; note: string | null; status: string; submitted_at: string; revised_at: string | null; accepted_at?: string | null; marketplace_fee_amount?: number | null; lead?: DealerVisibleLead | null };
 const motorgeeksWebsiteUrl = "https://motorgeeks.co.uk";
 
 const terminalStatuses = new Set(["purchased", "purchased_later", "lost", "returned_to_pool"]);
@@ -157,7 +158,7 @@ export function DealerPortalV4Live({ section = "dashboard" }: { section?: Portal
         ...payload,
         marketplaceAvailable: marketplacePayload.available ?? [],
         marketplaceOffers: marketplacePayload.offers ?? [],
-        marketplaceFeeAmount: Number(marketplacePayload.marketplace_fee_amount ?? 0),
+        marketplaceFeeBands: marketplacePayload.marketplace_fee_bands ?? [],
       });
       setStatus(null);
     } else {
@@ -226,7 +227,7 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
         ...payload,
         marketplaceAvailable: [],
         marketplaceOffers: [],
-        marketplaceFeeAmount: 0,
+        marketplaceFeeBands: [],
       });
       setStatus(null);
     } else {
@@ -320,7 +321,7 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
         ...direct,
         marketplaceAvailable: marketplace.available ?? [],
         marketplaceOffers: marketplace.offers ?? [],
-        marketplaceFeeAmount: Number(marketplace.marketplace_fee_amount ?? 0),
+        marketplaceFeeBands: marketplace.marketplace_fee_bands ?? [],
       });
     } else setError(direct.error || marketplace.error || "Unable to load this offer lead.");
     setLoading(false);
@@ -335,9 +336,14 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
   const available = data?.marketplaceAvailable.find(item => Number(item.lead.id) === leadNumber) ?? null;
   const ownOffer = data?.marketplaceOffers.find(offer => Number(offer.website_lead_id || offer.lead_id) === leadNumber) ?? null;
   const lead = available?.lead ?? ownOffer?.lead ?? null;
-  const marketplaceFeeAmount = Number(available?.marketplace_fee_amount ?? data?.marketplaceFeeAmount ?? 0);
   const offerAmount = safeNumber(amount);
-  const totalCost = offerAmount == null ? null : offerAmount + marketplaceFeeAmount;
+  const displayedOfferAmount = offerAmount ?? (ownOffer ? Number(ownOffer.amount_pence) / 100 : null);
+  const marketplaceFeeAmount = Number(
+    ownOffer?.status === "accepted"
+      ? ownOffer.marketplace_fee_amount ?? ownOffer.lead?.marketplace_fee_amount ?? 0
+      : marketplaceFeeForPrice(displayedOfferAmount ?? 0, data?.marketplaceFeeBands ?? []) ?? 0,
+  );
+  const totalCost = displayedOfferAmount == null ? null : displayedOfferAmount + marketplaceFeeAmount;
 
   async function submitOffer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -381,9 +387,10 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
             <Input label="Offer amount" value={amount} set={setAmount} type="number" required />
             <label className={styles.fullField}><span>Offer note (optional)</span><small>This note will be shown to the seller. Do not include personal contact details.</small><textarea value={note} onChange={event => setNote(event.target.value)} placeholder="Subject to the motorcycle being as described." /></label>
             <div className={styles.offerCostBox}>
-              <p><strong>Your offer:</strong> {offerAmount == null ? "Enter amount" : formatGbp(offerAmount)}</p>
+              <p><strong>Your offer:</strong> {displayedOfferAmount == null ? "Enter amount" : formatGbp(displayedOfferAmount)}</p>
               <p><strong>MotorGeeks successful purchase fee:</strong> {formatGbp(marketplaceFeeAmount)}</p>
-              <p><strong>Total buying cost if purchase completes:</strong> {totalCost == null ? "Enter amount" : `${formatGbp(offerAmount!)} + ${formatGbp(marketplaceFeeAmount)} = ${formatGbp(totalCost)}`}</p>
+              <p><strong>Total buying cost if purchase completes:</strong> {totalCost == null ? "Enter amount" : `${formatGbp(displayedOfferAmount!)} + ${formatGbp(marketplaceFeeAmount)} = ${formatGbp(totalCost)}`}</p>
+              <small>The MotorGeeks fee applies only if the motorcycle is actually purchased.</small>
             </div>
             <button className={styles.blueButton} disabled={busy || offerAmount == null || offerAmount <= 0}>{busy ? "Submitting..." : ownOffer ? "Revise offer" : "Make an offer"}</button>
           </form>
@@ -494,7 +501,7 @@ function MarketplaceMyOffers({ offers }: { offers: MarketplaceOffer[] }) {
           const lead = offer.lead;
           return <Link className={`${styles.tableRow} ${styles.myOffersRow} ${styles.clickableRow}`} href={`/dealer-portal/offer-leads/${offer.website_lead_id || offer.lead_id}`} key={offer.id}>
             <span className={styles.bikeCell}>{lead ? leadRow(lead).image : <span className={styles.tableNoPhoto}>No photo</span>}<span><strong>{lead ? leadTitle(lead) : "Marketplace motorcycle"}</strong><small>{lead?.reg || "Registration pending"}</small></span></span>
-            <span className={styles.price}>{formatOfferAmount(offer.amount_pence)}</span><span>{formatLeadDate(offer.revised_at || offer.submitted_at)}</span><span className={`${styles.status} ${offer.status === "accepted" ? styles.viewed : ""}`}>{offerStatusLabel(offer.status)}</span><span className={styles.rowAction}>View opportunity →</span>
+            <span className={styles.price}>{formatOfferAmount(offer.amount_pence)}<small>{offer.marketplace_fee_amount != null ? ` + ${formatGbp(offer.marketplace_fee_amount)} fee if purchased` : "Fee shown in opportunity"}</small></span><span>{formatLeadDate(offer.revised_at || offer.submitted_at)}</span><span className={`${styles.status} ${offer.status === "accepted" ? styles.viewed : ""}`}>{offerStatusLabel(offer.status)}</span><span className={styles.rowAction}>View opportunity →</span>
           </Link>;
         })}
       </div> : <EmptyInline copy="You have not submitted any marketplace offers yet." />}
@@ -640,7 +647,10 @@ function WorkLeadPanel({ claimId, lead, onChanged }: { claimId: string; lead: De
   const [noteBody, setNoteBody] = useState("");
   const [lostReason, setLostReason] = useState<string>(lostReasons[0]);
   const [lostReasonDetail, setLostReasonDetail] = useState("");
-  const [purchase, setPurchase] = useState({ purchase_price: String(safeNumber(lead.price) ?? ""), purchase_date: new Date().toISOString().slice(0, 10), collection_date: "", mileage_at_purchase: String(safeNumber(lead.mileage) ?? ""), notes: "" });
+  const marketplacePurchase = lead.opportunity_mode === "marketplace_offer";
+  const agreedPurchase = safeNumber(lead.accepted_offer_amount);
+  const marketplaceFee = safeNumber(lead.marketplace_fee_amount) ?? 0;
+  const [purchase, setPurchase] = useState({ purchase_price: String(marketplacePurchase ? agreedPurchase ?? "" : safeNumber(lead.price) ?? ""), purchase_date: new Date().toISOString().slice(0, 10), collection_date: "", mileage_at_purchase: String(safeNumber(lead.mileage) ?? ""), notes: "", confirmed_purchased: false });
 
   async function updateStatus(status: DealerLeadClaimStatus, extra: Record<string, unknown> = {}) {
     setBusy(status);
@@ -677,7 +687,7 @@ function WorkLeadPanel({ claimId, lead, onChanged }: { claimId: string; lead: De
     <div className={styles.workflowChips}>{workStatuses.map(([status, label]) => <button className={lead.portal_claim_status === status ? styles.active : ""} type="button" disabled={Boolean(busy)} onClick={() => void updateStatus(status)} key={status}>{label}</button>)}</div>
     <form className={styles.mockForm} onSubmit={addNote}><select value={noteType} onChange={event => setNoteType(event.target.value)}><option value="note">Note</option><option value="call">Call</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="offer">Offer</option></select><textarea value={noteBody} onChange={event => setNoteBody(event.target.value)} placeholder="Add activity note, offer, call outcome or next step" required /><button className={styles.blueButton} disabled={Boolean(busy)}>{busy === "note" ? "Adding..." : "Add Note"}</button></form>
     <details className={styles.outcomePanel}><summary>Lost / Return</summary><div><select value={lostReason} onChange={event => setLostReason(event.target.value)}>{lostReasons.map(reason => <option key={reason}>{reason}</option>)}</select>{lostReason === "Other" && <input value={lostReasonDetail} onChange={event => setLostReasonDetail(event.target.value)} placeholder="Brief reason" />}<button type="button" onClick={() => void updateStatus("lost", { lost_reason: lostReason, lost_reason_detail: lostReasonDetail })}>Mark Lost</button><button type="button" onClick={() => void updateStatus("returned_to_pool")}>Return to Pool</button></div></details>
-    <details className={styles.outcomePanel}><summary>Report Purchase</summary><form onSubmit={reportPurchase}><Input label="Purchase price" value={purchase.purchase_price} set={value => setPurchase(current => ({ ...current, purchase_price: value }))} type="number" required /><Input label="Purchase date" value={purchase.purchase_date} set={value => setPurchase(current => ({ ...current, purchase_date: value }))} type="date" required /><Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" /><Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" /><label className={styles.fullField}><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} /></label><button className={styles.blueButton} disabled={Boolean(busy)}>{busy === "purchase" ? "Reporting..." : "Mark as Purchased"}</button></form></details>
+    <details className={styles.outcomePanel}><summary>Report Purchase</summary><form onSubmit={reportPurchase}>{marketplacePurchase && <div className={`${styles.offerCostBox} ${styles.fullField}`}><p><strong>Agreed motorcycle purchase:</strong> {formatGbp(agreedPurchase ?? 0)}</p><p><strong>MotorGeeks successful purchase fee:</strong> {formatGbp(marketplaceFee)}</p><p><strong>Total acquisition cost:</strong> {formatGbp((agreedPurchase ?? 0) + marketplaceFee)}</p><small>The MotorGeeks fee becomes payable only when you confirm the motorcycle was actually purchased.</small></div>}<Input label="Purchase price" value={purchase.purchase_price} set={value => setPurchase(current => ({ ...current, purchase_price: value }))} type="number" required /><Input label="Purchase date" value={purchase.purchase_date} set={value => setPurchase(current => ({ ...current, purchase_date: value }))} type="date" required /><Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" /><Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" /><label className={styles.fullField}><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} /></label>{marketplacePurchase && <label className={styles.fullField}><input type="checkbox" checked={purchase.confirmed_purchased} onChange={event => setPurchase(current => ({ ...current, confirmed_purchased: event.target.checked }))} required /> I confirm this motorcycle was actually purchased at the accepted offer amount.</label>}<button className={styles.blueButton} disabled={Boolean(busy) || (marketplacePurchase && !purchase.confirmed_purchased)}>{busy === "purchase" ? "Reporting..." : "Mark as Purchased"}</button></form></details>
   </Panel>;
 }
 

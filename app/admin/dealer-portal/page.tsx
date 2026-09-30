@@ -5,6 +5,7 @@ import { Children, useEffect, useMemo, useState, type FormEvent, type ReactNode 
 import { formatLeadDate, statusLabel } from "@/lib/website-leads";
 import type { DealerBuyingPreferences, DealerFeeLedgerEntry, DealerGeographyPreferences, DealerLeadClaim, DealerLeadNote, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPurchase, DealerPurchaseFee } from "@/types/dealer-portal";
 import { LeadBrowser } from "@/app/website-leads/lead-browser";
+import type { MarketplaceFeeBand } from "@/lib/marketplace-fees";
 
 type RelatedDealer = { id: string; trading_name: string; successful_purchase_fee?: number | null } | null;
 type RelatedLead = { id: number; reg?: string | null; make?: string | null; model?: string | null; year?: string | null; mileage?: string | null; status?: string | null; postcode?: string | null; location_town?: string | null } | null;
@@ -13,10 +14,13 @@ type AdminNote = DealerLeadNote & { dealer?: RelatedDealer; lead?: RelatedLead }
 type AdminPurchase = DealerPurchase & { dealer?: RelatedDealer; lead?: RelatedLead };
 type AdminFee = DealerPurchaseFee & { dealer?: RelatedDealer; lead?: RelatedLead; purchase?: Pick<DealerPurchase, "id" | "purchase_type" | "purchase_price" | "purchase_date" | "reported_at"> | null };
 type AdminLedger = DealerFeeLedgerEntry & { dealer?: RelatedDealer; lead?: RelatedLead };
-type AdminOverview = { claims: AdminClaim[]; notes: AdminNote[]; purchases: AdminPurchase[]; fees: AdminFee[]; ledger: AdminLedger[] };
+type MarketplaceDeal = { id: number; reg?: string | null; make?: string | null; model?: string | null; year?: string | null; fname?: string | null; lname?: string | null; marketplace_status?: string | null; accepted_offer_amount?: number | null; marketplace_fee_default_amount?: number | null; marketplace_fee_amount?: number | null; marketplace_fee_override_amount?: number | null; marketplace_fee_override_reason?: string | null; marketplace_fee_overridden_at?: string | null; marketplace_accepted_at?: string | null; purchased_at?: string | null; dealer_name?: string | null };
+type MarketplaceOverrideAudit = { id: number; website_lead_id: number; default_fee_amount: number; previous_final_fee_amount: number; final_fee_amount: number; reason: string; changed_by: string; created_at: string };
+type AdminOverview = { claims: AdminClaim[]; notes: AdminNote[]; purchases: AdminPurchase[]; fees: AdminFee[]; ledger: AdminLedger[]; marketplaceDeals: MarketplaceDeal[]; marketplaceOverrides: MarketplaceOverrideAudit[] };
+type MarketplaceFeeSettings = { bands: MarketplaceFeeBand[]; updated_at: string | null; updated_by: string | null };
 type BackfillResult = { id?: number; reg?: string | null; error?: string; skipped?: boolean; reason?: string };
 type BackfillPayload = { processed?: number; checked?: number; failed?: number; skipped?: number; results?: BackfillResult[]; error?: string };
-type AdminTab = "daily" | "dealers" | "oversight";
+type AdminTab = "daily" | "dealers" | "oversight" | "marketplace-fees";
 type DealerModalTab = "account" | "buying" | "history" | "geography" | "login";
 
 const emptyAccount: Partial<DealerPortalAccountWithPreferences> = {
@@ -86,7 +90,8 @@ function splitArrayText(value: string) {
 
 export default function DealerPortalAdminPage() {
   const [accounts, setAccounts] = useState<DealerPortalAccountWithPreferences[]>([]);
-  const [overview, setOverview] = useState<AdminOverview>({ claims: [], notes: [], purchases: [], fees: [], ledger: [] });
+  const [overview, setOverview] = useState<AdminOverview>({ claims: [], notes: [], purchases: [], fees: [], ledger: [], marketplaceDeals: [], marketplaceOverrides: [] });
+  const [marketplaceFees, setMarketplaceFees] = useState<MarketplaceFeeSettings>({ bands: [], updated_at: null, updated_by: null });
   const [editing, setEditing] = useState<Partial<DealerPortalAccountWithPreferences> | null>(null);
   const [access, setAccess] = useState(emptyAccess);
   const [loading, setLoading] = useState(true);
@@ -99,16 +104,20 @@ export default function DealerPortalAdminPage() {
   async function load() {
     setLoading(true);
     setError("");
-    const [accountResponse, overviewResponse] = await Promise.all([
+    const [accountResponse, overviewResponse, marketplaceFeeResponse] = await Promise.all([
       fetch("/api/dealer-portal/admin/accounts", { cache: "no-store" }),
       fetch("/api/dealer-portal/admin/overview", { cache: "no-store" }),
+      fetch("/api/dealer-portal/admin/marketplace-fees", { cache: "no-store" }),
     ]);
     const accountPayload = await accountResponse.json();
     const overviewPayload = await overviewResponse.json();
+    const marketplaceFeePayload = await marketplaceFeeResponse.json();
     if (accountResponse.ok) setAccounts(accountPayload.accounts ?? []);
     else setError(accountPayload.error || "Unable to load dealer portal accounts.");
-    if (overviewResponse.ok) setOverview({ claims: overviewPayload.claims ?? [], notes: overviewPayload.notes ?? [], purchases: overviewPayload.purchases ?? [], fees: overviewPayload.fees ?? [], ledger: overviewPayload.ledger ?? [] });
+    if (overviewResponse.ok) setOverview({ claims: overviewPayload.claims ?? [], notes: overviewPayload.notes ?? [], purchases: overviewPayload.purchases ?? [], fees: overviewPayload.fees ?? [], ledger: overviewPayload.ledger ?? [], marketplaceDeals: overviewPayload.marketplaceDeals ?? [], marketplaceOverrides: overviewPayload.marketplaceOverrides ?? [] });
     else setError(overviewPayload.error || "Unable to load dealer portal overview.");
+    if (marketplaceFeeResponse.ok) setMarketplaceFees({ bands: marketplaceFeePayload.bands ?? [], updated_at: marketplaceFeePayload.updated_at ?? null, updated_by: marketplaceFeePayload.updated_by ?? null });
+    else setError(marketplaceFeePayload.error || "Unable to load marketplace fee settings.");
     setLoading(false);
   }
 
@@ -237,6 +246,7 @@ export default function DealerPortalAdminPage() {
         <button className={activeTab === "daily" ? "active" : ""} type="button" onClick={() => setActiveTab("daily")}><span>Lead Queue</span></button>
         <button className={activeTab === "dealers" ? "active" : ""} type="button" onClick={() => setActiveTab("dealers")}><span>Dealers</span><b>{accounts.length}</b></button>
         <button className={activeTab === "oversight" ? "active" : ""} type="button" onClick={() => setActiveTab("oversight")}><span>Oversight</span><b>{overview.claims.length + overview.purchases.length}</b></button>
+        <button className={activeTab === "marketplace-fees" ? "active" : ""} type="button" onClick={() => setActiveTab("marketplace-fees")}><span>Marketplace Fees</span><b>{marketplaceFees.bands.length}</b></button>
       </nav>
       {activeTab === "daily" && <section className="dealer-admin-panel"><LeadBrowser queue dealers={activeAccounts} /></section>}
       {activeTab === "dealers" && <section className="dealer-admin-panel">
@@ -257,6 +267,7 @@ export default function DealerPortalAdminPage() {
           </div>
         </section>
       </section>}
+      {activeTab === "marketplace-fees" && <MarketplaceFeesPanel key={marketplaceFees.updated_at ?? "new"} settings={marketplaceFees} deals={overview.marketplaceDeals} audit={overview.marketplaceOverrides} onChanged={load} />}
     </section>
     {editing && <DealerAccountModal editing={editing} access={access} saving={saving} setAccess={setAccess} setField={setField} setBuyingField={setBuyingField} setGeographyField={setGeographyField} onSubmit={saveAccount} onClose={() => { setEditing(null); setAccess(emptyAccess); }} />}
   </main>;
@@ -325,6 +336,83 @@ function AdminNumberPreference({ label, value, set }: { label: string; value: nu
 
 function AdminCheckbox({ label, checked, set }: { label: string; checked: boolean; set: (value: boolean) => void }) {
   return <label><input type="checkbox" checked={checked} onChange={event => set(event.target.checked)} /><span>{label}</span></label>;
+}
+
+function MarketplaceFeesPanel({ settings, deals, audit, onChanged }: { settings: MarketplaceFeeSettings; deals: MarketplaceDeal[]; audit: MarketplaceOverrideAudit[]; onChanged: () => Promise<void> }) {
+  const [bands, setBands] = useState<MarketplaceFeeBand[]>(settings.bands);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  function updateBand(index: number, key: "min_purchase_price" | "max_purchase_price" | "fee_amount", value: string) {
+    setBands(current => current.map((band, position) => position === index ? { ...band, [key]: key === "max_purchase_price" && value === "" ? null : Number(value) } : band));
+  }
+  function addBand() {
+    setBands(current => {
+      const ordered = [...current].sort((a, b) => a.min_purchase_price - b.min_purchase_price);
+      const last = ordered.at(-1);
+      if (!last) return [{ min_purchase_price: 0, max_purchase_price: null, fee_amount: 0 }];
+      const nextStart = Math.max(last.min_purchase_price + 1000, 1000);
+      return [...ordered.slice(0, -1), { ...last, max_purchase_price: nextStart }, { min_purchase_price: nextStart, max_purchase_price: null, fee_amount: last.fee_amount }];
+    });
+  }
+  function removeBand(index: number) {
+    setBands(current => {
+      if (current.length <= 1) return current;
+      const next = current.filter((_, position) => position !== index).sort((a, b) => a.min_purchase_price - b.min_purchase_price);
+      return next.map((band, position) => ({ ...band, min_purchase_price: position === 0 ? 0 : Number(next[position - 1].max_purchase_price), max_purchase_price: position === next.length - 1 ? null : band.max_purchase_price }));
+    });
+  }
+  async function saveBands() {
+    setSaving(true); setMessage("");
+    const response = await fetch("/api/dealer-portal/admin/marketplace-fees", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bands }) });
+    const payload = await response.json();
+    if (!response.ok) setMessage(payload.error || "Unable to save marketplace fee bands.");
+    else { setMessage("Marketplace fee bands saved. Future accepted offers will use the new bands."); await onChanged(); }
+    setSaving(false);
+  }
+  return <section className="dealer-admin-panel marketplace-fee-admin">
+    <section className="website-detail-card marketplace-fee-settings">
+      <header><div><h2>MotorGeeks Marketplace Fees</h2><p>Applied only after an accepted marketplace motorcycle is reported as purchased. Direct lead fees are separate.</p></div><span>Last changed {settings.updated_at ? formatLeadDate(settings.updated_at) : "not recorded"}</span></header>
+      {message && <div className={message.includes("Unable") || message.includes("must") ? "website-state error compact" : "website-state success compact"}>{message}</div>}
+      <div className="marketplace-fee-band-list">
+        <div className="marketplace-fee-band-head"><span>From</span><span>Up to (exclusive)</span><span>Fee</span><span>Action</span></div>
+        {bands.map((band, index) => <div className="marketplace-fee-band" key={band.id ?? `${index}-${band.min_purchase_price}`}>
+          <label><span>From</span><input type="number" min="0" step="0.01" value={band.min_purchase_price} onChange={event => updateBand(index, "min_purchase_price", event.target.value)} /></label>
+          <label><span>Up to</span><input type="number" min="0" step="0.01" value={band.max_purchase_price ?? ""} placeholder="No limit" onChange={event => updateBand(index, "max_purchase_price", event.target.value)} /></label>
+          <label><span>Fee</span><input type="number" min="0" step="0.01" value={band.fee_amount} onChange={event => updateBand(index, "fee_amount", event.target.value)} /></label>
+          <button type="button" onClick={() => removeBand(index)} disabled={bands.length <= 1}>Remove</button>
+        </div>)}
+      </div>
+      <footer><button className="admin-secondary" type="button" onClick={addBand}>Add band</button><button className="admin-primary" type="button" disabled={saving} onClick={() => void saveBands()}>{saving ? "Saving..." : "Save fee bands"}</button></footer>
+    </section>
+    <section className="website-detail-card marketplace-deal-fees"><header><div><h2>Marketplace Deals</h2><p>Accepted amounts, locked fees, overrides and purchase status.</p></div></header>
+      <div className="marketplace-deal-list">{deals.length ? deals.map(deal => <MarketplaceDealFee key={deal.id} deal={deal} audit={audit.filter(item => item.website_lead_id === deal.id)} onChanged={onChanged} />) : <p>No accepted marketplace deals yet.</p>}</div>
+    </section>
+  </section>;
+}
+
+function MarketplaceDealFee({ deal, audit, onChanged }: { deal: MarketplaceDeal; audit: MarketplaceOverrideAudit[]; onChanged: () => Promise<void> }) {
+  const [amount, setAmount] = useState(String(deal.marketplace_fee_amount ?? ""));
+  const [reasonType, setReasonType] = useState("goodwill");
+  const [reasonDetail, setReasonDetail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const reason = reasonType === "other" ? reasonDetail.trim() : `${statusLabel(reasonType)}${reasonDetail.trim() ? `: ${reasonDetail.trim()}` : ""}`;
+  async function saveOverride(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setMessage("");
+    const response = await fetch(`/api/dealer-portal/admin/marketplace-fees/${deal.id}/override`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ final_fee_amount: amount, reason }) });
+    const payload = await response.json();
+    if (!response.ok) setMessage(payload.error || "Unable to override marketplace fee.");
+    else { setMessage("Marketplace fee override saved."); await onChanged(); }
+    setBusy(false);
+  }
+  return <article className="marketplace-deal-fee">
+    <header><div><b>#{deal.id} {deal.reg || "No reg"} {[deal.year,deal.make,deal.model].filter(Boolean).join(" ")}</b><span>{deal.dealer_name || "Dealer pending"} · accepted {deal.marketplace_accepted_at ? formatLeadDate(deal.marketplace_accepted_at) : "date unknown"}</span></div><strong>{deal.purchased_at ? "Purchased" : statusLabel(deal.marketplace_status || "accepted")}</strong></header>
+    <dl><div><dt>Dealer offer</dt><dd>{money(deal.accepted_offer_amount)}</dd></div><div><dt>Default fee</dt><dd>{money(deal.marketplace_fee_default_amount)}</dd></div><div><dt>Override</dt><dd>{deal.marketplace_fee_override_amount == null ? "None" : money(deal.marketplace_fee_override_amount)}</dd></div><div><dt>Final fee</dt><dd>{money(deal.marketplace_fee_amount)}</dd></div><div><dt>Seller</dt><dd>{[deal.fname,deal.lname].filter(Boolean).join(" ") || "Not recorded"}</dd></div><div><dt>Fee status</dt><dd>{deal.purchased_at ? "Liability created" : "Not payable yet"}</dd></div></dl>
+    {!deal.purchased_at && <form onSubmit={saveOverride}><label><span>Final MotorGeeks fee</span><input type="number" min="0" step="0.01" value={amount} onChange={event => setAmount(event.target.value)} required /></label><label><span>Internal reason</span><select value={reasonType} onChange={event => setReasonType(event.target.value)}><option value="goodwill">Goodwill</option><option value="launch_promotion">Launch promotion</option><option value="dealer_agreement">Dealer agreement</option><option value="disputed_lead">Disputed lead</option><option value="manual_adjustment">Manual adjustment</option><option value="other">Other</option></select></label><label><span>{reasonType === "other" ? "Reason (required)" : "Additional note (optional)"}</span><input value={reasonDetail} onChange={event => setReasonDetail(event.target.value)} required={reasonType === "other"} /></label><button className="admin-primary" disabled={busy}>{busy ? "Saving..." : "Apply override"}</button></form>}
+    {deal.marketplace_fee_override_reason && <p><b>Current internal reason:</b> {deal.marketplace_fee_override_reason} · {deal.marketplace_fee_overridden_at ? formatLeadDate(deal.marketplace_fee_overridden_at) : ""}</p>}
+    {audit.length > 0 && <details><summary>Override audit ({audit.length})</summary>{audit.map(item => <p key={item.id}>{formatLeadDate(item.created_at)} · {money(item.previous_final_fee_amount)} → {money(item.final_fee_amount)} · {item.reason} · staff {item.changed_by}</p>)}</details>}
+    {message && <p className={message.includes("Unable") ? "error" : "success"}>{message}</p>}
+  </article>;
 }
 
 function OverviewPanel({ title, empty, children }: { title: string; empty: string; children: ReactNode }) {

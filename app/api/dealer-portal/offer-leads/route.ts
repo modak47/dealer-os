@@ -7,6 +7,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { isVisualTestRequest } from "@/lib/visual-test-mode";
 import { combineLeadImages } from "@/lib/website-leads";
 import type { WebsiteLead } from "@/types/website-lead";
+import { marketplaceFeeForPrice, type MarketplaceFeeBand } from "@/lib/marketplace-fees";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,7 @@ function visualMarketplaceFixture() {
   };
   return {
     dealer: { id: "visual-dealer", trading_name: "DWB Trading", successful_purchase_fee: 50 },
-    available: [{ allocation_id: "visual-marketplace-allocation", lead, marketplace_fee_amount: 0 }],
+    available: [{ allocation_id: "visual-marketplace-allocation", lead, marketplace_fee_amount: null }],
     offers: [{
       id: "visual-offer-1",
       website_lead_id: 9902,
@@ -77,7 +78,13 @@ function visualMarketplaceFixture() {
       revised_at: null,
       lead: { ...lead, id: 9902, reg: "AB12CDE", make: "Yamaha", model: "MT-09", year: "2021", mileage: "6800", marketplace_status: "offer_received" },
     }],
-    marketplace_fee_amount: 0,
+    marketplace_fee_bands: [
+      { id: "visual-band-1", min_purchase_price: 0, max_purchase_price: 2000, fee_amount: 49, sort_order: 0 },
+      { id: "visual-band-2", min_purchase_price: 2000, max_purchase_price: 4000, fee_amount: 79, sort_order: 1 },
+      { id: "visual-band-3", min_purchase_price: 4000, max_purchase_price: 6000, fee_amount: 99, sort_order: 2 },
+      { id: "visual-band-4", min_purchase_price: 6000, max_purchase_price: 10000, fee_amount: 129, sort_order: 3 },
+      { id: "visual-band-5", min_purchase_price: 10000, max_purchase_price: null, fee_amount: 149, sort_order: 4 },
+    ],
   };
 }
 
@@ -86,7 +93,7 @@ export async function GET(request: Request) {
   const session = await getCurrentDealerPortalAccount();
   if (!session) return NextResponse.json({ error: "Dealer portal access is not available for this user." }, { status: 401 });
   const db = getSupabaseAdminClient();
-  const [allocations, offers, feeSettings] = await Promise.all([
+  const [allocations, offers, feeBands] = await Promise.all([
     db.from("dealer_lead_allocations")
       .select("id,website_lead_id,allocation_status,allocated_at,match_reasons,lead:website_leads(*)")
       .eq("dealer_account_id", session.dealer.id)
@@ -96,11 +103,12 @@ export async function GET(request: Request) {
       .select("*,lead:website_leads!dealer_offers_website_lead_id_fkey(*)")
       .eq("dealer_account_id", session.dealer.id)
       .order("submitted_at", { ascending: false }),
-    db.from("marketplace_fee_settings").select("successful_purchase_fee").eq("id", true).maybeSingle(),
+    db.from("marketplace_fee_bands").select("id,min_purchase_price,max_purchase_price,fee_amount,sort_order").order("min_purchase_price"),
   ]);
   if (allocations.error) return NextResponse.json({ error: "Unable to load offer opportunities." }, { status: 500 });
   if (offers.error) return NextResponse.json({ error: "Unable to load your offers." }, { status: 500 });
-  if (feeSettings.error) return NextResponse.json({ error: "Unable to load marketplace fee settings." }, { status: 500 });
+  if (feeBands.error) return NextResponse.json({ error: "Unable to load marketplace fee settings." }, { status: 500 });
+  const bands = (feeBands.data ?? []) as MarketplaceFeeBand[];
   const leadIds = [
     ...((allocations.data ?? []) as unknown as Array<Record<string, unknown>>).map(row => Number(row.website_lead_id)),
     ...((offers.data ?? []) as unknown as Array<Record<string, unknown>>).map(row => Number((relatedLead(row.lead) as WebsiteLead | null)?.id)),
@@ -127,7 +135,7 @@ export async function GET(request: Request) {
     return [{
       allocation_id: row.id,
       lead: safeLead(lead),
-      marketplace_fee_amount: (lead as Record<string, unknown>).marketplace_fee_amount ?? feeSettings.data?.successful_purchase_fee ?? 0,
+      marketplace_fee_amount: (lead as Record<string, unknown>).marketplace_fee_amount ?? null,
     }];
   });
   const dealerOffers = ((offers.data ?? []) as unknown as Array<Record<string, unknown>>).flatMap(offer => {
@@ -137,13 +145,14 @@ export async function GET(request: Request) {
       ...offer,
       lead_id: lead.id,
       lead: safeLead(lead),
+      marketplace_fee_amount: (lead as Record<string, unknown>).marketplace_fee_amount ?? marketplaceFeeForPrice(Number(offer.amount_pence) / 100, bands),
     }];
   });
   return NextResponse.json({
     dealer: dealerAccountResponse(session.dealer),
     available,
     offers: dealerOffers,
-    marketplace_fee_amount: feeSettings.data?.successful_purchase_fee ?? 0,
+    marketplace_fee_bands: bands,
   });
 }
 
