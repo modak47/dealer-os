@@ -6,6 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { marketplaceFeeForPrice, validateMarketplaceFeeBands } from "@/lib/marketplace-fees";
 
 const migration = readFileSync("supabase/migrations/20260930000100_marketplace_fee_bands_and_overrides.sql", "utf8");
+const boundedReplacementMigration = readFileSync("supabase/migrations/20260930000200_marketplace_fee_band_bounded_replace.sql", "utf8");
 const bands = [
   { min_purchase_price: 0, max_purchase_price: 2000, fee_amount: 49 },
   { min_purchase_price: 2000, max_purchase_price: 4000, fee_amount: 79 },
@@ -54,6 +55,7 @@ test("isolated PostgreSQL: fee settings, snapshots, overrides and purchase are s
       alter default privileges in schema public grant all on tables to anon,authenticated;
     `);
     await db.exec(migration);
+    await db.exec(boundedReplacementMigration);
     await db.exec("grant select on all tables in schema public to service_role");
     await db.query("insert into auth.users(id) values($1),($2)", [staff, dealerUser]);
     await db.query("insert into dealer_users(id,role,active) values($1,'team_member',true),($2,'dealer',true)", [staff, dealerUser]);
@@ -84,10 +86,37 @@ test("isolated PostgreSQL: fee settings, snapshots, overrides and purchase are s
     assert.equal((await db.query<{ count: number }>("select count(*)::int count from dealer_purchase_fees")).rows[0].count, 0);
 
     await db.exec("set role service_role");
-    await assert.rejects(db.query("select public.staff_replace_marketplace_fee_bands($1::jsonb,$2)", [JSON.stringify([{ min_purchase_price: 0, max_purchase_price: 5000, fee_amount: 10 }, { min_purchase_price: 4000, max_purchase_price: null, fee_amount: 20 }]), staff]), /continuous/);
-    const futureBands = bands.map(band => ({ ...band, fee_amount: band.min_purchase_price === 4000 ? 88 : band.fee_amount }));
+    const storedBands = async () => (await db.query<{ min_purchase_price: number; max_purchase_price: number | null; fee_amount: number }>("select min_purchase_price,max_purchase_price,fee_amount from marketplace_fee_bands order by min_purchase_price")).rows.map(row => ({ min_purchase_price: Number(row.min_purchase_price), max_purchase_price: row.max_purchase_price == null ? null : Number(row.max_purchase_price), fee_amount: Number(row.fee_amount) }));
+    const expectRejectedAtomically = async (proposal: typeof bands) => {
+      const before = await storedBands();
+      await assert.rejects(db.query("select public.staff_replace_marketplace_fee_bands($1::jsonb,$2)", [JSON.stringify(proposal), staff]), /continuous|non-overlapping|upper limit/);
+      assert.deepEqual(await storedBands(), before);
+    };
+    await assert.rejects(db.query("select public.staff_replace_marketplace_fee_bands($1::jsonb,$2)", [JSON.stringify(bands), dealerUser]), /Staff access required/);
+    await expectRejectedAtomically([{ min_purchase_price: 0, max_purchase_price: 2000, fee_amount: 49 }, { min_purchase_price: 2500, max_purchase_price: null, fee_amount: 79 }]);
+    await expectRejectedAtomically([{ min_purchase_price: 0, max_purchase_price: 5000, fee_amount: 49 }, { min_purchase_price: 4000, max_purchase_price: null, fee_amount: 79 }]);
+    await expectRejectedAtomically([{ min_purchase_price: 0, max_purchase_price: null, fee_amount: -1 }]);
+    await expectRejectedAtomically([{ min_purchase_price: 0, max_purchase_price: 2000, fee_amount: 49 }, { min_purchase_price: 2000, max_purchase_price: 4000, fee_amount: 79 }]);
+
+    const historyBefore = (await db.query<{ count: number }>("select count(*)::int count from marketplace_fee_settings_history")).rows[0].count;
+    const futureBands = bands.map(band => ({ ...band, fee_amount: band.min_purchase_price === 4000 ? 109 : band.fee_amount }));
     await db.query("select public.staff_replace_marketplace_fee_bands($1::jsonb,$2)", [JSON.stringify(futureBands), staff]);
+    assert.equal(Number((await db.query<{ fee: number }>("select fee_amount fee from marketplace_fee_bands where min_purchase_price=4000")).rows[0].fee), 109);
     assert.equal(Number((await db.query<{ marketplace_fee_amount: number }>("select marketplace_fee_amount from website_leads where id=$1", [lead])).rows[0].marketplace_fee_amount), 99);
+    assert.equal((await db.query<{ count: number }>("select count(*)::int count from marketplace_fee_settings_history where changed_by=$1", [staff])).rows[0].count, historyBefore + 1);
+
+    await db.query("select public.staff_replace_marketplace_fee_bands($1::jsonb,$2)", [JSON.stringify(bands), staff]);
+    assert.equal(Number((await db.query<{ fee: number }>("select fee_amount fee from marketplace_fee_bands where min_purchase_price=4000")).rows[0].fee), 99);
+    const sixBands = [
+      ...bands.slice(0, 3),
+      { min_purchase_price: 6000, max_purchase_price: 8000, fee_amount: 129 },
+      { min_purchase_price: 8000, max_purchase_price: 10000, fee_amount: 139 },
+      bands[4],
+    ];
+    await db.query("select public.staff_replace_marketplace_fee_bands($1::jsonb,$2)", [JSON.stringify(sixBands), staff]);
+    assert.equal((await storedBands()).length, 6);
+    await db.query("select public.staff_replace_marketplace_fee_bands($1::jsonb,$2)", [JSON.stringify(bands), staff]);
+    assert.deepEqual(await storedBands(), bands);
     await db.query("select public.staff_override_marketplace_fee($1,75,'dealer agreement',$2)", [lead, staff]);
     await db.query("select public.staff_override_marketplace_fee($1,0,'launch promotion',$2)", [lead, staff]);
     assert.equal(Number((await db.query<{ marketplace_fee_amount: number }>("select marketplace_fee_amount from website_leads where id=$1", [lead])).rows[0].marketplace_fee_amount), 0);
@@ -112,6 +141,12 @@ test("isolated PostgreSQL: fee settings, snapshots, overrides and purchase are s
   } finally {
     await db.close();
   }
+});
+
+test("follow-up migration uses a locked, explicitly bounded replacement delete", () => {
+  assert.match(boundedReplacementMigration, /lock table public\.marketplace_fee_bands in share row exclusive mode/i);
+  assert.match(boundedReplacementMigration, /delete from public\.marketplace_fee_bands\s+where id = any\(v_existing_ids\)/i);
+  assert.doesNotMatch(boundedReplacementMigration, /delete from public\.marketplace_fee_bands\s*;/i);
 });
 
 test("application keeps marketplace and direct purchase fee paths separate", () => {
