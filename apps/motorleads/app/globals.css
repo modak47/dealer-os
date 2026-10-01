@@ -1233,6 +1233,8 @@ h3 {
 
 .ml-brand-hero,
 .ml-brand-hub-hero { background: linear-gradient(90deg, rgba(3, 24, 40, .98), rgba(3, 24, 40, .8), rgba(3, 24, 40, .42)), url("/images/motorleads-how-lifestyle.jpg") right center / cover no-repeat; }
+.ml-brand-page-logo { display: flex; width: 168px; height: 78px; align-items: center; justify-content: center; margin-bottom: 20px; padding: 10px 14px; border: 1px solid rgba(255, 255, 255, .28); border-radius: 6px; background: rgba(255, 255, 255, .96); }
+.ml-brand-page-logo img { width: 100%; height: 100%; object-fit: contain; }
 .ml-brand-families { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
 .ml-brand-families article { padding: 22px; border: 1px solid var(--ml-line); border-radius: 6px; background: var(--ml-soft); }
 .ml-brand-families h3 { margin: 0 0 7px; font-size: 24px; line-height: 1.08; letter-spacing: 0; }
@@ -1265,7 +1267,9 @@ h3 {
 .ml-brand-hub-intro p:first-child { margin-top: 0; }
 .ml-brand-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--ml-line); border-left: 1px solid var(--ml-line); }
 .ml-brand-grid article { position: relative; min-height: 230px; padding: 30px 34px; border-right: 1px solid var(--ml-line); border-bottom: 1px solid var(--ml-line); overflow: hidden; }
-.ml-brand-grid article > span { position: absolute; right: 18px; bottom: -34px; color: #eff6fc; font-family: var(--ml-display-font); font-size: 150px; line-height: 1; pointer-events: none; }
+.ml-brand-card-head { display: grid; grid-template-columns: minmax(0, 1fr) 130px; gap: 24px; align-items: center; min-height: 68px; }
+.ml-brand-card-logo { display: flex; width: 130px; height: 68px; align-items: center; justify-content: flex-end; }
+.ml-brand-card-logo img { width: 100%; height: 100%; object-fit: contain; object-position: right center; }
 .ml-brand-grid h2 { position: relative; margin: 0; font-size: 34px; letter-spacing: 0; }
 .ml-brand-grid h2 a,
 .ml-brand-grid article > a,
@@ -1274,6 +1278,7 @@ h3 {
 .ml-brand-grid p,
 .ml-brand-grid article > a { position: relative; }
 .ml-brand-grid article > a { font-weight: 900; }
+.ml-brand-trademark { margin: 16px 0 0; color: #60758b; font-size: 13px; line-height: 1.55; }
 .ml-brand-hub-advice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; margin-top: 54px; }
 .ml-brand-hub-advice h2 { margin: 0 0 10px; font-size: 32px; letter-spacing: 0; }
 

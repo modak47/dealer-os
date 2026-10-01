@@ -25,6 +25,7 @@ test("all ten brand guides have distinct routes, H1s and substantive brand-speci
 
   for (const guide of guides) {
     assert.ok(existsSync(`${app}${guide.path}/page.tsx`), `${guide.path} page is missing`);
+    assert.ok(existsSync(`apps/motorleads/public${guide.logo}`), `${guide.brand} logo is missing`);
     assert.ok(guide.overview.join(" ").length > 300, `${guide.brand} overview is too short`);
     assert.equal(guide.families.length, 4);
     assert.ok(guide.evidence.length >= 6);
@@ -52,6 +53,7 @@ test("brand pages publish unique metadata and use canonical shared guide markup"
   const component = read(`${app}/components/brand-guide.tsx`);
   assert.match(component, /<Breadcrumbs/);
   assert.match(component, /<h1>{guide\.h1}<\/h1>/);
+  assert.match(component, /alt={`\$\{guide\.brand} logo`}/);
   assert.match(component, /<ValuationCta compact/);
   assert.match(component, /not endorsed by, sponsored by or affiliated with/);
 });
@@ -59,6 +61,7 @@ test("brand pages publish unique metadata and use canonical shared guide markup"
 test("brands hub links every guide and the four core seller resources", () => {
   const hub = read(`${app}/motorcycle-brands/page.tsx`);
   for (const guide of guides) assert.match(hub, new RegExp(guide.path.replaceAll("/", "\\/")));
+  for (const guide of guides) assert.match(hub, new RegExp(guide.logo.replaceAll("/", "\\/")));
   for (const path of ["/sell-my-motorbike", "/motorbike-valuation", "/how-to-sell-a-motorbike", "/valuation"]) {
     assert.match(hub, new RegExp(path.replaceAll("/", "\\/")));
   }

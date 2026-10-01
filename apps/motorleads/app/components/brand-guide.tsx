@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Breadcrumbs } from "./seo";
 import { PageShell } from "./site-shell";
@@ -5,6 +6,7 @@ import { ValuationCta } from "./valuation-cta";
 
 export type BrandGuideContent = {
   brand: string;
+  logo: string;
   path: string;
   breadcrumb: string;
   eyebrow: string;
@@ -32,6 +34,9 @@ export function BrandGuide({ guide }: { guide: BrandGuideContent }) {
     ]} />
     <section className="ml-guide-hero ml-brand-hero">
       <div className="ml-shell">
+        <div className="ml-brand-page-logo">
+          <Image src={guide.logo} alt={`${guide.brand} logo`} width={156} height={72} priority />
+        </div>
         <span>{guide.eyebrow}</span>
         <h1>{guide.h1}</h1>
         <p>{guide.intro}</p>
@@ -80,7 +85,7 @@ export function BrandGuide({ guide }: { guide: BrandGuideContent }) {
           </section>
           <section className="ml-brand-disclaimer">
             <h2>About manufacturer names</h2>
-            <p>{guide.brand} names and model names identify the motorcycle being sold. MotorGeeks is an independent marketplace and is not endorsed by, sponsored by or affiliated with {guide.brand}.</p>
+            <p>{guide.brand} names, model names and logos identify the motorcycle being sold. MotorGeeks is an independent marketplace and is not endorsed by, sponsored by or affiliated with {guide.brand}.</p>
           </section>
         </div>
         <aside className="ml-guide-aside">
