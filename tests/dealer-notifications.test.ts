@@ -16,7 +16,7 @@ function source(path: string) {
 
 describe("dealer notification content contract", () => {
   it("builds new-lead payloads from dealer-safe fields only", () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://motorgeeks.co.uk";
+    process.env.NEXT_PUBLIC_DEALER_PORTAL_URL = "https://portal.motorgeeks.co.uk";
     const payload = buildDealerSafeLeadNotificationPayload({
       id: 42,
       year: 2019,
@@ -47,7 +47,7 @@ describe("dealer notification content contract", () => {
     ].sort());
     assert.equal(payload.approximate_location, "Redbridge");
     assert.equal(payload.approximate_distance_miles, 52.2);
-    assert.equal(payload.dealer_portal_url, "https://motorgeeks.co.uk/dealer-portal/leads/42");
+    assert.equal(payload.dealer_portal_url, "https://portal.motorgeeks.co.uk/dealer-portal/leads/42");
     assert.equal(JSON.stringify(payload).includes("07123"), false);
     assert.equal(JSON.stringify(payload).includes("seller@example.com"), false);
     assert.equal(JSON.stringify(payload).includes("IG1 1AA"), false);

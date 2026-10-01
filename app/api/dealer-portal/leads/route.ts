@@ -409,6 +409,7 @@ function visualDealerPortalFixture() {
     customer_message: "Bike starts and rides well. Exhaust is noisy and chain was mentioned on the last MOT.",
     portal_notes: [
       { id: "visual-note-1", website_lead_id: 9002, claim_id: "visual-claim-active", dealer_account_id: dealer.id, dealer_user_id: null, note_type: "call", body: "Left voicemail and sent a follow-up email.", created_at: "2026-08-16T10:10:00.000Z" },
+      { id: "visual-note-status", website_lead_id: 9002, claim_id: "visual-claim-active", dealer_account_id: dealer.id, dealer_user_id: null, note_type: "status", body: "Status changed to attempting_contact", created_at: "2026-08-16T10:12:00.000Z" },
     ],
     portal_vehicle_check: {
       ...check,

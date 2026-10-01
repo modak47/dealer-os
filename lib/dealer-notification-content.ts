@@ -1,4 +1,3 @@
-import { absoluteUrl } from "@/lib/site-url";
 import type { DealerLeadAllocation, DealerPortalAccount, DealerPortalUserSummary } from "@/types/dealer-portal";
 import type { DealerNotificationEventType } from "@/types/dealer-notifications";
 
@@ -23,7 +22,8 @@ export function leadOpportunityEventType(allocationMethod: DealerLeadAllocation[
 }
 
 export function dealerPortalLink(leadId?: number | string | null) {
-  return absoluteUrl(leadId ? `/dealer-portal/leads/${leadId}` : "/dealer-portal");
+  const portal = (process.env.NEXT_PUBLIC_DEALER_PORTAL_URL || "https://portal.motorgeeks.co.uk").replace(/\/+$/, "");
+  return `${portal}${leadId ? `/dealer-portal/leads/${leadId}` : "/dealer-portal"}`;
 }
 
 export function buildDealerSafeLeadNotificationPayload(lead: LeadNotificationLead, distanceMiles?: number | null) {

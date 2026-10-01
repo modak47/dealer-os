@@ -75,4 +75,22 @@ describe("MotorGeeks launch completion", () => {
     assert.ok(dealerEmail);
     assert.doesNotMatch(dealerEmail, /leadResult\.data\.(?:email|mobile|telephone)/);
   });
+
+  it("uses recoverable seller email links and distinct completion states", () => {
+    const sellerDelivery = source("apps/motorleads/app/lib/seller-delivery.ts");
+    const sellerPortal = source("apps/motorleads/app/seller/page.tsx");
+    assert.match(sellerDelivery, /url:'https:\/\/motorgeeks\.co\.uk\/seller\/recover'/);
+    assert.doesNotMatch(sellerDelivery, /url:'https:\/\/motorgeeks\.co\.uk\/seller'/);
+    assert.match(sellerPortal, /value === "purchased"/);
+    assert.match(sellerPortal, /label: "Purchased"/);
+    assert.match(sellerPortal, /value === "purchase_pending"/);
+    assert.match(sellerPortal, /label: "Purchase pending"/);
+  });
+
+  it("presents dealer workflow statuses in human language", () => {
+    const portal = source("app/dealer-portal/v4-live-client.tsx");
+    assert.match(portal, /\["agreed_to_purchase", "Purchase Agreed"\]/);
+    assert.match(portal, /collection_booked: "Collection booked"/);
+    assert.match(portal, /note\.note_type === "status" \? label/);
+  });
 });

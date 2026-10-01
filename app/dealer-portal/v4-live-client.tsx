@@ -42,7 +42,7 @@ const workStatuses: [DealerLeadClaimStatus, string][] = [
   ["contacted", "Contacted"],
   ["offer_made", "Offer Made"],
   ["negotiating", "Negotiating"],
-  ["agreed_to_purchase", "Agreed"],
+  ["agreed_to_purchase", "Purchase Agreed"],
   ["collection_booked", "Collection Booked"],
 ];
 
@@ -306,6 +306,9 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [imageIndex, setImageIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<Exclude<LeadTab, "customer">>("overview");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -344,6 +347,22 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
       : marketplaceFeeForPrice(displayedOfferAmount ?? 0, data?.marketplaceFeeBands ?? []) ?? 0,
   );
   const totalCost = displayedOfferAmount == null ? null : displayedOfferAmount + marketplaceFeeAmount;
+  const images = lead?.resolved_images ?? (lead ? combineLeadImages(lead) : []);
+  const title = lead ? leadTitle(lead) : "Motorcycle";
+  const imageCount = images.length;
+  const showPrevious = () => setImageIndex(current => imageCount ? (current + imageCount - 1) % imageCount : 0);
+  const showNext = () => setImageIndex(current => imageCount ? (current + 1) % imageCount : 0);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLightboxOpen(false);
+      if (event.key === "ArrowLeft") setImageIndex(current => imageCount ? (current + imageCount - 1) % imageCount : 0);
+      if (event.key === "ArrowRight") setImageIndex(current => imageCount ? (current + 1) % imageCount : 0);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [imageCount, lightboxOpen]);
 
   async function submitOffer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -370,7 +389,6 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
   if (!data) return <DealerUnavailable error={error} status={null} />;
   if (!lead) return <DealerV4Shell dealer={data.dealer} section="offer-leads" counts={shellCounts(data)}><section className={styles.dashboard}><Link className={styles.breadcrumb} href="/dealer-portal/offer-leads">← Offer Leads</Link><EmptyPanel title="Offer lead not available" copy="This marketplace opportunity is not currently available to your dealership." /></section></DealerV4Shell>;
 
-  const images = lead.resolved_images ?? combineLeadImages(lead);
   return <DealerV4Shell dealer={data.dealer} section="offer-leads" counts={shellCounts(data)}>
     <section className={styles.dashboard}>
       <Link className={styles.breadcrumb} href="/dealer-portal/offer-leads">← Offer Leads</Link>
@@ -381,7 +399,7 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
       </section>
       <section className={styles.summaryCells}>{marketplaceFacts(lead).map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</section>
       <section className={styles.marketplaceWorkspace}>
-        <article className={styles.galleryPanel}><WorkspaceGallery images={images} imageIndex={0} title={leadTitle(lead)} onPrevious={() => undefined} onNext={() => undefined} onOpen={() => undefined} /></article>
+        <article className={styles.galleryPanel}><WorkspaceGallery images={images} imageIndex={imageIndex} title={title} onPrevious={showPrevious} onNext={showNext} onOpen={(index) => { setImageIndex(index); setLightboxOpen(true); }} /></article>
         <Panel title="Make an offer" link="Marketplace">
           <form className={`${styles.mockForm} ${styles.marketplaceOfferForm}`} onSubmit={submitOffer}>
             <Input label="Offer amount" value={amount} set={setAmount} type="number" required />
@@ -396,7 +414,14 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
           </form>
         </Panel>
       </section>
-      <OverviewTab lead={lead} />
+      <nav className={styles.leadTabs} aria-label="Marketplace opportunity tabs">{[["overview", "Overview"], ["vehicle-check", "Vehicle Check"], ["mot", "MOT & Mileage"], ["location", "Location"]].map(([value, label]) => <button className={activeTab === value ? styles.active : ""} type="button" onClick={() => setActiveTab(value as Exclude<LeadTab, "customer">)} key={value}>{label}</button>)}</nav>
+      <div className={styles.tabContent}>
+        {activeTab === "overview" && <OverviewTab lead={lead} />}
+        {activeTab === "vehicle-check" && <VehicleCheckTab lead={lead} />}
+        {activeTab === "mot" && <MotTab lead={lead} />}
+        {activeTab === "location" && <LocationTab dealer={data.dealer} lead={lead} unlocked={Boolean(lead.customer_unlocked)} />}
+      </div>
+      {lightboxOpen && <PhotoLightbox images={images} title={title} index={imageIndex} setIndex={setImageIndex} onClose={() => setLightboxOpen(false)} />}
     </section>
   </DealerV4Shell>;
 }
@@ -636,7 +661,7 @@ function CustomerWorkTab({ lead, onChanged }: { lead: DealerVisibleLead; onChang
     <Panel title="Customer details" link="Claimed lead"><div className={styles.contactCard}><h3>{customerName(lead)}</h3><p>{lead.portal_location_label || lead.postcode || "Location pending"}</p><div>{lead.phone && <a href={`tel:${lead.phone}`}>Call {lead.phone}</a>}{lead.email && <a href={`mailto:${lead.email}`}>Email customer</a>}</div></div></Panel>
     {active && <WorkLeadPanel claimId={claimId} lead={lead} onChanged={onChanged} />}
     {purchasedLater && <PurchasedLaterPanel claimId={claimId} lead={lead} onChanged={onChanged} />}
-    <Panel title="Activity timeline" link="Chronological"><div className={styles.timeline}>{lead.portal_notes?.length ? lead.portal_notes.map((note, index) => <p key={note.id}><span>{index + 1}</span>{statusLabel(note.note_type)} · {formatLeadDate(note.created_at)} — {note.body}</p>) : <p>No activity recorded yet.</p>}</div></Panel>
+    <Panel title="Activity timeline" link="Chronological"><div className={styles.timeline}>{lead.portal_notes?.length ? lead.portal_notes.map((note, index) => <p key={note.id}><span>{index + 1}</span>{formatActivityCopy(note)} · {formatLeadDate(note.created_at)}</p>) : <p>No activity recorded yet.</p>}</div></Panel>
   </section>;
 }
 
@@ -968,6 +993,10 @@ function formatActivityStatus(note: DealerLeadNote) {
   const statusMatch = body.match(/status changed to ([a-z0-9_-]+)/);
   const code = statusMatch?.[1] || (body.includes("purchase reported") || body.includes("successful purchase") ? "successful_purchase" : note.note_type);
   return lifecycleStatusLabel(code);
+}
+function formatActivityCopy(note: DealerLeadNote) {
+  const label = formatActivityStatus(note);
+  return note.note_type === "status" ? label : `${label} · ${note.body}`;
 }
 function lifecycleStatusLabel(value: string | null | undefined) {
   const labels: Record<string, string> = {

@@ -33,7 +33,7 @@ export async function sendOfferAcceptedNotifications(websiteLeadId:number,offerI
  if(!key||!from)return;
  const motorcycle=[leadResult.data.make,leadResult.data.model].filter(Boolean).join(' ')||leadResult.data.reg||'motorcycle';
  const amount=(Number(offerResult.data.amount_pence)/100).toLocaleString('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0});
- if(leadResult.data.email)await sendEmail({key,from,to:leadResult.data.email,idempotencyKey:`mg-offer-accepted-seller-${offerId}`,subject:`Your MotorGeeks offer has been accepted`,heading:'Your offer is accepted',copy:`You accepted the ${amount} offer for ${motorcycle}. The selected dealer can now contact you to confirm the motorcycle, payment and handover arrangements.`,action:'Open my profile',url:'https://motorgeeks.co.uk/seller'}).catch(()=>undefined);
+ if(leadResult.data.email)await sendEmail({key,from,to:leadResult.data.email,idempotencyKey:`mg-offer-accepted-seller-${offerId}`,subject:`Your MotorGeeks offer has been accepted`,heading:'Your offer is accepted',copy:`You accepted the ${amount} offer for ${motorcycle}. The selected dealer can now contact you to confirm the motorcycle, payment and handover arrangements.`,action:'Access my secure profile',url:'https://motorgeeks.co.uk/seller/recover'}).catch(()=>undefined);
  const users=await db.from('dealer_portal_users').select('user_id').eq('dealer_account_id',offerResult.data.dealer_account_id).eq('active',true);
  if(users.error||!users.data?.length)return;
  const wanted=new Set(users.data.map(row=>String(row.user_id)));
@@ -57,7 +57,7 @@ export async function sendNewOfferNotification(websiteLeadId:number,offerId:stri
  if(!key||!from)return {status:'not_configured'};
  const motorcycle=[leadResult.data.make,leadResult.data.model].filter(Boolean).join(' ')||leadResult.data.reg||'your motorcycle';
  const amount=(Number(offerResult.data.amount_pence)/100).toLocaleString('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0});
- const response=await sendEmail({key,from,to:leadResult.data.email,idempotencyKey:`mg-offer-received-${offerId}`,subject:`New MotorGeeks offer for ${motorcycle}`,heading:'You have a new dealer offer',copy:`${amount} has been offered for ${motorcycle}. Sign in to your secure profile to review the offer and any seller-visible note.`,action:'Review my offer',url:'https://motorgeeks.co.uk/seller'});
+ const response=await sendEmail({key,from,to:leadResult.data.email,idempotencyKey:`mg-offer-received-${offerId}`,subject:`New MotorGeeks offer for ${motorcycle}`,heading:'You have a new dealer offer',copy:`${amount} has been offered for ${motorcycle}. Use your secure seller access to review the offer and any seller-visible note.`,action:'Access my secure profile',url:'https://motorgeeks.co.uk/seller/recover'});
  const provider=await response.json().catch(()=>({}));
  return response.ok?{status:'accepted',providerId:typeof provider.id==='string'?provider.id:undefined}:{status:'failed'};
 }

@@ -1405,7 +1405,7 @@
 
 .tabContent {
   min-height: calc(100vh - 140px);
-  padding-bottom: calc(100vh - 120px);
+  padding-bottom: 48px;
 }
 
 .overviewGrid {

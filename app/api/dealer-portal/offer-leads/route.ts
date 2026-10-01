@@ -50,7 +50,10 @@ function visualMarketplaceFixture() {
     image10: null,
     Images: null,
     images: null,
-    resolved_images: ["https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1100&q=80"],
+    resolved_images: [
+      "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1100&q=80",
+      "https://images.unsplash.com/photo-1558981359-219d6364c9c8?auto=format&fit=crop&w=1100&q=80",
+    ],
     website: "motorgeeks",
     date: "2026-09-10T10:00:00.000Z",
     created_at: "2026-09-10T10:00:00.000Z",

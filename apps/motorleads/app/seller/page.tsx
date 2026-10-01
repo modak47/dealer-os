@@ -107,7 +107,9 @@ export default async function SellerPortalPage() {
 }
 
 function sellerStatus(value: string, hasOffers: boolean) {
-  if (value === "offer_accepted" || value === "purchase_pending") return { label: "Offer accepted", heading: "Your chosen dealer is ready for the next step", copy: "The dealer can now contact you to arrange the purchase and handover." };
+  if (value === "purchased") return { label: "Purchased", heading: "Your motorcycle purchase is complete", copy: "The selected dealer has confirmed the purchase. Contact MotorGeeks if you need help with this completed profile." };
+  if (value === "purchase_pending") return { label: "Purchase pending", heading: "Your purchase is being completed", copy: "The selected dealer can contact you to confirm payment, collection and handover arrangements." };
+  if (value === "offer_accepted") return { label: "Offer accepted", heading: "Your chosen dealer is ready for the next step", copy: "The dealer can now contact you to arrange the purchase and handover." };
   if (value === "offer_received" || hasOffers) return { label: "Offers received", heading: "You have a dealer offer to review", copy: "Compare the offer details below. You remain in control and do not have to accept an offer." };
   if (value === "live_to_dealers") return { label: "Available to dealers", heading: "Your motorcycle is with matched dealers", copy: "Approved dealers can review the motorcycle details and make blind offers. We will show any offers here." };
   if (value === "under_review") return { label: "Under review", heading: "MotorGeeks is reviewing your profile", copy: "We are checking the motorcycle details before matching it with suitable approved dealers." };
