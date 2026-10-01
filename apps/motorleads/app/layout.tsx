@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Barlow_Condensed, Inter } from "next/font/google";
 import "./globals.css";
 import { site, absoluteUrl } from "./site";
+import { ScrollToTop } from "./components/scroll-to-top";
 
 const display = Barlow_Condensed({ subsets: ["latin"], variable: "--font-display", weight: ["600", "700", "800"] });
 const body = Inter({ subsets: ["latin"], variable: "--font-body" });
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`${display.variable} ${body.variable}`}>
-    <body>{children}</body>
+  return <html lang="en" className={`${display.variable} ${body.variable}`} data-scroll-behavior="smooth">
+    <body><ScrollToTop />{children}</body>
   </html>;
 }

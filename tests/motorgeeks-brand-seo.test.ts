@@ -84,3 +84,13 @@ test("the shared MotorGeeks logo always targets the top of the homepage", () => 
   assert.match(brand, /root\.scrollTop = 0/);
   assert.match(shell, /id="motorgeeks-home"/);
 });
+
+test("public route changes reset scroll without breaking intentional anchors", () => {
+  const layout = read(`${app}/layout.tsx`);
+  const scrollToTop = read(`${app}/components/scroll-to-top.tsx`);
+
+  assert.match(layout, /data-scroll-behavior="smooth"/);
+  assert.match(layout, /<ScrollToTop \/>/);
+  assert.match(scrollToTop, /root\.scrollTop = 0/);
+  assert.match(scrollToTop, /window\.location\.hash/);
+});
