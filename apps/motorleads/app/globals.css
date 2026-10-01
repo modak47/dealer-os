@@ -1231,6 +1231,52 @@ h3 {
 .ml-guide-factors dt { color: var(--ml-ink); font-weight: 900; }
 .ml-guide-factors dd { margin: 0; }
 
+.ml-brand-hero,
+.ml-brand-hub-hero { background: linear-gradient(90deg, rgba(3, 24, 40, .98), rgba(3, 24, 40, .8), rgba(3, 24, 40, .42)), url("/images/motorleads-how-lifestyle.jpg") right center / cover no-repeat; }
+.ml-brand-families { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
+.ml-brand-families article { padding: 22px; border: 1px solid var(--ml-line); border-radius: 6px; background: var(--ml-soft); }
+.ml-brand-families h3 { margin: 0 0 7px; font-size: 24px; line-height: 1.08; letter-spacing: 0; }
+.ml-brand-families p { margin: 0; font-size: 15px; line-height: 1.58; }
+.ml-brand-checklist { display: grid; gap: 10px; margin: 22px 0 0; padding: 0; list-style: none; }
+.ml-brand-checklist li { position: relative; padding-left: 30px; }
+.ml-brand-checklist li::before { position: absolute; left: 0; top: 1px; color: var(--ml-blue); content: "✓"; font-size: 20px; font-weight: 950; }
+.ml-brand-faqs { border-top: 1px solid var(--ml-line); }
+.ml-brand-faqs details { border-bottom: 1px solid var(--ml-line); }
+.ml-brand-faqs summary { display: flex; justify-content: space-between; gap: 18px; padding: 19px 0; color: var(--ml-ink); cursor: pointer; font-size: 18px; font-weight: 900; list-style: none; }
+.ml-brand-faqs summary::-webkit-details-marker { display: none; }
+.ml-brand-faqs summary span { color: var(--ml-blue-dark); font-size: 24px; }
+.ml-brand-faqs details[open] summary span { transform: rotate(45deg); }
+.ml-brand-faqs p { margin-top: 0; padding-right: 30px; }
+.ml-brand-disclaimer { border-bottom: 0 !important; }
+.ml-brand-registration { padding: 58px 0; background: var(--ml-soft); }
+.ml-brand-registration > .ml-shell { display: grid; grid-template-columns: .75fr 1.25fr; gap: 58px; align-items: center; }
+.ml-brand-registration span { color: var(--ml-blue-dark); font-size: 14px; font-weight: 950; text-transform: uppercase; }
+.ml-brand-registration h2 { margin: 8px 0 10px; font-size: 43px; line-height: 1; letter-spacing: 0; }
+.ml-brand-registration p { margin: 0; color: #425b74; font-size: 17px; line-height: 1.6; }
+.ml-brand-registration .ml-reg-form > a { color: var(--ml-blue-dark); }
+
+.ml-brand-hub-content { padding: 68px 0 84px; background: white; }
+.ml-brand-hub-intro { display: grid; grid-template-columns: .8fr 1.2fr; gap: 60px; margin-bottom: 45px; }
+.ml-brand-hub-intro span { color: var(--ml-blue-dark); font-size: 14px; font-weight: 950; text-transform: uppercase; }
+.ml-brand-hub-intro h2 { margin: 9px 0 0; font-size: 46px; line-height: 1; letter-spacing: 0; }
+.ml-brand-hub-intro p,
+.ml-brand-grid p,
+.ml-brand-hub-advice p { color: #425b74; font-size: 16px; line-height: 1.65; }
+.ml-brand-hub-intro p:first-child { margin-top: 0; }
+.ml-brand-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--ml-line); border-left: 1px solid var(--ml-line); }
+.ml-brand-grid article { position: relative; min-height: 230px; padding: 30px 34px; border-right: 1px solid var(--ml-line); border-bottom: 1px solid var(--ml-line); overflow: hidden; }
+.ml-brand-grid article > span { position: absolute; right: 18px; bottom: -34px; color: #eff6fc; font-family: var(--ml-display-font); font-size: 150px; line-height: 1; pointer-events: none; }
+.ml-brand-grid h2 { position: relative; margin: 0; font-size: 34px; letter-spacing: 0; }
+.ml-brand-grid h2 a,
+.ml-brand-grid article > a,
+.ml-brand-hub-advice a,
+.ml-guides-intro a { color: var(--ml-blue-dark); }
+.ml-brand-grid p,
+.ml-brand-grid article > a { position: relative; }
+.ml-brand-grid article > a { font-weight: 900; }
+.ml-brand-hub-advice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; margin-top: 54px; }
+.ml-brand-hub-advice h2 { margin: 0 0 10px; font-size: 32px; letter-spacing: 0; }
+
 .ml-guides-band { padding: 68px 0; background: white; }
 .ml-guides-band > .ml-shell { display: grid; grid-template-columns: minmax(250px, .7fr) minmax(0, 1.5fr); gap: 58px; }
 .ml-guides-intro p { margin-bottom: 0; }
@@ -1284,7 +1330,9 @@ h3 {
   .ml-valuation-shell .ml-shell,
   .ml-guide-grid,
   .ml-guides-band > .ml-shell,
-  .ml-valuation-context > .ml-shell {
+  .ml-valuation-context > .ml-shell,
+  .ml-brand-registration > .ml-shell,
+  .ml-brand-hub-intro {
     grid-template-columns: 1fr;
   }
 
@@ -1451,6 +1499,14 @@ h3 {
   .ml-guides-links { grid-template-columns: 1fr; }
   .ml-guides-links article { padding: 22px 0; border-left: 0; border-bottom: 1px solid var(--ml-line); }
   .ml-guide-factors > div { grid-template-columns: 1fr; gap: 5px; }
+  .ml-brand-families,
+  .ml-brand-grid,
+  .ml-brand-hub-advice { grid-template-columns: 1fr; }
+  .ml-brand-hub-content { padding: 46px 0 58px; }
+  .ml-brand-hub-intro { gap: 20px; }
+  .ml-brand-hub-intro h2,
+  .ml-brand-registration h2 { font-size: 38px; }
+  .ml-brand-grid article { min-height: 205px; padding: 26px 24px; }
 
   .ml-process-grid {
     gap: 28px;

@@ -111,7 +111,7 @@ export function SellerGuidesSection() {
   ] as const;
   return <section className="ml-guides-band">
     <div className="ml-shell">
-      <div className="ml-guides-intro"><span>Seller guides</span><h2>Useful advice before you sell.</h2><p>Clear information helps you present your motorcycle accurately and understand each stage of the sale.</p></div>
+      <div className="ml-guides-intro"><span>Seller guides</span><h2>Useful advice before you sell.</h2><p>Clear information helps you present your motorcycle accurately and understand each stage of the sale. <Link href="/motorcycle-brands">Browse guides for popular motorcycle brands</Link>.</p></div>
       <div className="ml-guides-links">{guides.map(([title, copy, href]) => <article key={href}><h3><Link href={href}>{title}</Link></h3><p>{copy}</p><Link href={href}>Read the guide <span aria-hidden="true">→</span></Link></article>)}</div>
     </div>
   </section>;
