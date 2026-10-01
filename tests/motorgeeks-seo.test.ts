@@ -20,6 +20,15 @@ test("private seller routes remain noindex with self-referencing canonicals", ()
   }
 });
 
+test("seller verification keeps the secure POST same-origin and separates recovery", () => {
+  const verify = read(`${app}/seller/verify/page.tsx`);
+  assert.match(verify, /referrer:\s*'same-origin'/);
+  assert.doesNotMatch(verify, /referrer:\s*'no-referrer'/);
+  assert.match(verify, /mg-seller-access-actions/);
+  assert.match(verify, /action="\/api\/seller\/access" method="post"/);
+  assert.match(verify, /href="\/seller\/recover"/);
+});
+
 test("homepage publishes truthful organization and website structured data", () => {
   const homepage = read(`${app}/page.tsx`);
   assert.match(homepage, /"@type": "Organization"/);

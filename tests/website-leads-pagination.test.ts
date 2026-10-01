@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { analyseLeadDate } from "../lib/website-lead-date";
 import { decodeLeadCursor, encodeLeadCursor, listFilters, londonMidnight } from "../lib/website-lead-list";
@@ -37,4 +38,12 @@ test("release needs explicit readiness and preserves separate marketplace lifecy
   assert.ok(releaseBlockReason({...ready,opportunity_mode:"unknown"}));
   assert.equal(releaseBlockReason({...ready,opportunity_mode:"marketplace_offer",marketplace_status:"submitted"}),null);
   for(const marketplace_status of ["offer_accepted","purchase_pending","live_to_dealers","draft"]) assert.ok(releaseBlockReason({...ready,opportunity_mode:"marketplace_offer",marketplace_status}));
+});
+test("staff lead browser exposes a focused MotorGeeks review shortcut", () => {
+  const source = readFileSync("app/website-leads/lead-browser.tsx", "utf8");
+  assert.match(source, /New MotorGeeks submissions/);
+  assert.match(source, /setView\("needs_review"\)/);
+  assert.match(source, /setSource\("motorgeeks"\)/);
+  assert.match(source, /setMode\("marketplace_offer"\)/);
+  assert.match(source, /setReview\("not_reviewed"\)/);
 });

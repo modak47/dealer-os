@@ -57,6 +57,11 @@ export function LeadBrowser({ queue = false, dealers = [] }: { queue?: boolean; 
     setQuery(value);
   }
   function chooseView(next: LeadView) { setView(next); setSelected([]); setReview(""); if (["ready", "backlog", "archived", "closed", "released", "active", "all"].includes(next)) setPeriod("all"); }
+  function showNewMotorGeeksSubmissions() {
+    setQuery(""); setSearch(""); setPeriod("all"); setView("needs_review");
+    setSource("motorgeeks"); setMode("marketplace_offer"); setStatus(""); setReview("not_reviewed");
+    setIncludeArchived(false); setSelected([]);
+  }
   async function bulk(action: "review" | "ready" | "archive" | "release") {
     if (!selected.length || saving) return;
     if (action === "archive" && !window.confirm(`Archive ${selected.length} selected leads? Active opportunities will be refused. Records remain searchable.`)) return;
@@ -84,6 +89,10 @@ export function LeadBrowser({ queue = false, dealers = [] }: { queue?: boolean; 
     <section className="website-kpis">{kpis.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</section>
     {countError && <p role="status">Totals unavailable. {countError}</p>}
     <nav className="lead-view-tabs" aria-label="Lead workflow views">{views.map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => chooseView(key)} disabled={saving || moreLoading}>{label}</button>)}</nav>
+    <div className="lead-source-shortcuts" aria-label="Submission shortcuts">
+      <button type="button" aria-pressed={view === "needs_review" && source === "motorgeeks" && mode === "marketplace_offer" && review === "not_reviewed" && !includeArchived} onClick={showNewMotorGeeksSubmissions} disabled={saving || moreLoading}>New MotorGeeks submissions</button>
+      <span>Opens unreleased MotorGeeks marketplace submissions awaiting staff review.</span>
+    </div>
     <div className="lead-browser-filters">
       <label className="lead-global-search">Search All history<input value={query} onChange={e => changeSearch(e.target.value)} placeholder="ID, registration, bike, name, email, phone or postcode" disabled={saving || moreLoading} /></label>
       <label>Date<select aria-label="Date" value={search ? "all" : period} onChange={e => setPeriod(e.target.value)} disabled={Boolean(query) || saving || moreLoading}><option value="all">All history</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="custom">Custom range</option></select></label>
