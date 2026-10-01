@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { Breadcrumbs } from "./seo";
 import { PageShell } from "./site-shell";
 import { ValuationCta } from "./valuation-cta";
@@ -7,6 +8,7 @@ import { ValuationCta } from "./valuation-cta";
 export type BrandGuideContent = {
   brand: string;
   logo: string;
+  heroImage: string;
   path: string;
   breadcrumb: string;
   eyebrow: string;
@@ -32,7 +34,10 @@ export function BrandGuide({ guide }: { guide: BrandGuideContent }) {
       { name: "Motorcycle brands", path: "/motorcycle-brands" },
       { name: guide.breadcrumb, path: guide.path }
     ]} />
-    <section className="ml-guide-hero ml-brand-hero">
+    <section
+      className="ml-guide-hero ml-brand-hero"
+      style={{ "--ml-brand-image": `url("${guide.heroImage}")` } as CSSProperties}
+    >
       <div className="ml-shell">
         <div className="ml-brand-page-logo">
           <Image src={guide.logo} alt={`${guide.brand} logo`} width={156} height={72} priority />

@@ -11,6 +11,6 @@ The SVG files were retrieved from Wikimedia Commons on 1 October 2026:
 - `suzuki.svg` — `File:Suzuki logo 2025.svg`
 - `kawasaki.svg` — `File:Kawasaki Logo vert.svg`
 - `triumph.svg` — `File:Triumph Motorcycles logo and claim 2015.svg`
-- `harley-davidson.svg` — `File:Harley-Davidson logo.svg`
+- `harley-davidson.svg` — `File:Harley Davidson orange logo.svg`
 - `ktm.svg` — `File:KTM-Logo.svg`
 - `royal-enfield.svg` — `File:Royal Enfield logo new.svg`

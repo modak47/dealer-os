@@ -3,6 +3,7 @@ import type { BrandGuideContent } from "./components/brand-guide";
 export const hondaGuide: BrandGuideContent = {
   brand: "Honda",
   logo: "/brand/manufacturers/honda.svg",
+  heroImage: "/images/brands/honda-hero.webp",
   path: "/sell-my-honda-motorbike",
   breadcrumb: "Sell my Honda",
   eyebrow: "Honda seller guide",
@@ -50,6 +51,7 @@ export const hondaGuide: BrandGuideContent = {
 export const yamahaGuide: BrandGuideContent = {
   brand: "Yamaha",
   logo: "/brand/manufacturers/yamaha.svg",
+  heroImage: "/images/brands/yamaha-hero.webp",
   path: "/sell-my-yamaha-motorbike",
   breadcrumb: "Sell my Yamaha",
   eyebrow: "Yamaha seller guide",
@@ -97,6 +99,7 @@ export const yamahaGuide: BrandGuideContent = {
 export const bmwGuide: BrandGuideContent = {
   brand: "BMW",
   logo: "/brand/manufacturers/bmw.svg",
+  heroImage: "/images/brands/bmw-hero.webp",
   path: "/sell-my-bmw-motorcycle",
   breadcrumb: "Sell my BMW",
   eyebrow: "BMW Motorrad seller guide",
@@ -144,6 +147,7 @@ export const bmwGuide: BrandGuideContent = {
 export const piaggioGuide: BrandGuideContent = {
   brand: "Piaggio",
   logo: "/brand/manufacturers/piaggio.svg",
+  heroImage: "/images/brands/piaggio-hero.webp",
   path: "/sell-my-piaggio-scooter",
   breadcrumb: "Sell my Piaggio",
   eyebrow: "Piaggio scooter seller guide",
@@ -191,6 +195,7 @@ export const piaggioGuide: BrandGuideContent = {
 export const suzukiGuide: BrandGuideContent = {
   brand: "Suzuki",
   logo: "/brand/manufacturers/suzuki.svg",
+  heroImage: "/images/brands/suzuki-hero.webp",
   path: "/sell-my-suzuki-motorbike",
   breadcrumb: "Sell my Suzuki",
   eyebrow: "Suzuki seller guide",
@@ -238,6 +243,7 @@ export const suzukiGuide: BrandGuideContent = {
 export const kawasakiGuide: BrandGuideContent = {
   brand: "Kawasaki",
   logo: "/brand/manufacturers/kawasaki.svg",
+  heroImage: "/images/brands/kawasaki-hero.webp",
   path: "/sell-my-kawasaki-motorbike",
   breadcrumb: "Sell my Kawasaki",
   eyebrow: "Kawasaki seller guide",
@@ -285,6 +291,7 @@ export const kawasakiGuide: BrandGuideContent = {
 export const triumphGuide: BrandGuideContent = {
   brand: "Triumph",
   logo: "/brand/manufacturers/triumph.svg",
+  heroImage: "/images/brands/triumph-hero.webp",
   path: "/sell-my-triumph-motorcycle",
   breadcrumb: "Sell my Triumph",
   eyebrow: "Triumph seller guide",
@@ -332,6 +339,7 @@ export const triumphGuide: BrandGuideContent = {
 export const harleyGuide: BrandGuideContent = {
   brand: "Harley-Davidson",
   logo: "/brand/manufacturers/harley-davidson.svg",
+  heroImage: "/images/brands/harley-davidson-hero.webp",
   path: "/sell-my-harley-davidson",
   breadcrumb: "Sell my Harley-Davidson",
   eyebrow: "Harley-Davidson seller guide",
@@ -379,6 +387,7 @@ export const harleyGuide: BrandGuideContent = {
 export const ktmGuide: BrandGuideContent = {
   brand: "KTM",
   logo: "/brand/manufacturers/ktm.svg",
+  heroImage: "/images/brands/ktm-hero.webp",
   path: "/sell-my-ktm-motorcycle",
   breadcrumb: "Sell my KTM",
   eyebrow: "KTM seller guide",
@@ -426,6 +435,7 @@ export const ktmGuide: BrandGuideContent = {
 export const royalEnfieldGuide: BrandGuideContent = {
   brand: "Royal Enfield",
   logo: "/brand/manufacturers/royal-enfield.svg",
+  heroImage: "/images/brands/royal-enfield-hero.webp",
   path: "/sell-my-royal-enfield",
   breadcrumb: "Sell my Royal Enfield",
   eyebrow: "Royal Enfield seller guide",
