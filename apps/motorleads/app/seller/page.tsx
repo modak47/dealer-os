@@ -5,9 +5,12 @@ import { formatRegistration } from "../lib/text";
 import { sellerLeadFromSession } from "../lib/marketplace";
 import { SellerPhotoControls, SellerPhotoSummary } from "../components/seller-photo-controls";
 import { AcceptOfferButton } from "./accept-offer-button";
+import { absoluteUrl } from "../site";
 
 export const metadata: Metadata = {
   title: "My Motorcycle Profile",
+  description: "Secure MotorGeeks seller profile.",
+  alternates: { canonical: absoluteUrl("/seller") },
   robots: { index: false, follow: false },
 };
 

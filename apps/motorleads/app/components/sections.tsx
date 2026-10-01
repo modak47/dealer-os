@@ -3,6 +3,7 @@ import { MotorGeeksTick } from "./brand";
 import { Icon } from "./icons";
 import { ValuationCta } from "./valuation-cta";
 import { site } from "../site";
+import { preload } from "react-dom";
 
 export const steps = [
   ["Tell us about your motorcycle", "Enter your registration and answer a few simple questions.", "form"],
@@ -12,18 +13,25 @@ export const steps = [
 ] as const;
 
 export const faqs = [
-  ["Is the valuation really free?", "Yes. There is no charge to submit your motorcycle details and no obligation to proceed."],
-  ["Do I have to accept anything?", "No. MotorGeeks helps introduce your motorcycle to suitable dealers. You stay in control of whether to continue."],
-  ["How do I know dealers are genuine?", "MotorGeeks is built around approved motorcycle dealers, not anonymous classified enquiries."],
-  ["How does collection work?", "If a dealer buys your motorcycle, collection or handover arrangements are agreed directly with you."]
+  ["How does MotorGeeks work?", "Enter your registration or motorcycle details, describe its condition and add clear photos. MotorGeeks can then introduce the motorcycle to approved dealers, who may make offers for you to consider."],
+  ["How is my motorbike valued?", "MotorGeeks does not promise a fixed price. Dealers consider the motorcycle's age, model, mileage, condition, service history, MOT status, photographs and current demand before deciding whether to make an offer."],
+  ["Do I have to accept an offer?", "No. Submitting your motorcycle is free and does not oblige you to accept an offer. You decide whether an offer works for you."],
+  ["Can I sell a motorbike with outstanding finance?", "You should disclose any outstanding finance. A buying dealer may require it to be settled as part of the transaction, and you should confirm the settlement process with your finance provider and the dealer."],
+  ["Can I sell a motorcycle without an MOT?", "You can still submit a motorcycle without a current MOT. Its MOT status and any known faults may affect dealer interest and the offers you receive."],
+  ["What photos should I upload?", "Include clear photographs of the front, rear, both sides, dashboard or mileage, service history and any damage. Honest, well-lit photos help dealers assess the motorcycle accurately."],
+  ["Does mileage affect my motorbike's value?", "Mileage is one factor dealers consider alongside age, condition, maintenance, ownership history, specification and demand. A well-maintained higher-mileage bike may still attract interest."],
+  ["What happens after I accept a dealer offer?", "The successful dealer receives the contact details needed to discuss the motorcycle, confirm its condition and arrange payment and collection or handover. The sale is completed directly with that dealer."],
+  ["Who buys my motorcycle?", "MotorGeeks introduces your motorcycle to approved motorcycle dealers. The dealer whose offer you accept is the prospective buyer."],
+  ["Does MotorGeeks buy the motorcycle?", "No. MotorGeeks operates the introduction and offer platform. Any purchase is made by the dealer, subject to the dealer's final checks and agreement with you."]
 ];
 
 export function Hero() {
+  preload("/images/motorleads-hero-scenic.jpg", { as: "image", fetchPriority: "high" });
   return <section className="ml-hero">
     <div className="ml-shell ml-hero-grid">
       <div className="ml-hero-copy">
-        <h1>Sell your motorcycle with <span>MotorGeeks</span></h1>
-        <p>Connect your motorcycle with trusted motorcycle dealers across the UK.</p>
+        <h1>Sell your motorbike with <span>MotorGeeks</span></h1>
+        <p>Enter your registration, add your motorcycle details and receive offers from approved dealers across the UK.</p>
         <ValuationCta />
       </div>
       <div className="ml-handwritten">
@@ -95,6 +103,20 @@ export function DealerProofSection() {
   </section>;
 }
 
+export function SellerGuidesSection() {
+  const guides = [
+    ["Sell my motorbike", "Understand the MotorGeeks offer process and what happens from registration to dealer collection.", "/sell-my-motorbike"],
+    ["Motorbike valuation guide", "See what can affect motorcycle value and how accurate details help dealers assess your bike.", "/motorbike-valuation"],
+    ["How to sell a motorbike", "Prepare your motorcycle, documents and photos before agreeing a sale with a dealer.", "/how-to-sell-a-motorbike"]
+  ] as const;
+  return <section className="ml-guides-band">
+    <div className="ml-shell">
+      <div className="ml-guides-intro"><span>Seller guides</span><h2>Useful advice before you sell.</h2><p>Clear information helps you present your motorcycle accurately and understand each stage of the sale.</p></div>
+      <div className="ml-guides-links">{guides.map(([title, copy, href]) => <article key={href}><h3><Link href={href}>{title}</Link></h3><p>{copy}</p><Link href={href}>Read the guide <span aria-hidden="true">→</span></Link></article>)}</div>
+    </div>
+  </section>;
+}
+
 export function ImageCta() {
   return <section className="ml-image-cta">
     <div className="ml-shell"><div><span>Ready to sell?</span><h2>Get your free motorcycle valuation today.</h2><p>It only takes a few minutes to start.</p><ValuationCta compact /></div><b>{site.tagline}</b></div>
@@ -105,7 +127,7 @@ export function FaqSection({ showLink = true }: { showLink?: boolean }) {
   return <section className="ml-faq-section">
     <div className="ml-shell">
       <div className="ml-faq-head"><div><span>Frequently asked questions</span><h2>Got a question?</h2><p>Find answers to the most common questions about selling your motorcycle with MotorGeeks.</p></div>{showLink && <Link href="/faq">View all FAQs →</Link>}</div>
-      <div className="ml-faq-grid">{faqs.map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div>
+      <div className="ml-faq-grid">{(showLink ? faqs.slice(0, 4) : faqs).map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div>
     </div>
   </section>;
 }

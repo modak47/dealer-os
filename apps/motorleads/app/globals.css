@@ -844,6 +844,10 @@ h3 {
   font-size: 20px;
 }
 
+.ml-footer h2.ml-footer-subheading {
+  margin: 18px 0 5px;
+}
+
 .ml-footer nav,
 .ml-footer-grid > div {
   display: grid;
@@ -1194,6 +1198,57 @@ h3 {
   font-weight: 800;
 }
 
+.ml-breadcrumbs { display: flex; flex-wrap: wrap; gap: 7px; padding-block: 16px; color: #526b84; font-size: 13px; font-weight: 750; }
+.ml-breadcrumbs > span { display: flex; gap: 7px; }
+.ml-breadcrumbs a { color: var(--ml-blue-dark); text-decoration: underline; text-underline-offset: 3px; }
+.ml-breadcrumbs b { color: #91a3b5; font-weight: 500; }
+
+.ml-guide-hero {
+  padding: 76px 0 82px;
+  background: linear-gradient(90deg, rgba(3, 24, 40, .98), rgba(3, 24, 40, .74), rgba(3, 24, 40, .28)), url("/images/motorleads-how-lifestyle.jpg") right center / cover no-repeat;
+  color: white;
+}
+.ml-guide-hero.valuation-guide { background: linear-gradient(90deg, rgba(3, 24, 40, .98), rgba(3, 24, 40, .76), rgba(3, 24, 40, .3)), url("/images/motorleads-valuation-driveway.jpg") right center / cover no-repeat; }
+.ml-guide-hero.selling-guide { background: linear-gradient(90deg, rgba(3, 24, 40, .98), rgba(3, 24, 40, .76), rgba(3, 24, 40, .3)), url("/images/motorleads-cta-road.jpg") right center / cover no-repeat; }
+.ml-guide-hero span, .ml-guides-intro > span { color: #73c2ff; font-size: 14px; font-weight: 950; letter-spacing: 0; text-transform: uppercase; }
+.ml-guide-hero h1 { max-width: 790px; margin: 10px 0 18px; font-size: clamp(54px, 6vw, 84px); line-height: .94; letter-spacing: 0; }
+.ml-guide-hero p { max-width: 700px; margin: 0 0 28px; color: #d6e4f0; font-size: 20px; line-height: 1.55; }
+
+.ml-guide-content { padding: 68px 0 90px; background: white; }
+.ml-guide-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 64px; align-items: start; }
+.ml-guide-main { max-width: 820px; }
+.ml-guide-main section { padding: 0 0 34px; border-bottom: 1px solid var(--ml-line); }
+.ml-guide-main section + section { padding-top: 34px; }
+.ml-guide-main h2, .ml-guide-aside h2, .ml-guides-intro h2 { margin: 0 0 14px; font-size: 38px; line-height: 1; letter-spacing: 0; }
+.ml-guide-main p, .ml-guide-main li, .ml-guide-main dd, .ml-guide-aside p, .ml-guide-aside li, .ml-guides-band p { color: #425b74; font-size: 17px; line-height: 1.72; }
+.ml-guide-main a, .ml-guide-aside > a:not(.ml-button) { color: var(--ml-blue-dark); font-weight: 850; text-decoration: underline; text-underline-offset: 3px; }
+.ml-guide-main ol, .ml-guide-aside ul { display: grid; gap: 14px; padding-left: 22px; }
+.ml-guide-main strong { color: var(--ml-ink); }
+.ml-guide-aside { position: sticky; top: 112px; display: grid; gap: 14px; padding: 28px; border: 1px solid var(--ml-line); border-radius: 8px; background: var(--ml-soft); }
+.ml-guide-aside h2, .ml-guide-aside p, .ml-guide-aside ul { margin-block: 0; }
+.ml-guide-factors { display: grid; gap: 0; margin: 22px 0 0; }
+.ml-guide-factors > div { display: grid; grid-template-columns: minmax(180px, .42fr) 1fr; gap: 22px; padding: 18px 0; border-top: 1px solid var(--ml-line); }
+.ml-guide-factors dt { color: var(--ml-ink); font-weight: 900; }
+.ml-guide-factors dd { margin: 0; }
+
+.ml-guides-band { padding: 68px 0; background: white; }
+.ml-guides-band > .ml-shell { display: grid; grid-template-columns: minmax(250px, .7fr) minmax(0, 1.5fr); gap: 58px; }
+.ml-guides-intro p { margin-bottom: 0; }
+.ml-guides-links { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--ml-line); }
+.ml-guides-links article { padding: 24px 24px 10px; border-left: 1px solid var(--ml-line); }
+.ml-guides-links h3 { margin: 0; font-size: 28px; line-height: 1; letter-spacing: 0; }
+.ml-guides-links h3 a, .ml-guides-links article > a { color: var(--ml-blue-dark); }
+.ml-guides-links article > a { font-weight: 900; }
+
+.ml-valuation-context { padding: 66px 0 78px; background: white; }
+.ml-valuation-context > .ml-shell { display: grid; grid-template-columns: .9fr 1.1fr; gap: 68px; }
+.ml-valuation-context span { color: var(--ml-blue-dark); font-size: 14px; font-weight: 950; text-transform: uppercase; }
+.ml-valuation-context h2 { margin: 9px 0 14px; font-size: 46px; line-height: 1; letter-spacing: 0; }
+.ml-valuation-context h3 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0; }
+.ml-valuation-context h3:not(:first-child) { margin-top: 26px; }
+.ml-valuation-context p { color: #425b74; font-size: 17px; line-height: 1.68; }
+.ml-valuation-context a { color: var(--ml-blue-dark); font-weight: 850; text-decoration: underline; text-underline-offset: 3px; }
+
 @media (max-width: 1120px) {
   :root {
     --ml-shell: min(100% - 44px, 1100px);
@@ -1226,9 +1281,15 @@ h3 {
   .ml-process-grid,
   .ml-proof .ml-shell,
   .ml-dealer-detail .ml-shell,
-  .ml-valuation-shell .ml-shell {
+  .ml-valuation-shell .ml-shell,
+  .ml-guide-grid,
+  .ml-guides-band > .ml-shell,
+  .ml-valuation-context > .ml-shell {
     grid-template-columns: 1fr;
   }
+
+  .ml-guide-main { max-width: none; }
+  .ml-guide-aside { position: static; }
 
   .ml-step-row {
     grid-template-columns: repeat(2, 1fr);
@@ -1377,9 +1438,19 @@ h3 {
   .ml-proof,
   .ml-faq-section,
   .ml-form-section,
-  .ml-dealer-detail {
+  .ml-dealer-detail,
+  .ml-guide-content,
+  .ml-guides-band,
+  .ml-valuation-context {
     padding: 46px 0;
   }
+
+  .ml-guide-hero { padding: 54px 0 60px; background-position: 65% center; }
+  .ml-guide-hero h1 { font-size: 44px; }
+  .ml-guide-hero p { font-size: 17px; }
+  .ml-guides-links { grid-template-columns: 1fr; }
+  .ml-guides-links article { padding: 22px 0; border-left: 0; border-bottom: 1px solid var(--ml-line); }
+  .ml-guide-factors > div { grid-template-columns: 1fr; gap: 5px; }
 
   .ml-process-grid {
     gap: 28px;

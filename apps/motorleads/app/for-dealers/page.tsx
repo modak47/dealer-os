@@ -1,14 +1,9 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "../components/icons";
 import { PageShell } from "../components/site-shell";
-import { absoluteUrl, site } from "../site";
+import { pageMetadata, site } from "../site";
 
-export const metadata: Metadata = {
-  title: "For Dealers",
-  description: "Motorcycle lead opportunities for approved motorcycle dealers.",
-  alternates: { canonical: absoluteUrl("/for-dealers") }
-};
+export const metadata = pageMetadata("Motorcycle Seller Opportunities for Dealers", "MotorGeeks gives approved UK motorcycle dealers access to relevant direct-claim and marketplace seller opportunities.", "/for-dealers");
 
 const points = [
   "Seller-submitted motorcycle opportunities",

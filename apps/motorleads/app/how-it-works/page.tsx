@@ -1,14 +1,9 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { PageShell } from "../components/site-shell";
 import { HowItWorksSection, ImageCta } from "../components/sections";
-import { absoluteUrl } from "../site";
+import { pageMetadata } from "../site";
 
-export const metadata: Metadata = {
-  title: "How It Works",
-  description: "How MotorGeeks helps motorcycle sellers connect with suitable dealers.",
-  alternates: { canonical: absoluteUrl("/how-it-works") }
-};
+export const metadata = pageMetadata("How MotorGeeks Works", "See how to submit your motorcycle, add condition details and photos, receive dealer offers and choose whether to sell.", "/how-it-works");
 
 export default function HowItWorksPage() {
   return <PageShell>

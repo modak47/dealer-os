@@ -1,8 +1,7 @@
-import type { Metadata } from "next";
 import { LegalPage } from "../components/legal";
-import { absoluteUrl } from "../site";
+import { pageMetadata } from "../site";
 
-export const metadata: Metadata = { title: "Privacy Policy", description: "How MotorGeeks handles personal information for sellers, dealers and website visitors.", alternates: { canonical: absoluteUrl("/privacy") } };
+export const metadata = pageMetadata("Privacy Policy", "How MotorGeeks handles personal information for motorcycle sellers, dealers and website visitors.", "/privacy");
 
 export default function PrivacyPage() {
   return <LegalPage title="Privacy Policy" intro="This policy explains how MotorGeeks handles personal information when you use our website, submit a motorcycle or apply for dealer access." sections={[

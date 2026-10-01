@@ -32,7 +32,7 @@ export function SiteFooter() {
     <div className="ml-shell ml-footer-grid">
       <div><MotorGeeksLogo /><p>Helping motorcycle owners connect with genuine motorcycle dealers across the UK.</p></div>
       <nav><h2>Quick links</h2>{nav.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}</nav>
-      <nav><h2>Legal</h2><Link href="/privacy">Privacy Policy</Link><Link href="/terms">Terms & Conditions</Link><Link href="/cookies">Cookies</Link></nav>
+      <nav><h2>Seller guides</h2><Link href="/sell-my-motorbike">Sell my motorbike</Link><Link href="/motorbike-valuation">Motorbike valuation</Link><Link href="/how-to-sell-a-motorbike">How to sell a motorbike</Link><h2 className="ml-footer-subheading">Legal</h2><Link href="/privacy">Privacy Policy</Link><Link href="/terms">Terms & Conditions</Link><Link href="/cookies">Cookies</Link></nav>
       <div><h2>Stay in touch</h2><p>Questions about selling a motorcycle or joining the dealer network?</p><Link href="/contact">Contact MotorGeeks →</Link></div>
     </div>
     <div className="ml-shell ml-footer-bottom"><p>© 2026 MotorGeeks. All rights reserved.</p><b>CONNECTING SELLERS WITH TRUSTED DEALERS.</b></div>

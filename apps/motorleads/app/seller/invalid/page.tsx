@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageShell } from "../../components/site-shell";
+import { absoluteUrl } from "../../site";
 
 export const metadata: Metadata = {
   title: "Secure Link Expired",
+  description: "Request a replacement secure MotorGeeks seller link.",
+  alternates: { canonical: absoluteUrl("/seller/invalid") },
   robots: { index: false, follow: false },
 };
 

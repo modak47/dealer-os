@@ -9,13 +9,13 @@ const body = Inter({ subsets: ["latin"], variable: "--font-body" });
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
-    default: "MotorGeeks | Sell your motorcycle through trusted dealers",
+    default: "Sell Your Motorbike | Get Dealer Offers | MotorGeeks",
     template: "%s | MotorGeeks"
   },
   description: site.description,
   alternates: { canonical: absoluteUrl("/") },
   openGraph: {
-    title: "MotorGeeks",
+    title: "Sell Your Motorbike | Get Dealer Offers | MotorGeeks",
     description: site.description,
     url: site.url,
     siteName: "MotorGeeks",
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "MotorGeeks",
+    title: "Sell Your Motorbike | Get Dealer Offers | MotorGeeks",
     description: site.description,
     images: [site.assets.socialPreview]
   },

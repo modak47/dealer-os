@@ -1,8 +1,7 @@
-import type { Metadata } from "next";
 import { LegalPage } from "../components/legal";
-import { absoluteUrl } from "../site";
+import { pageMetadata } from "../site";
 
-export const metadata: Metadata = { title: "Cookies", description: "How MotorGeeks uses essential browser storage and cookies.", alternates: { canonical: absoluteUrl("/cookies") } };
+export const metadata = pageMetadata("Cookie Policy", "How MotorGeeks uses essential browser storage and cookies across the public website and secure seller journey.", "/cookies");
 
 export default function CookiesPage() {
   return <LegalPage title="Cookies" intro="This notice explains how MotorGeeks uses essential cookies and similar browser technologies." sections={[

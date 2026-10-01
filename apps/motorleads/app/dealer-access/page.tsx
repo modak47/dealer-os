@@ -1,13 +1,8 @@
-import type { Metadata } from "next";
 import { PageShell } from "../components/site-shell";
 import { ContactForm } from "../components/simple-forms";
-import { absoluteUrl } from "../site";
+import { pageMetadata } from "../site";
 
-export const metadata: Metadata = {
-  title: "Dealer Access",
-  description: "Request access to MotorGeeks motorcycle seller opportunities.",
-  alternates: { canonical: absoluteUrl("/dealer-access") }
-};
+export const metadata = pageMetadata("Join the MotorGeeks Dealer Network", "Apply for access to MotorGeeks motorcycle seller opportunities. Dealer applications are reviewed before portal access is enabled.", "/dealer-access");
 
 export default function DealerAccessPage() {
   return <PageShell>

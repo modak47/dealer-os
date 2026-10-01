@@ -1,9 +1,10 @@
+import Image from "next/image";
 import Link from "next/link";
 import { site } from "../site";
 
 export function MotorGeeksLogo() {
   return <Link className="ml-logo" href="/" aria-label="MotorGeeks home">
-    <img src={site.assets.lockupDark} alt="MotorGeeks" />
+    <Image src={site.assets.lockupDark} alt="MotorGeeks" width={1128} height={221} preload sizes="(max-width: 760px) 198px, 285px" />
   </Link>;
 }
 

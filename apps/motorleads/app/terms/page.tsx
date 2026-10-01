@@ -1,8 +1,7 @@
-import type { Metadata } from "next";
 import { LegalPage } from "../components/legal";
-import { absoluteUrl } from "../site";
+import { pageMetadata } from "../site";
 
-export const metadata: Metadata = { title: "Terms & Conditions", description: "Terms for using the MotorGeeks motorcycle marketplace and dealer service.", alternates: { canonical: absoluteUrl("/terms") } };
+export const metadata = pageMetadata("Terms and Conditions", "Terms for using the MotorGeeks motorcycle seller marketplace and dealer service.", "/terms");
 
 export default function TermsPage() {
   return <LegalPage title="Terms & Conditions" intro="These terms describe the MotorGeeks website, seller marketplace and dealer access service." sections={[

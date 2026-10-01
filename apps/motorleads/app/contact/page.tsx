@@ -1,13 +1,8 @@
-import type { Metadata } from "next";
 import { PageShell } from "../components/site-shell";
 import { ContactForm } from "../components/simple-forms";
-import { absoluteUrl } from "../site";
+import { pageMetadata } from "../site";
 
-export const metadata: Metadata = {
-  title: "Contact",
-  description: "Contact MotorGeeks about selling a motorcycle or dealer access.",
-  alternates: { canonical: absoluteUrl("/contact") }
-};
+export const metadata = pageMetadata("Contact MotorGeeks", "Contact MotorGeeks about selling a motorcycle, your secure seller profile or access to the dealer network.", "/contact");
 
 export default function ContactPage() {
   return <PageShell>

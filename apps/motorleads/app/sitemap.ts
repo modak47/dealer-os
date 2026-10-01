@@ -1,13 +1,12 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "./site";
 
-const routes = ["/", "/how-it-works", "/for-dealers", "/about", "/faq", "/contact", "/dealer-access", "/valuation", "/privacy", "/terms", "/cookies"];
+const routes = ["/", "/sell-my-motorbike", "/motorbike-valuation", "/how-to-sell-a-motorbike", "/how-it-works", "/for-dealers", "/about", "/faq", "/contact", "/dealer-access", "/valuation", "/privacy", "/terms", "/cookies"];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return routes.map(route => ({
     url: absoluteUrl(route),
-    lastModified: new Date(),
     changeFrequency: route === "/" ? "weekly" : "monthly",
-    priority: route === "/" ? 1 : route === "/valuation" || route === "/for-dealers" ? .9 : .7
+    priority: route === "/" ? 1 : ["/valuation", "/sell-my-motorbike", "/motorbike-valuation"].includes(route) ? .9 : .7
   }));
 }
