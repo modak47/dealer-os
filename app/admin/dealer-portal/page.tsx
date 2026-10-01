@@ -135,12 +135,7 @@ export default function DealerPortalAdminPage() {
   }), [accounts]);
   const pendingFees = useMemo(() => overview.fees.filter(fee => fee.status !== "paid" && fee.status !== "void"), [overview.fees]);
   const pendingFeeTotal = useMemo(() => pendingFees.reduce((total, fee) => total + (Number(fee.outstanding_amount ?? fee.fee_amount) || 0), 0), [pendingFees]);
-  const kpis = [
-    ["Active Dealers", activeAccounts.length],
-    ["Claims", overview.claims.length],
-    ["Purchases", overview.purchases.length],
-    [`Fees Pending (${pendingFees.length})`, money(pendingFeeTotal)],
-  ];
+  const kpis = [["Active dealers", activeAccounts.length], ["Active claims", overview.claims.length], ["Purchases", overview.purchases.length], ["Fees pending", money(pendingFeeTotal)]];
 
   function setField(key: keyof DealerPortalAccount, value: string | number) {
     setEditing(current => ({ ...(current ?? emptyAccount), [key]: value }));
@@ -238,17 +233,17 @@ export default function DealerPortalAdminPage() {
   }
 
   return <main className="admin-page dealer-portal-admin-page">
-    <div className="admin-heading"><div><h1>Dealer Portal</h1><p>Review leads and release direct claims or MotorGeeks dealer-offer opportunities.</p></div><div className="quick-actions"><Link href="/dealer-login" target="_blank">Dealer Login</Link><button className="admin-secondary" onClick={() => void backfillVehicleChecks()} disabled={backfilling}>{backfilling ? "Checking..." : "Run Missing Vehicle Checks"}</button><button className="admin-primary" onClick={() => startEditing(emptyAccount)}>Add Portal Dealer</button></div></div>
-    <section className="website-kpis">{kpis.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</section>
+    <div className="admin-heading"><div><h1>Dealer Distribution</h1><p>Send ready leads to dealers and monitor live opportunities, offers and completed deals.</p></div><div className="quick-actions"><Link href="/dealer-login" target="_blank">Dealer Login</Link><button className="admin-secondary" onClick={() => void backfillVehicleChecks()} disabled={backfilling}>{backfilling ? "Checking..." : "Run Missing Vehicle Checks"}</button><button className="admin-primary" onClick={() => startEditing(emptyAccount)}>Add Portal Dealer</button></div></div>
+    <section className="dealer-summary-strip" aria-label="Dealer portal summary">{kpis.map(([label, value]) => <span key={label}><strong>{value}</strong> {label}</span>)}</section>
     {error && <div className="website-state error compact">{error}</div>}{notice && <div className="website-state success compact">{notice}</div>}
     <section className="dealer-admin-workspace">
       <nav className="dealer-admin-tabs" aria-label="Dealer portal admin sections">
-        <button className={activeTab === "daily" ? "active" : ""} type="button" onClick={() => setActiveTab("daily")}><span>Lead Queue</span></button>
+        <button className={activeTab === "daily" ? "active" : ""} type="button" onClick={() => setActiveTab("daily")}><span>Distribution</span></button>
         <button className={activeTab === "dealers" ? "active" : ""} type="button" onClick={() => setActiveTab("dealers")}><span>Dealers</span><b>{accounts.length}</b></button>
         <button className={activeTab === "oversight" ? "active" : ""} type="button" onClick={() => setActiveTab("oversight")}><span>Oversight</span><b>{overview.claims.length + overview.purchases.length}</b></button>
         <button className={activeTab === "marketplace-fees" ? "active" : ""} type="button" onClick={() => setActiveTab("marketplace-fees")}><span>Marketplace Fees</span><b>{marketplaceFees.bands.length}</b></button>
       </nav>
-      {activeTab === "daily" && <section className="dealer-admin-panel"><LeadBrowser queue dealers={activeAccounts} /></section>}
+      {activeTab === "daily" && <section className="dealer-admin-panel"><LeadBrowser workspace="distribution" dealers={activeAccounts} /></section>}
       {activeTab === "dealers" && <section className="dealer-admin-panel">
         <section className="website-detail-card dealer-portal-accounts">
           <header><div><h2>Portal Dealers</h2><p>Dealer accounts are hidden from the daily view to keep this page cleaner.</p></div><button className="admin-primary" onClick={() => startEditing(emptyAccount)}>Add Portal Dealer</button></header>

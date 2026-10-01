@@ -1,4 +1,4 @@
-export const leadViews = ["all", "needs_review", "ready", "released", "active", "closed", "archived", "backlog"] as const;
+export const leadViews = ["all", "needs_review", "ready", "released", "active", "live", "offers", "deals_agreed", "completed", "closed", "archived", "backlog"] as const;
 export type LeadView = typeof leadViews[number];
 export type LeadListRow = {
   id: number; public_id: string; received_at: string; received_date_basis: string;
@@ -11,7 +11,7 @@ export type LeadListRow = {
   thumbnail_url: string | null;
 };
 export type LeadListPage = { leads: LeadListRow[]; nextCursor: string | null; hasMore: boolean };
-export type LeadCounts = { total: number; new: number; pendingValuations: number; receivedToday: number; receivedThisWeek: number; purchasedThisMonth: number; sourceCounts: Record<string, number>; sourceOptions?: string[]; ready: number; released: number; needsReview: number };
+export type LeadCounts = { total: number; new: number; pendingValuations: number; receivedToday: number; receivedThisWeek: number; purchasedThisMonth: number; sourceCounts: Record<string, number>; sourceOptions?: string[]; ready: number; released: number; needsReview: number; live: number; offers: number; dealsAgreed: number; completed: number; closed: number; archived: number };
 
 const dayPattern = /^\d{4}-\d{2}-\d{2}$/;
 export function londonMidnight(day: string) {

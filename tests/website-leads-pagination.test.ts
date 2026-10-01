@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { analyseLeadDate } from "../lib/website-lead-date";
 import { decodeLeadCursor, encodeLeadCursor, listFilters, londonMidnight } from "../lib/website-lead-list";
 import { releaseBlockReason } from "../lib/website-lead-release";
+import { formatAskingPrice } from "../lib/website-leads";
 test("London date windows include the complete DST-change day", () => {
   assert.equal(londonMidnight("2026-03-29"), "2026-03-29T00:00:00.000Z");
   assert.equal(londonMidnight("2026-03-30"), "2026-03-29T23:00:00.000Z");
@@ -39,11 +40,29 @@ test("release needs explicit readiness and preserves separate marketplace lifecy
   assert.equal(releaseBlockReason({...ready,opportunity_mode:"marketplace_offer",marketplace_status:"submitted"}),null);
   for(const marketplace_status of ["offer_accepted","purchase_pending","live_to_dealers","draft"]) assert.ok(releaseBlockReason({...ready,opportunity_mode:"marketplace_offer",marketplace_status}));
 });
-test("staff lead browser exposes a focused MotorGeeks review shortcut", () => {
+test("staff lead browser separates intake and dealer distribution without a duplicate MotorGeeks shortcut", () => {
   const source = readFileSync("app/website-leads/lead-browser.tsx", "utf8");
-  assert.match(source, /New MotorGeeks submissions/);
-  assert.match(source, /setView\("needs_review"\)/);
-  assert.match(source, /setSource\("motorgeeks"\)/);
-  assert.match(source, /setMode\("marketplace_offer"\)/);
-  assert.match(source, /setReview\("not_reviewed"\)/);
+  assert.doesNotMatch(source, /New MotorGeeks submissions/);
+  assert.match(source, /New Leads/);
+  assert.match(source, /Ready to Send/);
+  assert.match(source, /Deals Agreed/);
+  assert.match(source, /formatAskingPrice\(lead\.price\)/);
+  assert.doesNotMatch(source, /formatGbp\(lead\.suggested_offer\)/);
+});
+
+test("seller asking price is formatted from the stored price and handles missing values", () => {
+  assert.equal(formatAskingPrice(12300), "£12,300");
+  assert.equal(formatAskingPrice("12300"), "£12,300");
+  assert.equal(formatAskingPrice(null), "Not supplied");
+  assert.equal(formatAskingPrice(""), "Not supplied");
+});
+
+test("workflow views are derived filters rather than new lead state columns", () => {
+  const migration = readFileSync("supabase/migrations/20261001000100_staff_lead_workflow_views.sql", "utf8");
+  assert.match(migration, /when 'live'/);
+  assert.match(migration, /when 'offers'/);
+  assert.match(migration, /when 'deals_agreed'/);
+  assert.match(migration, /when 'completed'/);
+  assert.doesNotMatch(migration, /alter table public\.website_leads add column/);
+  assert.match(migration, /revoke all on function public\.staff_website_leads_list[\s\S]*from public,anon,authenticated/);
 });

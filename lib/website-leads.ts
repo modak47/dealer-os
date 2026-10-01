@@ -8,6 +8,11 @@ export function formatGbp(value: number | string | null | undefined): string {
   return number === null ? "Not set" : currencyFormatter.format(number);
 }
 
+export function formatAskingPrice(value: number | string | null | undefined): string {
+  const number = safeNumber(value);
+  return number === null ? "Not supplied" : currencyFormatter.format(number);
+}
+
 export function formatLeadDate(value: string | null | undefined): string {
   if (!value) return "Not recorded";
   const date = parseLeadDate(value);

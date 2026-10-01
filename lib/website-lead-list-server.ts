@@ -3,7 +3,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { decodeLeadCursor, encodeLeadCursor, listFilters, type LeadListRow, type LeadListPage } from "@/lib/website-lead-list";
 import { combineLeadImages } from "@/lib/website-leads";
 
-const publicListKeys = ["id", "public_id", "received_at", "received_date_basis", "lead_source", "reg", "make", "model", "year", "mileage", "price", "location_town", "status", "opportunity_mode", "marketplace_status", "portal_reviewed_at", "portal_ready_at", "archived_at", "valuation_status", "retail_estimate", "suggested_offer", "estimated_margin", "vehicle_check_status", "photo_count"] as const;
+const publicListKeys = ["id", "public_id", "received_at", "received_date_basis", "lead_source", "reg", "make", "model", "year", "mileage", "price", "location_town", "status", "opportunity_mode", "marketplace_status", "portal_reviewed_at", "portal_ready_at", "archived_at", "valuation_status", "retail_estimate", "estimated_margin", "vehicle_check_status", "photo_count"] as const;
 
 export async function loadLeadList(params: URLSearchParams): Promise<LeadListPage> {
   const filters = listFilters(params);
