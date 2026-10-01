@@ -1,11 +1,28 @@
+"use client";
+
 import Image from "next/image";
-import Link from "next/link";
 import { site } from "../site";
 
 export function MotorGeeksLogo() {
-  return <Link className="ml-logo" href="/" aria-label="MotorGeeks home">
+  const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (window.location.pathname !== "/") return;
+    event.preventDefault();
+    window.history.replaceState(null, "", "/");
+    const root = document.documentElement;
+    const previousScrollBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = "auto";
+    root.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.requestAnimationFrame(() => {
+      root.style.scrollBehavior = previousScrollBehavior;
+    });
+  };
+
+  // A document navigation prevents Next.js from restoring the homepage's previous scroll position.
+  // eslint-disable-next-line @next/next/no-html-link-for-pages
+  return <a className="ml-logo" href="/#motorgeeks-home" aria-label="MotorGeeks home" onClick={handleClick}>
     <Image src={site.assets.lockupDark} alt="MotorGeeks" width={1128} height={221} preload sizes="(max-width: 760px) 198px, 285px" />
-  </Link>;
+  </a>;
 }
 
 export function MotorGeeksTick() {

@@ -11,7 +11,7 @@ const nav = [
 ] as const;
 
 export function SiteHeader() {
-  return <header className="ml-header">
+  return <header className="ml-header" id="motorgeeks-home">
     <div className="ml-shell ml-header-row">
       <MotorGeeksLogo />
       <nav className="ml-desktop-nav" aria-label="Primary navigation">{nav.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}</nav>

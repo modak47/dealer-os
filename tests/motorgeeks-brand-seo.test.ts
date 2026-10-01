@@ -75,3 +75,12 @@ test("sitemap includes the hub and all ten canonical brand routes", () => {
   for (const guide of guides) assert.match(sitemap, new RegExp(`"${guide.path.replaceAll("/", "\\/")}"`));
   assert.doesNotMatch(sitemap, /"\/seller|"\/api/);
 });
+
+test("the shared MotorGeeks logo always targets the top of the homepage", () => {
+  const brand = read(`${app}/components/brand.tsx`);
+  const shell = read(`${app}/components/site-shell.tsx`);
+
+  assert.match(brand, /href="\/#motorgeeks-home"/);
+  assert.match(brand, /root\.scrollTop = 0/);
+  assert.match(shell, /id="motorgeeks-home"/);
+});
