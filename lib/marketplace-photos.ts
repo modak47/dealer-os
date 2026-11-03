@@ -16,7 +16,7 @@ export async function signedMarketplacePhotoUrls(db: SupabaseClient, websiteLead
     .from("lead_photos")
     .select("website_lead_id,storage_bucket,storage_path,sort_order,status")
     .in("website_lead_id", ids)
-    .neq("status", "removed")
+    .eq("status", "uploaded")
     .order("sort_order", { ascending: true });
   if (error) throw new Error(error.message);
   for (const photo of (data ?? []) as MarketplacePhotoRow[]) {
