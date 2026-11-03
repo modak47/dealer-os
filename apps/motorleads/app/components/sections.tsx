@@ -16,13 +16,13 @@ export const faqs = [
   ["How does MotorGeeks work?", "Enter your registration or motorcycle details, describe its condition and add clear photos. MotorGeeks can then introduce the motorcycle to approved dealers, who may make offers for you to consider."],
   ["How is my motorbike valued?", "MotorGeeks does not promise a fixed price. Dealers consider the motorcycle's age, model, mileage, condition, service history, MOT status, photographs and current demand before deciding whether to make an offer."],
   ["Do I have to accept an offer?", "No. Submitting your motorcycle is free and does not oblige you to accept an offer. You decide whether an offer works for you."],
-  ["Can I sell a motorbike with outstanding finance?", "You should disclose any outstanding finance. A buying dealer may require it to be settled as part of the transaction, and you should confirm the settlement process with your finance provider and the dealer."],
+  ["Can I sell a motorbike with outstanding finance?", "Tell us if there is money still owed on the bike. Ask your finance company how much is needed to pay it off, then agree with the dealer how this will be paid before completing the sale."],
   ["Can I sell a motorcycle without an MOT?", "You can still submit a motorcycle without a current MOT. Its MOT status and any known faults may affect dealer interest and the offers you receive."],
   ["What photos should I upload?", "Include clear photographs of the front, rear, both sides, dashboard or mileage, service history and any damage. Honest, well-lit photos help dealers assess the motorcycle accurately."],
-  ["Does mileage affect my motorbike's value?", "Mileage is one factor dealers consider alongside age, condition, maintenance, ownership history, specification and demand. A well-maintained higher-mileage bike may still attract interest."],
+  ["Does mileage affect my motorbike's value?", "Mileage is one factor dealers consider alongside age, condition, maintenance, ownership history, fitted features and demand. A well-maintained higher-mileage bike may still attract interest."],
   ["What happens after I accept a dealer offer?", "The successful dealer receives the contact details needed to discuss the motorcycle, confirm its condition and arrange payment and collection or handover. The sale is completed directly with that dealer."],
-  ["Who buys my motorcycle?", "MotorGeeks introduces your motorcycle to approved motorcycle dealers. The dealer whose offer you accept is the prospective buyer."],
-  ["Does MotorGeeks buy the motorcycle?", "No. MotorGeeks operates the introduction and offer platform. Any purchase is made by the dealer, subject to the dealer's final checks and agreement with you."]
+  ["Who buys my motorcycle?", "MotorGeeks introduces your motorcycle to approved motorcycle dealers. If you accept an offer, you arrange the sale directly with that dealer."],
+  ["Does MotorGeeks buy the motorcycle?", "No. MotorGeeks helps you connect with approved dealers and compare their offers. You sell directly to your chosen dealer after they have checked the bike and agreed the sale with you."]
 ];
 
 export function Hero() {
@@ -78,7 +78,7 @@ export function HowItWorksSection({ full = false }: { full?: boolean }) {
 
 export function WhySection() {
   const benefits = [
-    ["Genuine dealers", "No classified tyre-kickers or anonymous messages.", "shield"],
+    ["Genuine dealers", "Hear from approved motorcycle dealers.", "shield"],
     ["Save time", "Relevant dealers can come to you.", "clock"],
     ["UK-wide network", "Reach motorcycle buyers beyond your local area.", "pin"],
     ["No obligation", "You choose whether to continue.", "star"]
@@ -95,9 +95,9 @@ export function WhySection() {
 export function DealerProofSection() {
   return <section className="ml-proof">
     <div className="ml-shell">
-      <div><span>Built for trust</span><h2>A motorcycle-first way to reach genuine buyers.</h2><p>MotorGeeks is shaped around the information dealers actually need: bike details, condition, photos, history and location.</p></div>
+      <div><span>Built for trust</span><h2>Connect with dealers who buy motorbikes.</h2><p>MotorGeeks is shaped around the information dealers actually need: bike details, condition, photos, history and location.</p></div>
       <div className="ml-proof-panel">
-        <div className="ml-proof-cards"><article><Icon name="shield" /><b>Verified dealer network</b><p>Approved buyers only.</p></article><article><Icon name="bike" /><b>Motorcycle-specific</b><p>Built around bike details, photos, MOT and condition.</p></article><article><Icon name="lock" /><b>Secure by design</b><p>Contact details are protected until the right point in the process.</p></article></div>
+        <div className="ml-proof-cards"><article><Icon name="shield" /><b>Verified dealer network</b><p>Approved buyers only.</p></article><article><Icon name="bike" /><b>Motorcycle-specific</b><p>Built around bike details, photos, MOT and condition.</p></article><article><Icon name="lock" /><b>Secure by design</b><p>Your contact details go to the dealer whose offer you accept.</p></article></div>
       </div>
     </div>
   </section>;
@@ -127,7 +127,7 @@ export function FaqSection({ showLink = true }: { showLink?: boolean }) {
   return <section className="ml-faq-section">
     <div className="ml-shell">
       <div className="ml-faq-head"><div><span>Frequently asked questions</span><h2>Got a question?</h2><p>Find answers to the most common questions about selling your motorcycle with MotorGeeks.</p></div>{showLink && <Link href="/faq">View all FAQs →</Link>}</div>
-      <div className="ml-faq-grid">{(showLink ? faqs.slice(0, 4) : faqs).map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div>
+      <div className="ml-faq-grid">{(showLink ? faqs.slice(0, 4) : faqs).map(([question, answer]) => <details key={question}><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div>
     </div>
   </section>;
 }

@@ -32,21 +32,24 @@ export function absoluteUrl(path = "/") {
 
 export function pageMetadata(title: string, description: string, path: string): Metadata {
   const url = absoluteUrl(path);
+  const includesBrand = /\bMotorGeeks\b/i.test(title);
+  const brandedTitle = includesBrand ? title : `${title} | MotorGeeks`;
   return {
-    title,
+    title: includesBrand ? { absolute: title } : title,
     description,
     alternates: { canonical: url },
     openGraph: {
-      title: `${title} | MotorGeeks`,
+      title: brandedTitle,
       description,
       url,
       siteName: site.name,
+      locale: "en_GB",
       type: "website",
       images: [{ url: site.assets.socialPreview, width: 1200, height: 630, alt: "MotorGeeks - connecting motorcycle sellers with trusted dealers" }]
     },
     twitter: {
       card: "summary_large_image",
-      title: `${title} | MotorGeeks`,
+      title: brandedTitle,
       description,
       images: [site.assets.socialPreview]
     }

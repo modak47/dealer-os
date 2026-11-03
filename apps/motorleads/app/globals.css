@@ -354,11 +354,14 @@ svg {
 }
 
 .ml-handwritten {
+  position: absolute;
+  right: calc((100% - 100vw) / 2 + clamp(24px, 3vw, 64px));
+  bottom: 80px;
   justify-self: end;
   display: grid;
   gap: 5px;
-  width: min(100%, 310px);
-  margin: 18px 46px 0 0;
+  width: clamp(190px, 14vw, 255px);
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -399,9 +402,10 @@ svg {
   color: white;
   font-style: normal;
   font-family: inherit;
-  font-size: 23px;
+  font-size: clamp(20px, 1.6vw, 23px);
   font-weight: 800;
   line-height: 1.03;
+  white-space: nowrap;
 }
 
 .ml-handwritten em i {
@@ -1305,6 +1309,14 @@ h3 {
     --ml-shell: min(100% - 44px, 1100px);
   }
 
+  .ml-hero-grid {
+    grid-template-columns: minmax(0, 680px);
+  }
+
+  .ml-handwritten {
+    display: none;
+  }
+
   .ml-header-row {
     grid-template-columns: minmax(190px, 240px) minmax(0, 1fr) auto;
     gap: 18px;
@@ -1649,7 +1661,13 @@ h3 {
 .mg-manual summary { cursor: pointer; color: var(--ml-blue); font-weight: 900; text-decoration: underline; }
 .mg-two,.mg-three { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .mg-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.mg-field { display: grid; gap: 7px; color: var(--ml-navy); font-weight: 900; }
+.mg-field { display: grid; align-content: start; gap: 7px; color: var(--ml-navy); font-weight: 900; }
+.mg-manual > .mg-two, .mg-manual > .mg-three { margin-top: 16px; }
+.mg-field-hint { margin: 0; color: #425b74; font-size: 14px; font-weight: 500; line-height: 1.5; }
+.ml-two-col article a { color: var(--ml-blue-dark); font-weight: 850; text-decoration: underline; text-underline-offset: 3px; }
+.ml-dealer-detail > .ml-shell > div:last-child p { color: #d6e4f0; }
+.mg-radio > .mg-field-hint { flex-basis: 100%; }
+.mg-consent a { color: var(--ml-blue-dark); text-decoration: underline; text-underline-offset: 3px; }
 .mg-field span b { color: #ff4f1f; }
 .mg-field input,.mg-field select { min-height: 48px; padding: 0 12px; }
 .mg-field textarea { min-height: 92px; padding: 12px; resize: vertical; }

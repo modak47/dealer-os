@@ -11,16 +11,16 @@ export function SellerPhotoControls({endpoint='/api/valuation/photos'}:{endpoint
  useEffect(()=>{if(loaded&&endpoint==='/api/seller/photos')window.dispatchEvent(new CustomEvent('mg-seller-photo-count',{detail:photos.length}));},[photos.length,loaded,endpoint]);
  async function upload(items:Upload[]){
   for(const item of items){item.status='uploading';setUploads(v=>[...v]);
-   try{if(item.file.size>sellerPhotoMaxBytes)throw new Error('Maximum 4 MiB per photo.');const form=new FormData();form.append('photos',item.file);const r=await fetch(endpoint,{method:'POST',body:form});const p=await r.json();if(!r.ok)throw new Error(p.error||'Upload failed.');setPhotos(p.photos);setEditable(p.editable);item.status='done';item.error=undefined;}
+   try{if(item.file.size>sellerPhotoMaxBytes)throw new Error('This photo is too large. Please choose one under 4 MB.');const form=new FormData();form.append('photos',item.file);const r=await fetch(endpoint,{method:'POST',body:form});const p=await r.json();if(!r.ok)throw new Error(p.error||'We could not upload this photo. Please try again.');setPhotos(p.photos);setEditable(p.editable);item.status='done';item.error=undefined;}
    catch(e){item.status='failed';item.error=e instanceof Error?e.message:'Upload failed.';}
    setUploads(v=>[...v]);
   }
  }
  const busy=uploads.some(x=>x.status==='uploading'||x.status==='waiting');
- return <div><p role="status">{message}</p><p>{photos.length} of {sellerPhotoLimit} photos. JPEG, PNG or WebP, up to 4 MiB each. Please convert HEIC/HEIF to JPEG first.</p>
- {!editable&&<p>Photos can be changed while your profile is awaiting review. Once it is live, accepted or closed, contact MotorGeeks for corrections.</p>}
+ return <div><p role="status">{message}</p><p>{photos.length} of {sellerPhotoLimit} photos added. Use JPG, PNG or WebP files, up to 4 MB each. Save iPhone photos in HEIC or HEIF format as JPG before uploading.</p>
+ {loaded&&!editable&&<p>You can change photos while your bike is waiting for review. Once it has been shared with dealers, an offer has been accepted or the listing is closed, contact MotorGeeks to make changes.</p>}
  {editable&&<label className="mg-uploader"><b>Choose photos</b><input type="file" multiple accept={sellerPhotoAccept} disabled={busy||photos.length>=sellerPhotoLimit} onChange={e=>{const added=Array.from(e.target.files||[]).map(file=>({file,status:'waiting' as const}));setUploads(v=>[...v,...added]);void upload(added);e.target.value='';}}/></label>}
- <ul aria-live="polite">{uploads.map((item,i)=><li key={i}>{item.file.name}: {item.status==='done'?'Uploaded':item.status}{item.error&&` — ${item.error}`} {item.status==='failed'&&<button type="button" disabled={busy} onClick={()=>void upload([item])}>Retry {item.file.name}</button>}</li>)}</ul>
+ <ul aria-live="polite">{uploads.map((item,i)=><li key={i}>{item.file.name}: {{waiting:'Waiting to upload',uploading:'Uploading…',done:'Uploaded',failed:'Could not upload'}[item.status]}{item.error&&` — ${item.error}`} {item.status==='failed'&&<button type="button" disabled={busy} onClick={()=>void upload([item])}>Retry {item.file.name}</button>}</li>)}</ul>
  <div className="mg-photo-preview-grid">{photos.map(photo=><figure key={photo.id}><img src={photo.preview_url} alt={photo.original_filename||'Motorcycle photo'}/><figcaption>{photo.original_filename}</figcaption>{editable&&<button type="button" className="mg-photo-remove" aria-label={`Remove ${photo.original_filename}`} disabled={busy} onClick={async()=>{try{const r=await fetch(`${endpoint}?id=${encodeURIComponent(photo.id)}`,{method:'DELETE'});const p=await r.json();if(!r.ok)throw new Error(p.error);setPhotos(p.photos);}catch(e){setMessage(e instanceof Error?e.message:'Could not remove photo.');}}}>×</button>}</figure>)}</div></div>;
 }
 

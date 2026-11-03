@@ -12,8 +12,8 @@ describe("MotorGeeks launch completion", () => {
     });
     assert.deepEqual(clean.vehicle, { registration: "AB12CDE", make: "Honda", model: "CBR", year: "2022", derivative: "RR", engineCapacity: "1000", fuelType: "Petrol", colour: "Red" });
     const flow = source("apps/motorleads/app/valuation/valuation-flow.tsx");
-    assert.match(flow, /Variant \/ model version/);
-    assert.match(flow, /Engine capacity \(cc\)/);
+    assert.match(flow, /Model version \(if known\)/);
+    assert.match(flow, /Engine size \(cc\)/);
     assert.doesNotMatch(flow, /derivative: v, engineCapacity: v/);
   });
 

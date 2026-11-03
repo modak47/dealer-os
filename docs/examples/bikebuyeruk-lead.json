@@ -1,0 +1,22 @@
+{
+  "external_submission_id": "bbuk-example-001",
+  "submitted_at": "2026-10-21T10:00:00Z",
+  "form_name": "BikeBuyerUK valuation",
+  "fname": "Example",
+  "lname": "Seller",
+  "email": "seller@example.invalid",
+  "phone": "07700900123",
+  "postcode": "SW1A 1AA",
+  "reg": "AB12 CDE",
+  "make": "Honda",
+  "model": "CB500F",
+  "year": 2021,
+  "mileage": 12000,
+  "bike_condition": "Good",
+  "service": "Full service history",
+  "price": 3500,
+  "images": [],
+  "consent_terms": true,
+  "consent_marketing": false,
+  "consent_source": "BikeBuyerUK valuation form - replace with the actual privacy notice URL/version"
+}

@@ -16,7 +16,7 @@ export function ValuationCta({ compact = false }: { compact?: boolean }) {
 
   return <form className={`ml-reg-form ${compact ? "compact" : ""}`} onSubmit={submit}>
     <span>UK</span>
-    <label><span>Motorcycle registration</span><input value={registration} onChange={event => setRegistration(event.target.value)} placeholder="Enter your registration (e.g. GY23 FFW)" /></label>
+    <label><span>Motorcycle registration</span><input value={registration} onChange={event => setRegistration(event.target.value)} placeholder="Enter your registration (e.g. GY26 ABC)" /></label>
     <button type="submit">Get a valuation <b>→</b></button>
     <Link href="/valuation">No registration? Enter motorcycle details manually.</Link>
   </form>;

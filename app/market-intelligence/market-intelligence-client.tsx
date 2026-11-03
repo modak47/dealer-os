@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import styles from "./market-intelligence.module.css";
 import type { MarketAnalytics, MarketListing, MarketSortKey } from "@/lib/market-intelligence";
 
 interface MarketResponse {
   analytics: MarketAnalytics;
   rows: MarketListing[];
   pagination: { page: number; pageSize: number; total: number; pages: number };
-  meta: { totalRows: number; fetchedRows: number; usedServerFilters: boolean; sampleLimited: boolean; summaryOnly?: boolean };
+  meta: { totalRows: number; fetchedRows: number; usedServerFilters: boolean; sampleLimited: boolean; summaryOnly?: boolean; generatedAt?: string };
 }
 
 interface MarketFilterOptions {
@@ -86,7 +87,7 @@ function Leaderboard({ title, rows, valueLabel = "Sold" }: { title: string; rows
 
 function TrendChart({ points }: { points: MarketAnalytics["removedTrend"] }) {
   const max = Math.max(...points.map((point) => point.removed), 1);
-  return <section className="mi-panel mi-trend-panel"><div className="panel-title"><h2>Removed listings trend</h2><span>{points.length} dates</span></div><div className="mi-trend">{points.slice(-40).map((point) => <div key={point.date} title={`${date(point.date)}: ${point.removed} removed`}><i style={{ height: `${Math.max(8, (point.removed / max) * 100)}%` }} /><span>{new Date(point.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</span></div>)}{!points.length && <p className="mi-empty">No removed listings in this range.</p>}</div></section>;
+  return <section className="mi-panel mi-trend-panel"><div className="panel-title"><h2>Removed listings trend</h2><span>{points.length} dates</span></div><div className="mi-trend" tabIndex={0} role="region" aria-label="Removed listings by date">{points.slice(-40).map((point) => <div key={point.date} title={`${date(point.date)}: ${point.removed} removed`}><i style={{ height: `${Math.max(8, (point.removed / max) * 100)}%` }} /><span>{new Date(point.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</span></div>)}{!points.length && <p className="mi-empty">No removed listings in this range.</p>}</div></section>;
 }
 
 function OptionList({ id, options }: { id: string; options: string[] }) {
@@ -101,6 +102,7 @@ export function MarketIntelligenceClient() {
   const [filterOptions, setFilterOptions] = useState<MarketFilterOptions>({ dealerNames: [], makes: [], models: [], years: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [requestVersion, setRequestVersion] = useState(0);
 
   const params = useMemo(() => buildParams(appliedFilters, page), [appliedFilters, page]);
   const analysisReady = hasAnalysisFilters(appliedFilters);
@@ -132,9 +134,9 @@ export function MarketIntelligenceClient() {
       .catch((fetchError: Error) => {
         if (fetchError.name !== "AbortError") setError(fetchError.message);
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [params]);
+  }, [params, requestVersion]);
 
   function update(key: keyof FilterState, value: string) {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -144,21 +146,25 @@ export function MarketIntelligenceClient() {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setData(null);
     setPage(1);
     setAppliedFilters(filters);
+    setRequestVersion((current) => current + 1);
   }
 
   function reset() {
     setLoading(true);
     setError("");
+    setData(null);
     setFilters(defaultFilters);
     setAppliedFilters(defaultFilters);
     setPage(1);
+    setRequestVersion((current) => current + 1);
   }
 
   const analytics = data?.analytics;
 
-  return <div className="market-intelligence">
+  return <div className={`market-intelligence ${styles.content}`}>
     <form className="mi-filters" onSubmit={apply}>
       <OptionList id="mi-dealer-options" options={filterOptions.dealerNames} />
       <OptionList id="mi-make-options" options={filterOptions.makes} />
@@ -196,7 +202,8 @@ export function MarketIntelligenceClient() {
       <KpiCard label="Avg days live" value={number(analytics.averageDaysLive)} hint="From first seen to removed/today" />
     </div>
 
-    {!analysisReady && <div className="mi-warning">Showing top-level market statistics only. Apply a date, dealer, make, model or other filter to load charts, leaderboards and listings. Export CSV still downloads the current full dataset.</div>}
+    {data?.meta.generatedAt && <div className="mi-warning" role="status">Market data last refreshed {new Date(data.meta.generatedAt).toLocaleString("en-GB")}. Data refreshes every five minutes; statistics, listings and CSV exports use this reporting snapshot.</div>}
+    {!analysisReady && <div className="mi-warning">Showing top-level market statistics only. Apply a date, dealer, make, model or other filter to load charts, leaderboards and listings. Export CSV downloads the full reporting snapshot.</div>}
 
     {analysisReady && <><div className="mi-grid">
       <TrendChart points={analytics.removedTrend} />
@@ -207,7 +214,7 @@ export function MarketIntelligenceClient() {
 
     <section className="mi-panel mi-listings">
       <div className="panel-title"><h2>Listings</h2><span>{data?.pagination.total.toLocaleString("en-GB")} matching rows</span></div>
-      <div className="mi-table-wrap"><table className="mi-table"><thead><tr><th>Status</th><th>Dealer</th><th>Bike</th><th>Year</th><th>Price</th><th>Mileage</th><th>Days</th><th>Seen</th><th /></tr></thead><tbody>{data?.rows.map((row) => <tr key={`${row.listingId}-${row.advertUrl}`}><td><span className={`mi-status ${row.status.toLowerCase()}`}>{row.status}</span></td><td><b>{row.dealerName}</b><small>{row.dealerPrivate}</small></td><td><b>{[row.make, row.model].filter(Boolean).join(" ") || "—"}</b><small>{row.derivative || `${row.location} ${row.postcode}`.trim() || row.listingId}</small></td><td>{row.year || "—"}</td><td>{money(row.price)}</td><td>{number(row.mileage)}</td><td>{number(row.daysLive)}</td><td><small>First {date(row.firstSeen)}</small><small>Last {date(row.lastSeen)}</small></td><td>{row.advertUrl ? <a href={row.advertUrl} target="_blank" rel="noreferrer">Advert ↗</a> : "—"}</td></tr>)}{!data?.rows.length && <tr><td colSpan={9}><p className="mi-empty">No listings match the selected filters.</p></td></tr>}</tbody></table></div>
+      <div className="mi-table-wrap" tabIndex={0} role="region" aria-label="Market listings"><table className="mi-table"><thead><tr><th>Status</th><th>Dealer</th><th>Bike</th><th>Year</th><th>Price</th><th>Mileage</th><th>Days</th><th>Seen</th><th /></tr></thead><tbody>{data?.rows.map((row) => <tr key={`${row.listingId}-${row.advertUrl}`}><td><span className={`mi-status ${row.status.toLowerCase()}`}>{row.status}</span></td><td><b>{row.dealerName}</b><small>{row.dealerPrivate}</small></td><td><b>{[row.make, row.model].filter(Boolean).join(" ") || "—"}</b><small>{row.derivative || `${row.location} ${row.postcode}`.trim() || row.listingId}</small></td><td>{row.year || "—"}</td><td>{money(row.price)}</td><td>{number(row.mileage)}</td><td>{number(row.daysLive)}</td><td><small>First {date(row.firstSeen)}</small><small>Last {date(row.lastSeen)}</small></td><td>{row.advertUrl ? <a href={row.advertUrl} target="_blank" rel="noreferrer">Advert ↗</a> : "—"}</td></tr>)}{!data?.rows.length && <tr><td colSpan={9}><p className="mi-empty">No listings match the selected filters.</p></td></tr>}</tbody></table></div>
       <div className="mi-pagination"><button onClick={() => { setLoading(true); setError(""); setPage((current) => Math.max(1, current - 1)); }} disabled={page <= 1 || loading}>Previous</button><span>Page {data?.pagination.page} of {data?.pagination.pages}</span><button onClick={() => { setLoading(true); setError(""); setPage((current) => current + 1); }} disabled={loading || Boolean(data && page >= data.pagination.pages)}>Next</button></div>
     </section></>}
     </>}

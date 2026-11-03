@@ -53,12 +53,26 @@ type AutotraderVehicleResponse = {
 };
 
 export async function lookupVehicleByVrm(vrmInput: string): Promise<DealerOsVehicle> {
+  return requestVehicleByVrm(vrmInput, true);
+}
+
+// Public form prefill must not request finance/history/full-check products.
+export async function lookupBasicVehicleByVrm(vrmInput: string): Promise<DealerOsVehicle> {
+  return requestVehicleByVrm(vrmInput, false);
+}
+
+async function requestVehicleByVrm(vrmInput: string, fullCheck: boolean): Promise<DealerOsVehicle> {
   const vrm = normaliseRegistration(vrmInput);
   if (!isValidVrm(vrm)) throw new AutotraderVehicleLookupError("Invalid VRM.", 400, "invalid_vrm");
 
   const config = getAutotraderConfig();
-  const params = new URLSearchParams({ advertiserId: config.advertiserId, registration: vrm, motTests: "true", history: "true", fullVehicleCheck: "true" });
-  const response = await autotraderFetch(`/vehicles?${params.toString()}`);
+  const params = new URLSearchParams({ advertiserId: config.advertiserId, registration: vrm });
+  if (fullCheck) {
+    params.set("motTests", "true");
+    params.set("history", "true");
+    params.set("fullVehicleCheck", "true");
+  }
+  const response = await autotraderFetch(`/vehicles?${params.toString()}`, fullCheck ? {} : { signal: AbortSignal.timeout(15_000) });
   const payload = await readJson<AutotraderVehicleResponse>(response);
 
   if (response.status === 404) throw new AutotraderVehicleLookupError("No vehicle found for that VRM.", 404, "not_found");

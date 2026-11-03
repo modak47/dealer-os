@@ -15,14 +15,16 @@ export function sellerInput(value: unknown): SellerForm {
 export function sellerValidation(value: SellerForm, step = 4): string[] {
  const input=sellerInput(value),v=input.vehicle!,c=input.condition!,s=input.seller!,errors:string[]=[];
  const positiveInteger=(x:unknown)=>typeof x==='string'&&/^\d+$/.test(x)&&Number.isSafeInteger(Number(x));
- if (!v.make || !v.model || !positiveInteger(v.year) || Number(v.year)<1900 || Number(v.year)>new Date().getFullYear()+1) errors.push("Add the make, model and a valid year, using lookup or manual entry.");
- if (!positiveInteger(c.mileage)) errors.push("Enter a valid mileage (zero is allowed).");
- if (!['yes','no'].includes(String(c.registeredKeeper))) errors.push("Tell us whether you are the registered keeper.");
+ if (!v.make || !v.model || !positiveInteger(v.year) || Number(v.year)<1900 || Number(v.year)>new Date().getFullYear()+1) errors.push("Add your bike's make, model and year. Use Find my bike or open Add or correct your bike details.");
+ if (!positiveInteger(c.mileage)) errors.push("Enter the mileage in miles, using whole numbers. Enter 0 if the bike has not covered any miles.");
+ if (!['yes','no'].includes(String(c.registeredKeeper))) errors.push("Tell us whether your name is on the V5C logbook.");
  if (step>=2) {
   if (!['Excellent','Good','Average','Poor','Non-runner'].includes(String(c.overallCondition))) errors.push("Choose the motorcycle's condition.");
   if (!['Full history','Part history','No history','Unknown'].includes(String(c.serviceHistory))) errors.push("Choose the service history.");
-  for(const key of ['running','writtenOff','outstandingFinance','mechanicalFaults','cosmeticDamage']) if(!(['writtenOff','outstandingFinance'].includes(key)?['yes','no','unsure']:['yes','no']).includes(String(c[key])))errors.push(`Answer the ${key.replace(/([A-Z])/g,' $1').toLowerCase()} question.`);
-  for(const [question,detail] of [['writtenOff','writeOffCategory'],['mechanicalFaults','faultDescription'],['cosmeticDamage','damageDescription']])if(c[question]==='yes'&&!c[detail])errors.push(`Add the ${detail.replace(/([A-Z])/g,' $1').toLowerCase()}.`);
+  const questions:Record<string,string>={running:"Tell us whether the bike starts and can be ridden.",writtenOff:"Tell us whether an insurer has recorded the bike as a write-off. Choose Unsure if you do not know.",outstandingFinance:"Tell us whether there is money still owed on finance. Choose Unsure if you do not know.",mechanicalFaults:"Tell us whether the bike has any mechanical or electrical faults.",cosmeticDamage:"Tell us whether there are any scratches, dents, rust or damaged bodywork."};
+  for(const key of Object.keys(questions)) if(!(['writtenOff','outstandingFinance'].includes(key)?['yes','no','unsure']:['yes','no']).includes(String(c[key])))errors.push(questions[key]);
+  const details:Record<string,string>={writeOffCategory:"Enter the write-off category, or enter Not known if you are unsure.",faultDescription:"Describe the faults you know about.",damageDescription:"Describe the damage you know about."};
+  for(const [question,detail] of [['writtenOff','writeOffCategory'],['mechanicalFaults','faultDescription'],['cosmeticDamage','damageDescription']])if(c[question]==='yes'&&!c[detail])errors.push(details[detail]);
  }
  if(step>=4){
   if(!s.firstName||!s.lastName)errors.push("Enter your first and last name.");

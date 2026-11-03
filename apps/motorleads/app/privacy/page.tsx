@@ -15,14 +15,14 @@ export default function PrivacyPage() {
     {
       title: "How we use information",
       body: [
-        "We use information to respond to enquiries, review dealer access requests, operate the MotorGeeks service, understand motorcycle opportunities and help route suitable seller enquiries to appropriate motorcycle dealers.",
+        "We use information to respond to enquiries, review dealer access requests, operate the MotorGeeks service, review bike details and help connect sellers with suitable motorcycle dealers.",
         "We may use technical information such as browser, device, security and server log data to keep the website working, prevent misuse and improve reliability."
       ]
     },
     {
       title: "Sharing information",
       body: [
-        "Where a seller uses MotorGeeks, relevant motorcycle and opportunity information may be shared with selected motorcycle dealers. Seller contact details are made available only to the dealer whose offer the seller accepts.",
+        "Where a seller uses MotorGeeks, relevant motorcycle details may be shared with selected motorcycle dealers. Seller contact details are made available only to the dealer whose offer the seller accepts.",
         "We do not sell personal information for unrelated marketing. We may share information with service providers who help us run the website, email delivery, hosting, security or business administration."
       ]
     },

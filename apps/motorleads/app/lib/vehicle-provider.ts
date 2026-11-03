@@ -32,7 +32,7 @@ export async function lookupByRegistration(registrationInput: string): Promise<V
   const registration = normaliseRegistration(registrationInput);
   if (!/^[A-Z0-9]{2,8}$/.test(registration)) throw new VehicleLookupError("Enter a valid UK motorcycle registration.", "invalid_vrm", 400);
   if (!hasAutotraderConfig()) {
-    throw new VehicleLookupError("Vehicle lookup is not configured yet. You can still enter your motorcycle manually.", "provider_unavailable", 503);
+    throw new VehicleLookupError("We cannot look up your bike right now. You can add its details yourself below.", "provider_unavailable", 503);
   }
 
   const config = getAutotraderConfig();
@@ -44,7 +44,7 @@ export async function lookupByRegistration(registrationInput: string): Promise<V
   });
   const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
   if (response.status === 404) throw new VehicleLookupError("We could not find that registration. You can enter the motorcycle manually.", "not_found", 404);
-  if (response.status === 403) throw new VehicleLookupError("The current Auto Trader agreement does not allow this vehicle lookup. Use manual entry for now.", "licensing_blocked", 403);
+  if (response.status === 403) throw new VehicleLookupError("We cannot look up this registration right now. You can add your bike's details yourself below.", "licensing_blocked", 403);
   if (!response.ok) throw new VehicleLookupError("Vehicle lookup is temporarily unavailable. Your progress is safe.", "provider_unavailable", 502);
 
   const vehicle = objectValue(payload.vehicle);

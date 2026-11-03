@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { SellerPhotoControls } from "../components/seller-photo-controls";
 import { sellerValidation, type SellerForm } from "../lib/seller-input";
@@ -11,7 +11,7 @@ type Vehicle = FormRecord;
 type Condition = FormRecord;
 type Seller = FormRecord;
 
-const steps = ["Your motorcycle", "Condition & history", "Photos", "Offers"];
+const steps = ["Your motorcycle", "Condition and history", "Photos", "Your contact details"];
 const photoGuidance = ["Front", "Rear", "Left side", "Right side", "Dashboard", "Damage", "Service history"];
 export function ValuationFlow({ initialRegistration = "" }: { initialRegistration?: string }) {
   const [step, setStep] = useState(1);
@@ -114,7 +114,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
       setVehicle({ ...payload.vehicle, registration: payload.vehicle.registration || value });
       setRegistration(payload.vehicle.registration || value);
     } catch (error) {
-      setLookup("error"); setMessage(error instanceof Error ? error.message : "Lookup failed. Manual entry is available.");
+      setLookup("error"); setMessage(error instanceof Error ? error.message : "We could not find your bike's details. You can add them yourself below.");
     } finally { setBusy(false); }
   }
   function next() {
@@ -133,7 +133,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
       const payload = await enqueue(() => request("/api/valuation/submit", { ...latest.current, version: revision.current }));
       stopped.current = true; setSubmitted(payload); setSaveState("Saved");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to submit. Your answers are retained; retry safely.");
+      setMessage(error instanceof Error ? error.message : "We could not send your details. Your answers are saved, so please try again.");
     } finally { setBusy(false); }
   }
 
@@ -141,7 +141,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
     return <section className="mg-valuation-complete">
       <div className="mg-success-icon">✓</div>
       <h1>{"You're all done!"}</h1>
-      <p>Your motorcycle profile has been saved.</p>
+      <p>Your motorcycle details are saved. We will review them before showing your bike to suitable dealers.</p>
       <article>
         <b>{vehicleTitle}</b>
         <span>{[displayValue(vehicle.year, "Year not set"), vehicle.derivative, vehicle.engineCapacity && `${vehicle.engineCapacity}cc`, vehicle.fuelType, displayValue(vehicle.colour, "Colour not set")].filter(Boolean).join(" · ")}</span>
@@ -153,7 +153,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
         <span>Available to dealers</span>
         <span>Offers received</span>
       </div>
-      <p className="mg-info">{submitted.emailStatus === "accepted" ? "Your secure-link email was accepted by our email provider. Check your inbox and spam folder." : "Your profile is saved. You can open it below, or request a replacement secure link if your email has not arrived."}</p>
+      <p className="mg-info">{submitted.emailStatus === "accepted" ? "Check your inbox and spam folder for the link to your motorcycle profile. You can also open your profile below." : "Your details are saved. Open your profile below, or request a new sign-in link if the email has not arrived."}</p>
       <div className="mg-complete-actions"><Link href="/seller#photos">Add more photos now</Link><Link href="/seller">Open my profile</Link><Link href="/seller/recover">Request a secure link</Link></div>
     </section>;
   }
@@ -170,31 +170,32 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
       <div className="mg-form-panel">
         <h2>Your motorcycle</h2>
         <p>{"Enter your registration and we'll look up the details. You can correct anything that does not look right."}</p>
-        <div className="mg-vrm-row"><span>UK</span><input value={registration} onChange={event => setRegistration(event.target.value.toUpperCase())} placeholder="GY23 FFW" /><button type="button" onClick={() => runLookup()}>{lookup === "loading" ? "Looking..." : "Look up reg"}</button></div>
+        <div className="mg-vrm-row"><span>UK</span><input aria-label="Motorcycle registration" autoComplete="off" value={registration} onChange={event => setRegistration(event.target.value.toUpperCase())} placeholder="GY26 ABC" /><button type="button" onClick={() => runLookup()}>{lookup === "loading" ? "Finding your bike…" : "Find my bike"}</button></div>
         {lookup === "success" && <div className="mg-found-box"><MotorGeeksTick /><div><b>We found your motorcycle</b><strong>{vehicleTitle}</strong><span>{[vehicle.year, vehicle.derivative, vehicle.engineCapacity && `${vehicle.engineCapacity}cc`, vehicle.fuelType, vehicle.colour, vehicle.motExpiry && `MOT ${vehicle.motExpiry}`].filter(Boolean).join(" · ")}</span></div></div>}
-        {lookup === "error" && <div className="mg-warning-box">Lookup unavailable. Your progress is safe and manual entry is available.</div>}
+        {lookup === "error" && <div className="mg-warning-box">You can still continue. Open “Add or correct your bike details” below and enter what you know.</div>}
         <ManualVehicle vehicle={vehicle} setVehicle={setVehicle} />
-        <Field label="Mileage" value={condition.mileage} set={v => setCondition({ ...condition, mileage: v })} required />
-        <div className="mg-two"><Field label="Previous owners" value={condition.previousOwners} set={v => setCondition({ ...condition, previousOwners: v })} /><Field label="Spare keys" value={condition.spareKeys} set={v => setCondition({ ...condition, spareKeys: v })} /></div>
-        <Radio label="Are you the registered keeper?" value={condition.registeredKeeper} set={v => setCondition({ ...condition, registeredKeeper: v })} options={[["yes", "Yes"], ["no", "No - I'm selling on their behalf"]]} />
+        <Field label="Mileage (miles)" hint="Use the mileage shown on your dashboard." value={condition.mileage} set={v => setCondition({ ...condition, mileage: v })} required />
+        <CountRadio label="Previous owners (if known)" hint="Owners before you. Choose 0 if you bought the bike new." value={condition.previousOwners} set={v => setCondition({ ...condition, previousOwners: v })} max={5} />
+        <CountRadio label="Number of spare keys" hint="Extra keys, not including your main key." value={condition.spareKeys} set={v => setCondition({ ...condition, spareKeys: v })} max={3} />
+        <Radio label="Is your name on the V5C logbook?" hint="This is your registration document. Choose No if you are selling on someone else's behalf." value={condition.registeredKeeper} set={v => setCondition({ ...condition, registeredKeeper: v })} options={[["yes", "Yes"], ["no", "No - I'm selling on their behalf"]]} />
       </div>
       <JourneySide />
     </div>}
     {step === 2 && <div className="mg-step-grid">
       <div className="mg-form-panel">
-        <h2>Condition & history</h2>
-        <div className="mg-two"><Select label="Overall condition" value={condition.overallCondition} set={v => setCondition({ ...condition, overallCondition: v })} options={["Excellent", "Good", "Average", "Poor", "Non-runner"]} /><Select label="Service history" value={condition.serviceHistory} set={v => setCondition({ ...condition, serviceHistory: v })} options={["Full history", "Part history", "No history", "Unknown"]} /></div>
-        <Radio label="Running and rideable?" value={condition.running} set={v => setCondition({ ...condition, running: v })} options={[["yes", "Yes"], ["no", "No"]]} />
-        <Radio label="Has the motorcycle ever been recorded as a write-off?" value={condition.writtenOff} set={v => setCondition({ ...condition, writtenOff: v })} options={[["no", "No"], ["yes", "Yes"], ["unsure", "Unsure"]]} />
-        {condition.writtenOff === "yes" && <Field label="Write-off category" value={condition.writeOffCategory} set={v => setCondition({ ...condition, writeOffCategory: v })} />}
-        <Radio label="Outstanding finance?" value={condition.outstandingFinance} set={v => setCondition({ ...condition, outstandingFinance: v })} options={[["no", "No"], ["yes", "Yes"], ["unsure", "Unsure"]]} />
-        <Radio label="Any mechanical faults?" value={condition.mechanicalFaults} set={v => setCondition({ ...condition, mechanicalFaults: v })} options={[["no", "No"], ["yes", "Yes"]]} />
-        {condition.mechanicalFaults === "yes" && <TextArea label="Fault description" value={condition.faultDescription} set={v => setCondition({ ...condition, faultDescription: v })} />}
-        <Radio label="Any cosmetic damage?" value={condition.cosmeticDamage} set={v => setCondition({ ...condition, cosmeticDamage: v })} options={[["no", "No"], ["yes", "Yes"]]} />
-        {condition.cosmeticDamage === "yes" && <TextArea label="Damage description" value={condition.damageDescription} set={v => setCondition({ ...condition, damageDescription: v })} />}
+        <h2>Condition and history</h2>
+        <div className="mg-two"><Select label="Overall condition" value={condition.overallCondition} set={v => setCondition({ ...condition, overallCondition: v })} options={["Excellent", "Good", ["Average", "Fair - some wear"], "Poor", ["Non-runner", "Does not run"]]} /><Select label="Service history" value={condition.serviceHistory} set={v => setCondition({ ...condition, serviceHistory: v })} options={[["Full history", "All service records available"], ["Part history", "Some service records available"], ["No history", "No service records"], ["Unknown", "Not sure"]]} /></div>
+        <Radio label="Does the bike start and can it be ridden?" value={condition.running} set={v => setCondition({ ...condition, running: v })} options={[["yes", "Yes"], ["no", "No"]]} />
+        <Radio label="Has an insurer ever recorded the bike as a write-off?" hint="Check any insurance or vehicle history documents. Choose Unsure if you do not know." value={condition.writtenOff} set={v => setCondition({ ...condition, writtenOff: v })} options={[["no", "No"], ["yes", "Yes"], ["unsure", "Unsure"]]} />
+        {condition.writtenOff === "yes" && <Field label="Write-off category" hint="For example, Cat N or Cat S. Enter 'Not known' if you are unsure." value={condition.writeOffCategory} set={v => setCondition({ ...condition, writeOffCategory: v })} />}
+        <Radio label="Is there any money still owed on finance?" value={condition.outstandingFinance} set={v => setCondition({ ...condition, outstandingFinance: v })} options={[["no", "No"], ["yes", "Yes"], ["unsure", "Unsure"]]} />
+        <Radio label="Any mechanical or electrical faults?" hint="For example, starting problems, leaks or warning lights." value={condition.mechanicalFaults} set={v => setCondition({ ...condition, mechanicalFaults: v })} options={[["no", "No"], ["yes", "Yes"]]} />
+        {condition.mechanicalFaults === "yes" && <TextArea label="Tell us about the faults" value={condition.faultDescription} set={v => setCondition({ ...condition, faultDescription: v })} />}
+        <Radio label="Any scratches, dents, rust or damaged bodywork?" value={condition.cosmeticDamage} set={v => setCondition({ ...condition, cosmeticDamage: v })} options={[["no", "No"], ["yes", "Yes"]]} />
+        {condition.cosmeticDamage === "yes" && <TextArea label="Tell us about the damage" value={condition.damageDescription} set={v => setCondition({ ...condition, damageDescription: v })} />}
         <div className="mg-three"><Field label="Last service date" value={condition.lastServiceDate} set={v => setCondition({ ...condition, lastServiceDate: v })} type="date" /><Field label="Mileage at last service" value={condition.mileageAtLastService} set={v => setCondition({ ...condition, mileageAtLastService: v })} /><Field label="MOT expiry date" value={condition.motExpiry || vehicle.motExpiry} set={v => setCondition({ ...condition, motExpiry: v })} type="date" /></div>
-        <TextArea label="Previous MOT advisories" value={condition.motAdvisories} set={v => setCondition({ ...condition, motAdvisories: v })} />
-        <TextArea label="Fitted extras" value={condition.fittedExtras} set={v => setCondition({ ...condition, fittedExtras: v })} />
+        <TextArea label="MOT advisories or warnings" hint="List any issues noted on your MOT certificate, even if the bike passed." value={condition.motAdvisories} set={v => setCondition({ ...condition, motAdvisories: v })} />
+        <TextArea label="Accessories or changes made to the bike" hint="For example, luggage, heated grips or a replacement exhaust." value={condition.fittedExtras} set={v => setCondition({ ...condition, fittedExtras: v })} />
       </div>
       <JourneySide />
     </div>}
@@ -215,7 +216,7 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
         <div className="mg-two"><Field label="First name" value={seller.firstName} set={v => setSeller({ ...seller, firstName: v })} required /><Field label="Last name" value={seller.lastName} set={v => setSeller({ ...seller, lastName: v })} required /></div>
         <Field label="Email address" value={seller.email} set={v => setSeller({ ...seller, email: v })} type="email" required />
         <div className="mg-two"><Field label="Mobile number" value={seller.mobile} set={v => setSeller({ ...seller, mobile: v })} required /><Field label="Postcode" value={seller.postcode} set={v => setSeller({ ...seller, postcode: v.toUpperCase() })} required /></div>
-        <label className="mg-consent"><input type="checkbox" checked={seller.consent === true} onChange={event => setSeller({ ...seller, consent: event.target.checked })} /> <span>I agree to the Privacy Policy and Terms. MotorGeeks may share my motorcycle/opportunity information with selected verified dealers who may make offers.</span></label>
+        <div className="mg-consent"><input id="seller-consent" type="checkbox" checked={seller.consent === true} onChange={event => setSeller({ ...seller, consent: event.target.checked })} /> <div><label htmlFor="seller-consent">I agree to MotorGeeks sharing my motorcycle details with selected approved dealers so they can make offers.</label> <span>I have read the <Link href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link> and agree to the <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms and Conditions</Link>.</span></div></div>
       </div>
       <JourneySide />
     </div>}
@@ -229,31 +230,45 @@ export function ValuationFlow({ initialRegistration = "" }: { initialRegistratio
 
 function ManualVehicle({ vehicle, setVehicle }: { vehicle: Vehicle; setVehicle: (vehicle: Vehicle) => void }) {
   return <details className="mg-manual">
-    <summary>No registration, import, private plate or wrong result? Edit details manually</summary>
+    <summary>Add or correct your bike details</summary>
+    <p>Use this if you have no registration, an imported bike or a private plate, or if any details are wrong.</p>
     <div className="mg-three"><Field label="Make" value={vehicle.make} set={v => setVehicle({ ...vehicle, make: v })} /><Field label="Model" value={vehicle.model} set={v => setVehicle({ ...vehicle, model: v })} /><Field label="Year" value={vehicle.year} set={v => setVehicle({ ...vehicle, year: v })} /></div>
-    <div className="mg-two"><Field label="Variant / model version" value={vehicle.derivative} set={v => setVehicle({ ...vehicle, derivative: v })} /><Field label="Engine capacity (cc)" value={vehicle.engineCapacity} set={v => setVehicle({ ...vehicle, engineCapacity: v })} /></div>
+    <div className="mg-two"><Field label="Model version (if known)" hint="The extra part of the model name, such as Sport, GT or RS." value={vehicle.derivative} set={v => setVehicle({ ...vehicle, derivative: v })} /><Field label="Engine size (cc)" value={vehicle.engineCapacity} set={v => setVehicle({ ...vehicle, engineCapacity: v })} /></div>
     <div className="mg-two"><Field label="Fuel type" value={vehicle.fuelType} set={v => setVehicle({ ...vehicle, fuelType: v })} /><Field label="Colour" value={vehicle.colour} set={v => setVehicle({ ...vehicle, colour: v })} /></div>
   </details>;
 }
 
 function JourneySide() {
-  return <aside className="mg-journey-side"><h3>What happens next</h3><ul><li>MotorGeeks reviews your motorcycle profile.</li><li>Matched approved dealers can make blind offers.</li><li>You choose whether an offer works for you.</li></ul></aside>;
+  return <aside className="mg-journey-side"><h3>What happens next</h3><ul><li>We review your bike details.</li><li>Suitable approved dealers can make offers. They cannot see each other’s offers.</li><li>You choose whether to accept an offer. There is no obligation.</li></ul></aside>;
 }
 
-function Field({ label, value, set, type = "text", required = false }: { label: string; value: unknown; set: (value: string) => void; type?: string; required?: boolean }) {
-  return <label className="mg-field"><span>{label}{required && <b>*</b>}</span><input type={type} value={value == null || typeof value === "object" ? "" : String(value)} onChange={event => set(event.target.value)} /></label>;
+function Field({ label, hint, value, set, type = "text", required = false }: { label: string; hint?: string; value: unknown; set: (value: string) => void; type?: string; required?: boolean }) {
+  const hintId = useId();
+  return <label className="mg-field"><span><span id={`${hintId}-label`}>{label}</span>{required && <b aria-hidden="true">*</b>}</span><input type={type} required={required} aria-labelledby={`${hintId}-label`} aria-describedby={hint ? hintId : undefined} value={value == null || typeof value === "object" ? "" : String(value)} onChange={event => set(event.target.value)} />{hint && <small className="mg-field-hint" id={hintId}>{hint}</small>}</label>;
 }
 
-function TextArea({ label, value, set }: { label: string; value: unknown; set: (value: string) => void }) {
-  return <label className="mg-field full"><span>{label}</span><textarea value={value == null || typeof value === "object" ? "" : String(value)} onChange={event => set(event.target.value)} /></label>;
+function TextArea({ label, hint, value, set }: { label: string; hint?: string; value: unknown; set: (value: string) => void }) {
+  const hintId = useId();
+  return <label className="mg-field full"><span id={`${hintId}-label`}>{label}</span>{hint && <small className="mg-field-hint" id={hintId}>{hint}</small>}<textarea aria-labelledby={`${hintId}-label`} aria-describedby={hint ? hintId : undefined} value={value == null || typeof value === "object" ? "" : String(value)} onChange={event => set(event.target.value)} /></label>;
 }
 
-function Select({ label, value, set, options }: { label: string; value: unknown; set: (value: string) => void; options: string[] }) {
-  return <label className="mg-field"><span>{label}</span><select value={value == null || typeof value === "object" ? "" : String(value)} onChange={event => set(event.target.value)}><option value="">Please choose</option>{options.map(option => <option key={option}>{option}</option>)}</select></label>;
+function Select({ label, value, set, options }: { label: string; value: unknown; set: (value: string) => void; options: (string | [string, string])[] }) {
+  const labelId = useId();
+  return <label className="mg-field"><span id={labelId}>{label}</span><select aria-labelledby={labelId} value={value == null || typeof value === "object" ? "" : String(value)} onChange={event => set(event.target.value)}><option value="">Please choose</option>{options.map(option => { const [key, text] = typeof option === "string" ? [option, option] : option; return <option key={key} value={key}>{text}</option>; })}</select></label>;
 }
 
-function Radio({ label, value, set, options }: { label: string; value: unknown; set: (value: string) => void; options: [string, string][] }) {
-  return <fieldset className="mg-radio"><legend>{label}</legend>{options.map(([key, text]) => <label key={key}><input type="radio" name={label} checked={value === key} onChange={() => set(key)} /> {text}</label>)}</fieldset>;
+function Radio({ label, hint, value, set, options }: { label: string; hint?: string; value: unknown; set: (value: string) => void; options: [string, string][] }) {
+  const hintId = useId();
+  return <fieldset className="mg-radio" aria-describedby={hint ? hintId : undefined}><legend>{label}</legend>{hint && <p className="mg-field-hint" id={hintId}>{hint}</p>}{options.map(([key, text]) => <label key={key}><input type="radio" name={label} checked={value === key} onChange={() => set(key)} /> {text}</label>)}</fieldset>;
+}
+
+function CountRadio({ label, hint, value, set, max }: { label: string; hint: string; value: unknown; set: (value: string) => void; max: number }) {
+  const selected = displayValue(value, "");
+  const options: [string, string][] = Array.from({ length: max + 1 }, (_, count) => [String(count), String(count)]);
+  options.push([`${max + 1}+`, `${max + 1}+`], ["Not sure", "Not sure"]);
+  // Keep an exact answer from an older draft visible until the customer changes it.
+  if (selected && !options.some(([key]) => key === selected)) options.push([selected, `${selected} (saved answer)`]);
+  return <Radio label={label} hint={hint} value={selected} set={set} options={options} />;
 }
 
 function displayValue(value: unknown, fallback: string) {

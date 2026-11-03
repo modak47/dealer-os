@@ -12,8 +12,8 @@ export default async function ValuationPage({ searchParams }: { searchParams: Pr
     <Breadcrumbs items={[{ name: "Motorbike valuation", path: "/valuation" }]} />
     <ValuationFlow initialRegistration={params.registration ?? ""} />
     <section className="ml-valuation-context"><div className="ml-shell">
-      <div><span>Understanding your valuation</span><h2>What helps dealers assess your motorcycle?</h2><p>A registration lookup can identify useful vehicle information, but condition, mileage, service history, MOT status and current demand also affect what a dealer may offer. Add accurate details and show faults plainly.</p></div>
-      <div><h3>Clear photos reduce uncertainty</h3><p>Photographs of both sides, the front, rear, dashboard, records and any damage help dealers understand the motorcycle before making an offer.</p><h3>An offer is not a guaranteed purchase</h3><p>You do not have to accept an offer. If you proceed, the dealer will confirm the motorcycle and arrange payment and handover directly with you.</p><p><Link href="/motorbike-valuation">Read the motorbike valuation guide</Link> or see <Link href="/how-to-sell-a-motorbike">how to prepare for a sale</Link>.</p></div>
+      <div><span>Understanding your valuation</span><h2>What helps dealers assess your motorcycle?</h2><p>Your registration helps us identify your bike. Its condition, mileage, service history, MOT and demand for that model also affect what dealers may offer. Check the details and tell us about any faults.</p></div>
+      <div><h3>Clear photos help dealers make offers</h3><p>Photographs of both sides, the front, rear, dashboard, records and any damage help dealers understand the motorcycle before making an offer.</p><h3>An offer is not a guaranteed purchase</h3><p>You do not have to accept an offer. If you proceed, the dealer will confirm the motorcycle and arrange payment and handover directly with you.</p><p><Link href="/motorbike-valuation">Read the motorbike valuation guide</Link> or see <Link href="/how-to-sell-a-motorbike">how to prepare for a sale</Link>.</p></div>
     </div></section>
   </PageShell>;
 }

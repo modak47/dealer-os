@@ -56,7 +56,8 @@ export function BrandGuide({ guide }: { guide: BrandGuideContent }) {
             {guide.overview.map(paragraph => <p key={paragraph}>{paragraph}</p>)}
           </section>
           <section>
-            <h2>Identify the exact model and specification</h2>
+            <h2>Tell us your model, version and features</h2>
+            <p>The version is the extra part of the model name, such as Sport, GT or RS. If you are unsure, check your registration document or service book and tell us what you know.</p>
             <p>{guide.familiesIntro}</p>
             <div className="ml-brand-families">{guide.families.map(family => <article key={family.name}>
               <h3>{family.name}</h3>
@@ -78,7 +79,7 @@ export function BrandGuide({ guide }: { guide: BrandGuideContent }) {
           </section>
           <section>
             <h2>How MotorGeeks dealer offers work</h2>
-            <p>Enter the registration or identify the motorcycle manually, then add its mileage, condition, history, specification and photographs. Approved dealers can review the profile and decide whether to make an offer. You can compare valid offers and you are not obliged to accept one.</p>
+            <p>Enter your registration or add your motorcycle details yourself, then tell us its mileage, condition, service history, features and accessories. Add clear photos so approved dealers can review your bike and decide whether to make an offer. You can compare offers and there is no obligation to accept one.</p>
             <p>If you accept, the selected dealer receives the contact information needed to discuss inspection, payment and collection or handover. The motorcycle must still match its description, and the purchase is completed directly with the dealer. Read the <Link href="/how-to-sell-a-motorbike">UK motorbike selling guide</Link> before handover.</p>
           </section>
           <section>
@@ -94,8 +95,8 @@ export function BrandGuide({ guide }: { guide: BrandGuideContent }) {
           </section>
         </div>
         <aside className="ml-guide-aside">
-          <h2>Prepare your profile</h2>
-          <p>Dealers need the exact model, current mileage, service and MOT history, keys, condition, modifications and clear photographs.</p>
+          <h2>What to have ready</h2>
+          <p>Have your model details, current mileage, service and MOT records, keys and clear photos ready. Tell us about any faults, accessories or changes made to your bike.</p>
           <Link className="ml-button ml-button-orange" href="/valuation">Start your valuation <span>→</span></Link>
           <Link href="/motorbike-valuation">What affects a valuation?</Link>
           <Link href="/motorcycle-brands">Browse all brand guides</Link>
@@ -104,7 +105,7 @@ export function BrandGuide({ guide }: { guide: BrandGuideContent }) {
     </article>
     <section className="ml-brand-registration">
       <div className="ml-shell">
-        <div><span>Ready to begin?</span><h2>Enter your registration.</h2><p>Start an accurate {guide.brand} motorcycle profile and invite approved dealers to consider it.</p></div>
+        <div><span>Ready to begin?</span><h2>Enter your registration.</h2><p>Tell us about your {guide.brand} and let approved dealers make you an offer.</p></div>
         <ValuationCta compact />
       </div>
     </section>

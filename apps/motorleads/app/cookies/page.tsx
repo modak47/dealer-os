@@ -14,15 +14,15 @@ export default function CookiesPage() {
     {
       title: "Essential cookies",
       body: [
-        "MotorGeeks may use essential cookies or similar technologies needed for website security, routing, form operation and reliable delivery of the service.",
+        "MotorGeeks uses essential cookies to keep your saved answers and sign-in working, and to help keep the website secure.",
         "These are used only where needed to provide the website and protect it from misuse."
       ]
     },
     {
       title: "Analytics and marketing cookies",
       body: [
-        "No optional analytics or advertising cookie provider should be enabled for V1 unless the business owner approves it and this notice is updated.",
-        "If optional tracking is introduced later, the website should explain what is used and provide any consent controls required by law."
+        "We do not currently use optional analytics or advertising cookies.",
+        "If we introduce optional cookies, we will update this notice and ask for consent where required."
       ]
     },
     {

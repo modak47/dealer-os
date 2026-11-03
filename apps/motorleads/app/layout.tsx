@@ -20,6 +20,7 @@ export const metadata: Metadata = {
     description: site.description,
     url: site.url,
     siteName: "MotorGeeks",
+    locale: "en_GB",
     type: "website",
     images: [{ url: site.assets.socialPreview, width: 1200, height: 630, alt: "MotorGeeks" }]
   },
@@ -29,7 +30,8 @@ export const metadata: Metadata = {
     description: site.description,
     images: [site.assets.socialPreview]
   },
-  icons: { icon: site.assets.mgIcon, apple: site.assets.mgIcon }
+  icons: { icon: site.assets.mgIcon, apple: site.assets.mgIcon },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large" } }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

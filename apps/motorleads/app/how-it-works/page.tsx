@@ -7,7 +7,7 @@ export const metadata = pageMetadata("How MotorGeeks Works", "See how to submit 
 
 export default function HowItWorksPage() {
   return <PageShell>
-    <section className="ml-page-hero how-page"><div className="ml-shell"><span>How MotorGeeks works</span><h1>A simple way to introduce your motorcycle to trusted dealers.</h1><p>Submit useful motorcycle details once, then let MotorGeeks help route the opportunity to suitable buyers.</p><Link className="ml-button ml-button-orange" href="/valuation">Start your valuation <span>→</span></Link></div></section>
+    <section className="ml-page-hero how-page"><div className="ml-shell"><span>How MotorGeeks works</span><h1>A simple way to sell your motorcycle to a trusted dealer.</h1><p>Tell us about your bike once, receive offers from suitable approved dealers and choose whether to accept.</p><Link className="ml-button ml-button-orange" href="/valuation">Start your valuation <span>→</span></Link></div></section>
     <HowItWorksSection full />
     <ImageCta />
   </PageShell>;

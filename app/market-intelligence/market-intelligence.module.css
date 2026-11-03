@@ -1,0 +1,8 @@
+.content :global(.mi-panel > .panel-title > span),
+.content :global(.mi-kpi small),
+.content :global(.mi-table th),
+.content :global(.mi-table td small),
+.content :global(.mi-trend span),
+.content :global(.mi-empty) {
+  color: #8c969d;
+}

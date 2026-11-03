@@ -16,7 +16,7 @@ export default function InvalidSellerLinkPage() {
       <div className="mg-seller-empty">
         <span>Secure access</span>
         <h1>This seller link is invalid or has expired.</h1>
-        <p>For privacy, MotorGeeks seller links expire and cannot be guessed. Request a secure link or contact MotorGeeks if you need help.</p>
+        <p>For your privacy, sign-in links expire. Request a new link to return to your saved motorcycle profile, or contact MotorGeeks for help.</p>
         <Link href="/seller/recover">Request a secure link</Link>
       </div>
     </section>

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { clearAutotraderTokenCache, testAutotraderConnection } from "../lib/autotrader";
 import { normaliseVehicleCheck } from "../lib/autotrader-vehicle-check";
-import { lookupVehicleByVrm, normaliseAutotraderVehicle } from "../lib/autotrader-vehicle-lookup";
+import { lookupBasicVehicleByVrm, lookupVehicleByVrm, normaliseAutotraderVehicle } from "../lib/autotrader-vehicle-lookup";
 
 const originalEnv = { ...process.env };
 const originalFetch = globalThis.fetch;
@@ -196,6 +196,22 @@ describe("Auto Trader Connect client", () => {
     assert.equal(check.clear, null);
     assert.equal(check.status, "Review report");
     assert.equal(check.writtenOff, null);
+  });
+
+  it("basic form lookup omits paid MOT/history/full-check options and has a request deadline", async () => {
+    process.env.AUTOTRADER_API_KEY = "sandbox-key";
+    process.env.AUTOTRADER_API_SECRET = "sandbox-secret";
+    process.env.AUTOTRADER_ADVERTISER_ID = "10014506";
+    process.env.AUTOTRADER_API_URL = "https://api-sandbox.autotrader.co.uk";
+    globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/authenticate")) return jsonResponse({ access_token: "isolated-basic-token", expires_at: "2099-01-01T00:00:00Z" });
+      assert.equal(url, "https://api-sandbox.autotrader.co.uk/vehicles?advertiserId=10014506&registration=TEST123");
+      assert.ok(init?.signal);
+      assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer isolated-basic-token");
+      return jsonResponse({ vehicle: { registration: "TEST123", make: "Honda", model: "CB500F", year: 2021 } });
+    };
+    assert.equal((await lookupBasicVehicleByVrm(" test 123 ")).model, "CB500F");
   });
 
   it("looks up a vehicle by VRM using the Auto Trader Vehicles API", async () => {

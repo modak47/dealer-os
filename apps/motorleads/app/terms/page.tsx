@@ -8,8 +8,8 @@ export default function TermsPage() {
     {
       title: "About MotorGeeks",
       body: [
-        "MotorGeeks helps motorcycle owners provide useful motorcycle details and contact information so suitable motorcycle dealers can review relevant opportunities.",
-        "The V1 service is an enquiry and introduction service. It does not guarantee a valuation, offer, sale, collection, finance settlement or purchase."
+        "MotorGeeks helps motorcycle owners provide useful motorcycle details and contact information so suitable motorcycle dealers can review bikes for sale.",
+        "MotorGeeks connects sellers with dealers. It does not guarantee a valuation, offer, sale, collection, finance settlement or purchase."
       ]
     },
     {
