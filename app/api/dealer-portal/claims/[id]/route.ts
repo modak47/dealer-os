@@ -35,6 +35,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       returned_at: status === "returned_to_pool" ? now : null,
     };
     const db = getSupabaseAdminClient();
+    const leadResult = await db.from("website_leads").select("opportunity_mode").eq("id", claim.website_lead_id).maybeSingle();
+    if (leadResult.error || !leadResult.data) return NextResponse.json({ error: "Unable to check this lead's workflow. Please try again." }, { status: 503 });
+    if (leadResult.data.opportunity_mode === "marketplace_offer") {
+      const result = await db.rpc("dealer_update_marketplace_claim", {
+        p_claim_id: claim.id, p_dealer_account_id: session.dealer.id, p_dealer_user_id: session.userId,
+        p_status: status, p_lost_reason: lostReason, p_lost_reason_detail: lostReasonDetail,
+      });
+      if (result.error) return NextResponse.json({ error: result.error.code === "42883" ? "Marketplace updates are temporarily unavailable. Contact MotorGeeks for help." : result.error.message }, { status: result.error.code === "42883" ? 503 : 409 });
+      return NextResponse.json({ claim: result.data });
+    }
+    if (["purchased", "purchased_later"].includes(claim.status)) return NextResponse.json({ error: "A purchased lead cannot be moved back to an active or lost status." }, { status: 409 });
     const { data, error } = await db.from("dealer_lead_claims").update(updates).eq("id", claim.id).select("*").single();
     if (error) return NextResponse.json({ error: `Unable to update claim: ${error.message}` }, { status: 500 });
     const leadStatus = leadStatusByClaimStatus[status];

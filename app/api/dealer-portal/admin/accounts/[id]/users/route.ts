@@ -3,6 +3,7 @@ import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getCurrentUserId } from "@/lib/current-user";
 import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
 import { assertDealerPortalUserLimit, assertSingleDealerAccountForUser, cleanDealerPortalUserEmail, cleanDealerPortalUserRole, findAuthUserByEmail } from "@/lib/dealer-portal-users";
+import { dealerInvitationRedirect } from "@/lib/dealer-auth-navigation";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +26,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     let authUser = await findAuthUserByEmail(email);
     let invited = false;
+    await assertDealerPortalUserLimit(id, authUser?.id ?? "");
     if (!authUser) {
       const invitedUser = await db.auth.admin.inviteUserByEmail(email, {
         data: { full_name: account.data.trading_name, role },
-        redirectTo: new URL("/dealer-portal", request.url).toString(),
+        redirectTo: dealerInvitationRedirect(request.url),
       });
       if (invitedUser.error) return NextResponse.json({ error: `Unable to invite dealer login: ${invitedUser.error.message}` }, { status: 500 });
       authUser = invitedUser.data.user as AuthUser;

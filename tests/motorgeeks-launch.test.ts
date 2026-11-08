@@ -78,7 +78,7 @@ describe("MotorGeeks launch completion", () => {
 
   it("uses recoverable seller email links and distinct completion states", () => {
     const sellerDelivery = source("apps/motorleads/app/lib/seller-delivery.ts");
-    const sellerPortal = source("apps/motorleads/app/seller/page.tsx");
+    const sellerPortal = source("apps/motorleads/app/lib/seller-status.ts");
     assert.match(sellerDelivery, /url:'https:\/\/motorgeeks\.co\.uk\/seller\/recover'/);
     assert.doesNotMatch(sellerDelivery, /url:'https:\/\/motorgeeks\.co\.uk\/seller'/);
     assert.match(sellerPortal, /value === "purchased"/);

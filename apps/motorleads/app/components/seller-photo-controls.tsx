@@ -24,8 +24,8 @@ export function SellerPhotoControls({endpoint='/api/valuation/photos'}:{endpoint
  <div className="mg-photo-preview-grid">{photos.map(photo=><figure key={photo.id}><img src={photo.preview_url} alt={photo.original_filename||'Motorcycle photo'}/><figcaption>{photo.original_filename}</figcaption>{editable&&<button type="button" className="mg-photo-remove" aria-label={`Remove ${photo.original_filename}`} disabled={busy} onClick={async()=>{try{const r=await fetch(`${endpoint}?id=${encodeURIComponent(photo.id)}`,{method:'DELETE'});const p=await r.json();if(!r.ok)throw new Error(p.error);setPhotos(p.photos);}catch(e){setMessage(e instanceof Error?e.message:'Could not remove photo.');}}}>×</button>}</figure>)}</div></div>;
 }
 
-export function SellerPhotoSummary({initialCount,rail=false}:{initialCount:number;rail?:boolean}){
+export function SellerPhotoSummary({initialCount,rail=false,closed=false}:{initialCount:number;rail?:boolean;closed?:boolean}){
  const [count,setCount]=useState(initialCount);
  useEffect(()=>{const update=(event:Event)=>setCount((event as CustomEvent<number>).detail);window.addEventListener('mg-seller-photo-count',update);return()=>window.removeEventListener('mg-seller-photo-count',update);},[]);
- return rail?<article className={count?'done':''}><b>Photos</b><span>{count?`${count} added`:'Can add later'}</span></article>:<p>{count?`${count} ${count===1?"photo is":"photos are"} attached to your motorcycle profile.`:'No photos have been added yet. We will still review your profile, but photos help dealers make better offers.'}</p>;
+ return rail?<article className={count?'done':''}><b>Photos</b><span>{count?`${count} added`:closed?'No photos added':'Can add later'}</span></article>:<p>{count?`${count} ${count===1?"photo is":"photos are"} attached to your motorcycle profile.`:closed?'No photos were added to this motorcycle profile.':'No photos have been added yet. We will still review your profile, but photos help dealers make better offers.'}</p>;
 }

@@ -140,7 +140,7 @@
   height: 4px;
   margin-top: 13px;
   border-radius: 999px;
-  background: #0085F5;
+  background: #0067bf;
   transform: rotate(-7deg);
 }
 
@@ -254,7 +254,7 @@
 .orangeButton {
   width: 100%;
   border: 0;
-  background: #ff5a1f;
+  background: #c93f0d;
   color: #ffffff;
 }
 
@@ -271,7 +271,7 @@
   gap: 16px;
   align-items: center;
   margin: 18px 0;
-  color: #667d95;
+  color: #526b86;
   font-size: 13px;
 }
 
@@ -404,7 +404,7 @@
 }
 
 .navItem.active {
-  background: #0085F5;
+  background: #0067bf;
   color: #ffffff;
 }
 
@@ -796,7 +796,7 @@
   min-height: 36px;
   padding: 0 13px;
   border-radius: 4px;
-  background: #0085F5;
+  background: #0067bf;
   color: #ffffff;
   font-size: 12px;
   font-weight: 700;
@@ -878,7 +878,7 @@
   padding: 5px 8px;
   border-radius: 4px;
   background: #fff0d2;
-  color: #b26300;
+  color: #875000;
   font-size: 11px;
   font-weight: 700;
 }
@@ -903,7 +903,7 @@
   height: 9px;
   margin-top: 4px;
   border-radius: 50%;
-  background: #0085F5;
+  background: #0067bf;
 }
 
 .dot.green {
@@ -1006,7 +1006,7 @@
 }
 
 .viewToggle .active {
-  background: #0085F5;
+  background: #0067bf;
   color: #ffffff;
 }
 
@@ -1108,7 +1108,7 @@
 
 .checkChip.warning {
   background: #fff0d2;
-  color: #b26300;
+  color: #875000;
 }
 
 .rowAction {
@@ -1180,7 +1180,7 @@
 .claimBox .blueButton {
   width: 100%;
   border: 0;
-  background: #0085F5;
+  background: #0067bf;
 }
 
 .summaryCells {
@@ -1399,7 +1399,7 @@
 }
 
 .leadTabs .active {
-  background: #0085F5;
+  background: #0067bf;
   color: #ffffff;
 }
 
@@ -1742,7 +1742,7 @@
   width: auto;
   min-width: 180px;
   border: 0;
-  background: #0085F5;
+  background: #0067bf;
   color: #ffffff;
 }
 
@@ -1783,7 +1783,7 @@
   min-height: 36px;
   padding: 0 13px;
   border-radius: 5px;
-  background: #0085F5;
+  background: #0067bf;
   color: #ffffff;
   font-weight: 750;
   text-decoration: none;
@@ -1796,13 +1796,14 @@
   padding: 0 18px 16px;
 }
 
-.workflowChips span {
+.workflowChips :is(span, button) {
   padding: 7px 10px;
   border: 1px solid #d6e2ee;
   border-radius: 999px;
   color: #324c68;
   font-size: 12px;
   font-weight: 750;
+  background: #ffffff;
 }
 
 .workflowChips .active {
@@ -1911,7 +1912,8 @@
 
 .mockForm .blueButton {
   border: 0;
-  background: #0085F5;
+  background: #0067bf;
+  color: #ffffff;
 }
 
 .terminalActions {
@@ -2379,7 +2381,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #0085F5;
+  background: #0067bf;
 }
 
 .mileageGraph span,
@@ -2841,3 +2843,13 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.passwordPage { display: grid; place-items: center; padding: 40px 20px; }
+.passwordPage .loginCard { width: min(100%, 470px); margin: 0; }
+.passwordPage h1 { margin: 24px 0 16px; font-size: 30px; line-height: 1.15; }
+.passwordPage form { display: grid; gap: 16px; }
+.passwordPage .loginCard > .logo { width: 220px; }
+.password .passwordToggle { position: absolute; top: auto; bottom: 3px; right: 4px; min-width: 52px; min-height: 40px; border: 0; background: white; color: #102b4f; font: inherit; font-size: 12px; cursor: pointer; }
+.password input { padding-right: 64px; }
+.app :is(a, button, input, select, textarea):focus-visible,
+.loginPage :is(a, button, input):focus-visible { outline: 3px solid #0067bf; outline-offset: 3px; }

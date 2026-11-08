@@ -5,8 +5,8 @@
   --ml-blue: #0085F5;
   --ml-blue-dark: #006fd0;
   --ml-cyan: #00B9ED;
-  --ml-orange: #ff5a1f;
-  --ml-orange-dark: #e64612;
+  --ml-orange: #c93f0d;
+  --ml-orange-dark: #ad3208;
   --ml-yellow: #ffd943;
   --ml-ink: #071b2c;
   --ml-muted: #647386;
@@ -164,7 +164,7 @@ svg {
 }
 
 .ml-button-blue {
-  background: var(--ml-blue);
+  background: var(--ml-blue-dark);
   color: white;
 }
 
@@ -263,7 +263,7 @@ svg {
 }
 
 .ml-hero-copy h1 span {
-  color: var(--ml-blue);
+  color: var(--ml-blue-dark);
 }
 
 .ml-hero-copy p {
@@ -390,7 +390,7 @@ svg {
   height: 4px;
   margin: 8px 0 17px 10px;
   border-radius: 999px;
-  background: var(--ml-blue);
+  background: var(--ml-blue-dark);
   transform: rotate(-7deg);
 }
 
@@ -455,7 +455,7 @@ svg {
 .ml-proof svg {
   width: 56px;
   height: 56px;
-  color: var(--ml-blue);
+  color: var(--ml-blue-dark);
 }
 
 .ml-trust-strip b,
@@ -504,7 +504,7 @@ svg {
 .ml-form-heading span,
 .ml-valuation-shell span,
 .ml-image-cta span {
-  color: var(--ml-blue);
+  color: var(--ml-blue-dark);
   font-size: 14px;
   font-weight: 950;
   letter-spacing: .04em;
@@ -544,7 +544,7 @@ h3 {
 .ml-scribble {
   display: block;
   margin-top: 24px;
-  color: var(--ml-blue);
+  color: var(--ml-blue-dark);
   font-size: 25px;
   transform: rotate(-5deg);
 }
@@ -570,7 +570,7 @@ h3 {
   width: 42px;
   height: 42px;
   border-radius: 999px;
-  background: var(--ml-blue);
+  background: var(--ml-blue-dark);
   color: white;
   font-style: normal;
   font-weight: 950;
@@ -640,7 +640,7 @@ h3 {
 .ml-why svg {
   width: 48px;
   height: 48px;
-  color: var(--ml-blue);
+  color: var(--ml-blue-dark);
 }
 
 .ml-why h3 {
@@ -652,7 +652,7 @@ h3 {
   position: absolute;
   right: clamp(42px, 9vw, 130px);
   bottom: 44px;
-  color: var(--ml-blue);
+  color: var(--ml-blue-dark);
   font-size: 31px;
   transform: rotate(-8deg);
   text-shadow: 0 2px 14px rgba(0, 0, 0, .45);
@@ -813,7 +813,7 @@ h3 {
 }
 
 .ml-faq-grid summary span {
-  color: var(--ml-blue);
+  color: var(--ml-blue-dark);
   font-size: 22px;
 }
 
@@ -885,7 +885,7 @@ h3 {
 .ml-newsletter button {
   border: 0;
   border-radius: 0 7px 7px 0;
-  background: var(--ml-blue);
+  background: var(--ml-blue-dark);
   color: white;
   font-size: 24px;
 }
@@ -1166,7 +1166,7 @@ h3 {
   min-height: 44px;
   border: 0;
   border-radius: 8px;
-  background: var(--ml-blue);
+  background: var(--ml-blue-dark);
   color: white;
   padding: 0 18px;
   font-weight: 900;
@@ -1189,7 +1189,7 @@ h3 {
 .ml-valuation-shell aside svg {
   width: 70px;
   height: 70px;
-  color: var(--ml-blue);
+  color: var(--ml-blue-dark);
 }
 
 .ml-valuation-shell h2 {
@@ -1245,7 +1245,7 @@ h3 {
 .ml-brand-families p { margin: 0; font-size: 15px; line-height: 1.58; }
 .ml-brand-checklist { display: grid; gap: 10px; margin: 22px 0 0; padding: 0; list-style: none; }
 .ml-brand-checklist li { position: relative; padding-left: 30px; }
-.ml-brand-checklist li::before { position: absolute; left: 0; top: 1px; color: var(--ml-blue); content: "✓"; font-size: 20px; font-weight: 950; }
+.ml-brand-checklist li::before { position: absolute; left: 0; top: 1px; color: var(--ml-blue-dark); content: "✓"; font-size: 20px; font-weight: 950; }
 .ml-brand-faqs { border-top: 1px solid var(--ml-line); }
 .ml-brand-faqs details { border-bottom: 1px solid var(--ml-line); }
 .ml-brand-faqs summary { display: flex; justify-content: space-between; gap: 18px; padding: 19px 0; color: var(--ml-ink); cursor: pointer; font-size: 18px; font-weight: 900; list-style: none; }
@@ -1641,7 +1641,7 @@ h3 {
 .mg-valuation-app > header h1 { margin-top: 4px; font-size: clamp(28px, 4vw, 42px); }
 .mg-valuation-app > header ol { display: flex; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .mg-valuation-app > header li { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 999px; background: #18324c; color: #abc4dc; font-weight: 950; }
-.mg-valuation-app > header li.active { background: var(--ml-blue); color: white; }
+.mg-valuation-app > header li.active { background: var(--ml-blue-dark); color: white; }
 .mg-step-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; }
 .mg-form-panel,.mg-journey-side,.mg-valuation-complete,.mg-seller-card,.mg-seller-empty,.mg-status-rail article { border: 1px solid #dbe6ef; border-radius: 8px; background: white; box-shadow: 0 14px 35px rgba(7, 24, 45, .08); }
 .mg-form-panel { display: grid; gap: 16px; padding: 28px; }
@@ -1658,7 +1658,7 @@ h3 {
 .mg-found-box div { display: grid; gap: 3px; }
 .mg-found-box strong { color: var(--ml-navy); font-size: 20px; }
 .mg-manual { border-top: 1px solid #e1ebf5; padding-top: 10px; }
-.mg-manual summary { cursor: pointer; color: var(--ml-blue); font-weight: 900; text-decoration: underline; }
+.mg-manual summary { cursor: pointer; color: var(--ml-blue-dark); font-weight: 900; text-decoration: underline; }
 .mg-two,.mg-three { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .mg-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .mg-field { display: grid; align-content: start; gap: 7px; color: var(--ml-navy); font-weight: 900; }
@@ -1765,3 +1765,13 @@ h3 {
 
 /* Seller logout shares the existing navigation styling. */
 .mg-seller-portal > aside button { border: 0; padding: 0; background: transparent; color: white; font: inherit; font-weight: 850; cursor: pointer; }
+
+/* Accessible text colours retain the established MotorGeeks layout. */
+.ml-guides-intro > span { color: var(--ml-blue-dark); }
+.ml-guides-intro p a { text-decoration: underline; text-underline-offset: 3px; }
+.ml-reg-form > span { color: var(--ml-navy); }
+:where(a, button, input, select, textarea, summary):focus-visible { outline: 3px solid var(--ml-blue-dark); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

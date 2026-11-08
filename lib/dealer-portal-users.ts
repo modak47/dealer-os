@@ -2,6 +2,7 @@ import "server-only";
 
 import { getCurrentUserId } from "@/lib/current-user";
 import { recordDealerPortalAuditEvent } from "@/lib/dealer-portal-audit";
+import { dealerInvitationRedirect } from "@/lib/dealer-auth-navigation";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { cleanText } from "@/lib/website-leads";
 import type { DealerPortalSession } from "@/lib/dealer-portal";
@@ -35,10 +36,11 @@ export async function inviteOrLinkDealerPortalUser(session: DealerPortalSession,
   const db = getSupabaseAdminClient();
   let authUser = await findAuthUserByEmail(email);
   let invited = false;
+  await assertDealerPortalUserLimit(session.dealer.id, authUser?.id ?? "");
   if (!authUser) {
     const invitedUser = await db.auth.admin.inviteUserByEmail(email, {
       data: { full_name: session.dealer.trading_name, role },
-      redirectTo: new URL("/dealer-portal", requestUrl).toString(),
+      redirectTo: dealerInvitationRedirect(requestUrl),
     });
     if (invitedUser.error) throw new Error(`Unable to invite dealer login: ${invitedUser.error.message}`);
     authUser = invitedUser.data.user as AuthUser;
@@ -96,6 +98,10 @@ export async function updateDealerPortalUserForSession(session: DealerPortalSess
   const updates: Record<string, unknown> = { updated_by: session.userId };
   if ("role" in body) updates.role = cleanDealerPortalUserRole(body.role);
   if ("active" in body) updates.active = body.active === true || body.active === "true" || body.active === 1 || body.active === "1";
+  if (updates.active === true && !current.active) {
+    await assertSingleDealerAccountForUser(current.user_id, session.dealer.id);
+    await assertDealerPortalUserLimit(session.dealer.id, current.user_id);
+  }
   const { data, error } = await db
     .from("dealer_portal_users")
     .update(updates)

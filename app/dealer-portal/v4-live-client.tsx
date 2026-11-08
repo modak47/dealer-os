@@ -8,6 +8,8 @@ import { directionsUrl, googleMapsUrl, staticMapUrl } from "@/lib/location-ui";
 import { dealerLostReasons } from "@/lib/dealer-portal-lifecycle";
 import { marketplaceFeeForPrice, type MarketplaceFeeBand } from "@/lib/marketplace-fees";
 import { createClient } from "@/lib/supabase/client";
+import { dealerAuthError, dealerPasswordPath, safeAuthNext } from "@/lib/dealer-auth-navigation";
+import { dealerPortalRequest } from "@/lib/dealer-portal-request";
 import { combineLeadImages, customerName, formatGbp, formatLeadDate, formatMileage, safeNumber, statusLabel } from "@/lib/website-leads";
 import type { DealerBuyingPreferences, DealerFeeLedgerEntry, DealerGeographyPreferences, DealerLeadClaimStatus, DealerLeadNote, DealerMileageHistoryItem, DealerMotHistoryItem, DealerPortalAccount, DealerPortalAccountWithPreferences, DealerPortalUserRole, DealerPortalUserSummary, DealerPurchase, DealerPurchaseFee, DealerVisibleLead } from "@/types/dealer-portal";
 import styles from "@/app/dealer-v4-preview/v4-preview.module.css";
@@ -51,14 +53,17 @@ export function DealerLoginV4Live({ configured }: { configured: boolean }) {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberEmail, setRememberEmail] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const saved = window.localStorage.getItem("dealeros-login-email");
-      if (saved) setEmail(saved);
+      try {
+        const saved = window.localStorage.getItem("dealeros-login-email");
+        if (saved) setEmail(saved);
+      } catch { /* Login still works when browser storage is blocked. */ }
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -75,13 +80,15 @@ export function DealerLoginV4Live({ configured }: { configured: boolean }) {
       const cleanEmail = email.trim();
       const { error } = await createClient().auth.signInWithPassword({ email: cleanEmail, password });
       if (error) throw error;
-      if (rememberEmail) window.localStorage.setItem("dealeros-login-email", cleanEmail);
-      else window.localStorage.removeItem("dealeros-login-email");
+      try {
+        if (rememberEmail) window.localStorage.setItem("dealeros-login-email", cleanEmail);
+        else window.localStorage.removeItem("dealeros-login-email");
+      } catch { /* Remembering an email is optional. */ }
       const next = searchParams.get("next");
       router.replace(isSafeDealerNext(next) ? next! : "/dealer-portal");
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Sign in failed.");
+      setMessage(dealerAuthError(error, "Unable to sign in. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -93,9 +100,14 @@ export function DealerLoginV4Live({ configured }: { configured: boolean }) {
       return;
     }
     setLoading(true);
-    const { error } = await createClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/dealer-portal")}` });
-    setLoading(false);
-    setMessage(error ? error.message : "Password reset email sent.");
+    setMessage("");
+    try {
+      const { error } = await createClient().auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(dealerPasswordPath)}` });
+      if (error) throw error;
+      setMessage("If this email has a dealer login, we’ll send a password reset link.");
+    } catch (error) {
+      setMessage(dealerAuthError(error, "Unable to request a password email. Please try again."));
+    } finally { setLoading(false); }
   }
 
   return <main className={styles.loginPage}>
@@ -114,16 +126,16 @@ export function DealerLoginV4Live({ configured }: { configured: boolean }) {
         <h2>Dealer login</h2>
         <p>Log in to access your MotorGeeks dealer portal.</p>
         <label className={styles.field}>Email address<input value={email} onChange={event => setEmail(event.target.value)} placeholder="yourname@dealership.co.uk" type="email" autoComplete="email" required disabled={!configured || loading} /></label>
-        <label className={`${styles.field} ${styles.password}`}>Password<input value={password} onChange={event => setPassword(event.target.value)} placeholder="Enter your password" type="password" autoComplete="current-password" required disabled={!configured || loading} /><span>◉</span></label>
+        <div className={`${styles.field} ${styles.password}`}><label htmlFor="dealer-login-password">Password</label><input id="dealer-login-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Enter your password" type={showPassword ? "text" : "password"} autoComplete="current-password" required disabled={!configured || loading} /><button className={styles.passwordToggle} type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)} disabled={loading}>{showPassword ? "Hide" : "Show"}</button></div>
         <div className={styles.loginOptions}>
-          <label><input type="checkbox" checked={rememberEmail} onChange={event => setRememberEmail(event.target.checked)} disabled={loading} /> Remember me</label>
+          <label><input type="checkbox" checked={rememberEmail} onChange={event => setRememberEmail(event.target.checked)} disabled={loading} /> Remember my email</label>
           <button type="button" onClick={resetPassword} disabled={!configured || loading}>Forgot password?</button>
         </div>
-        {message && <p className={message.includes("sent") ? styles.successMessage : styles.errorMessage}>{message}</p>}
+        {(message || searchParams.get("error")) && <p role="status" className={message.includes("we’ll send") ? styles.successMessage : styles.errorMessage}>{message || "This sign-in link has expired. Request a new password email below."}</p>}
         <button className={styles.orangeButton} type="submit" disabled={!configured || loading}>{loading ? "Logging in..." : "Log in →"}</button>
         <div className={styles.divider}>or</div>
-        <a className={styles.outlineButton} href="mailto:support@motorgeeks.co.uk?subject=Dealer%20access%20request">Request dealer access →</a>
-        <a className={styles.loginNetwork} href="mailto:support@motorgeeks.co.uk?subject=Dealer%20access%20request">Not a dealer yet? Join our verified dealer network</a>
+        <a className={styles.outlineButton} href={`${motorgeeksWebsiteUrl}/dealer-access`}>Request dealer access →</a>
+        <a className={styles.loginNetwork} href={`${motorgeeksWebsiteUrl}/dealer-access`}>Not a dealer yet? Join our verified dealer network</a>
       </form>
       <aside className={styles.benefitColumn}>
         <Benefit icon={<ShieldIcon />} title="Verified dealer network">All dealers are reviewed and approved before access is granted.</Benefit>
@@ -142,14 +154,13 @@ export function DealerPortalV4Live({ section = "dashboard" }: { section?: Portal
   const [status, setStatus] = useState<PortalStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     const [response, marketplaceResponse] = await Promise.all([
-      fetch("/api/dealer-portal/leads", { cache: "no-store" }),
-      fetch("/api/dealer-portal/offer-leads", { cache: "no-store" }),
+      dealerPortalRequest("/api/dealer-portal/leads", { cache: "no-store" }),
+      dealerPortalRequest("/api/dealer-portal/offer-leads", { cache: "no-store" }),
     ]);
     const payload = await response.json();
     const marketplacePayload = await marketplaceResponse.json();
@@ -174,21 +185,15 @@ export function DealerPortalV4Live({ section = "dashboard" }: { section?: Portal
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  async function signOut() {
-    await createClient().auth.signOut();
-    setData(null);
-    setNotice("Signed out.");
-  }
 
   if (loading) return <V4Loading label="Loading dealer portal..." />;
-  if (!data) return <DealerUnavailable error={error} status={status} />;
+  if (!data) return <DealerUnavailable error={error} status={status} onRetry={() => void load()} />;
 
   const active = activeLeads(data.claimed);
   const purchased = purchasedLeads(data.claimed);
   const lost = lostLeads(data.claimed);
 
-  return <DealerV4Shell dealer={data.dealer} section={section} counts={{ available: data.available.length, offerLeads: data.marketplaceAvailable.length, offers: data.marketplaceOffers.length, active: active.length, purchased: purchased.length, lost: lost.length }} onSignOut={signOut}>
-    {notice && <p className={styles.successMessage}>{notice}</p>}
+  return <DealerV4Shell dealer={data.dealer} section={section} counts={{ available: data.available.length, offerLeads: data.marketplaceAvailable.length, offers: data.marketplaceOffers.length, active: active.length, purchased: purchased.length, lost: lost.length }}>
     {section === "dashboard" && <Dashboard data={data} active={active} purchased={purchased} lost={lost} />}
     {section === "opportunities" && <OpportunityList leads={data.available} title="Opportunities" subtitle="Motorcycles currently available to your dealership." empty="No available opportunities right now." />}
     {section === "offer-leads" && <MarketplaceOfferLeadList leads={data.marketplaceAvailable} />}
@@ -220,7 +225,7 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const response = await fetch("/api/dealer-portal/leads", { cache: "no-store" });
+    const response = await dealerPortalRequest("/api/dealer-portal/leads", { cache: "no-store" });
     const payload = await response.json();
     if (response.ok) {
       setData({
@@ -254,7 +259,7 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
     setBusy(true);
     setError("");
     setNotice("");
-    const response = await fetch(`/api/dealer-portal/leads/${lead.id}/claim`, { method: "POST" });
+    const response = await dealerPortalRequest(`/api/dealer-portal/leads/${lead.id}/claim`, { method: "POST" });
     const payload = await response.json();
     if (response.ok) {
       setNotice("Lead claimed. Customer details are now unlocked.");
@@ -290,7 +295,7 @@ export function DealerLeadWorkspaceV4Live({ leadId }: { leadId: string }) {
   }
 
   if (loading) return <V4Loading label="Loading opportunity..." />;
-  if (!data) return <DealerUnavailable error={error} status={status} />;
+  if (!data) return <DealerUnavailable error={error} status={status} onRetry={() => void load()} />;
   if (!lead) return <DealerV4Shell dealer={data.dealer} section="opportunities" counts={shellCounts(data)}><section className={styles.dashboard}><Link className={styles.breadcrumb} href="/dealer-portal/opportunities">← Back to opportunities</Link><EmptyPanel title="Lead not available" copy="This opportunity is not currently available to your dealership, or it has moved out of your authorised portal records." /></section></DealerV4Shell>;
 
   return <DealerV4Shell dealer={data.dealer} section="opportunities" counts={shellCounts(data)}>
@@ -314,8 +319,8 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
     setLoading(true);
     setError("");
     const [directResponse, marketplaceResponse] = await Promise.all([
-      fetch("/api/dealer-portal/leads", { cache: "no-store" }),
-      fetch("/api/dealer-portal/offer-leads", { cache: "no-store" }),
+      dealerPortalRequest("/api/dealer-portal/leads", { cache: "no-store" }),
+      dealerPortalRequest("/api/dealer-portal/offer-leads", { cache: "no-store" }),
     ]);
     const direct = await directResponse.json();
     const marketplace = await marketplaceResponse.json();
@@ -326,7 +331,7 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
         marketplaceOffers: marketplace.offers ?? [],
         marketplaceFeeBands: marketplace.marketplace_fee_bands ?? [],
       });
-    } else setError(direct.error || marketplace.error || "Unable to load this offer lead.");
+    } else { setData(null); setError(direct.error || marketplace.error || "Unable to load this offer lead."); }
     setLoading(false);
   }, []);
 
@@ -370,7 +375,7 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
     setBusy(true);
     setError("");
     setNotice("");
-    const response = await fetch(`/api/dealer-portal/offer-leads/${lead.id}/offer`, {
+    const response = await dealerPortalRequest(`/api/dealer-portal/offer-leads/${lead.id}/offer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount, note }),
@@ -386,7 +391,7 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
   }
 
   if (loading) return <V4Loading label="Loading offer lead..." />;
-  if (!data) return <DealerUnavailable error={error} status={null} />;
+  if (!data) return <DealerUnavailable error={error} status={null} onRetry={() => void load()} />;
   if (!lead) return <DealerV4Shell dealer={data.dealer} section="offer-leads" counts={shellCounts(data)}><section className={styles.dashboard}><Link className={styles.breadcrumb} href="/dealer-portal/offer-leads">← Offer Leads</Link><EmptyPanel title="Offer lead not available" copy="This marketplace opportunity is not currently available to your dealership." /></section></DealerV4Shell>;
 
   return <DealerV4Shell dealer={data.dealer} section="offer-leads" counts={shellCounts(data)}>
@@ -414,7 +419,7 @@ export function DealerMarketplaceWorkspaceV4Live({ leadId }: { leadId: string })
           </form>
         </Panel>
       </section>
-      <nav className={styles.leadTabs} aria-label="Marketplace opportunity tabs">{[["overview", "Overview"], ["vehicle-check", "Vehicle Check"], ["mot", "MOT & Mileage"], ["location", "Location"]].map(([value, label]) => <button className={activeTab === value ? styles.active : ""} type="button" onClick={() => setActiveTab(value as Exclude<LeadTab, "customer">)} key={value}>{label}</button>)}</nav>
+      <nav className={styles.leadTabs} aria-label="Marketplace opportunity tabs">{[["overview", "Overview"], ["vehicle-check", "Vehicle Check"], ["mot", "MOT & Mileage"], ["location", "Location"]].map(([value, label]) => <button className={activeTab === value ? styles.active : ""} aria-pressed={activeTab === value} type="button" onClick={() => setActiveTab(value as Exclude<LeadTab, "customer">)} key={value}>{label}</button>)}</nav>
       <div className={styles.tabContent}>
         {activeTab === "overview" && <OverviewTab lead={lead} />}
         {activeTab === "vehicle-check" && <VehicleCheckTab lead={lead} />}
@@ -592,7 +597,7 @@ function LeadWorkspaceView({ dealer, lead, activeTab, tabsRef, busy, error, noti
       <article className={styles.galleryPanel}><WorkspaceGallery images={images} imageIndex={imageIndex} title={title} onPrevious={showPrevious} onNext={showNext} onOpen={(index) => { setImageIndex(index); setLightboxOpen(true); }} /></article>
       <article className={styles.customerLocked}>{unlocked ? <><CheckIcon /><h2>Customer details unlocked</h2><p>{customerName(lead)} · {lead.portal_location_label || "Location pending"}</p></> : <><LockIcon /><h2>Customer details</h2><p>Customer contact details will be available after you claim this opportunity.</p></>}</article>
     </section>
-    <nav className={styles.leadTabs} aria-label="Lead workspace tabs" ref={tabsRef}>{tabs.map(([value, label]) => <button className={tab === value ? styles.active : ""} type="button" onClick={() => onSelectTab(value)} key={value}>{label}</button>)}</nav>
+    <nav className={styles.leadTabs} aria-label="Lead workspace tabs" ref={tabsRef}>{tabs.map(([value, label]) => <button className={tab === value ? styles.active : ""} aria-pressed={tab === value} type="button" onClick={() => onSelectTab(value)} key={value}>{label}</button>)}</nav>
     <div className={styles.tabContent}>
       {tab === "overview" && <OverviewTab lead={lead} />}
       {tab === "vehicle-check" && <VehicleCheckTab lead={lead} />}
@@ -668,6 +673,7 @@ function CustomerWorkTab({ lead, onChanged }: { lead: DealerVisibleLead; onChang
 function WorkLeadPanel({ claimId, lead, onChanged }: { claimId: string; lead: DealerVisibleLead; onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
   const [noteType, setNoteType] = useState("note");
   const [noteBody, setNoteBody] = useState("");
   const [lostReason, setLostReason] = useState<string>(lostReasons[0]);
@@ -680,8 +686,9 @@ function WorkLeadPanel({ claimId, lead, onChanged }: { claimId: string; lead: De
   async function updateStatus(status: DealerLeadClaimStatus, extra: Record<string, unknown> = {}) {
     setBusy(status);
     setMessage("");
-    const response = await fetch(`/api/dealer-portal/claims/${claimId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, ...extra }) });
+    const response = await dealerPortalRequest(`/api/dealer-portal/claims/${claimId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, ...extra }) });
     const payload = await response.json();
+    setMessageIsError(!response.ok);
     if (!response.ok) setMessage(payload.error || "Unable to update status.");
     else { setMessage("Status updated."); await onChanged(); }
     setBusy("");
@@ -690,8 +697,9 @@ function WorkLeadPanel({ claimId, lead, onChanged }: { claimId: string; lead: De
   async function addNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy("note");
-    const response = await fetch(`/api/dealer-portal/claims/${claimId}/notes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note_type: noteType, body: noteBody }) });
+    const response = await dealerPortalRequest(`/api/dealer-portal/claims/${claimId}/notes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note_type: noteType, body: noteBody }) });
     const payload = await response.json();
+    setMessageIsError(!response.ok);
     if (!response.ok) setMessage(payload.error || "Unable to add note.");
     else { setNoteBody(""); setMessage("Note added."); await onChanged(); }
     setBusy("");
@@ -700,18 +708,19 @@ function WorkLeadPanel({ claimId, lead, onChanged }: { claimId: string; lead: De
   async function reportPurchase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy("purchase");
-    const response = await fetch(`/api/dealer-portal/claims/${claimId}/purchase`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(purchase) });
+    const response = await dealerPortalRequest(`/api/dealer-portal/claims/${claimId}/purchase`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(purchase) });
     const payload = await response.json();
+    setMessageIsError(!response.ok);
     if (!response.ok) setMessage(payload.error || "Unable to report purchase.");
-    else { setMessage("Purchase reported and Successful Purchase Fee created."); await onChanged(); }
+    else { setMessage(marketplacePurchase ? "Purchase reported and marketplace fee recorded." : "Purchase reported and Successful Purchase Fee created."); await onChanged(); }
     setBusy("");
   }
 
   return <Panel title="Work lead" link="Current state">
-    {message && <p className={message.includes("Unable") ? styles.errorMessage : styles.successMessage}>{message}</p>}
-    <div className={styles.workflowChips}>{workStatuses.map(([status, label]) => <button className={lead.portal_claim_status === status ? styles.active : ""} type="button" disabled={Boolean(busy)} onClick={() => void updateStatus(status)} key={status}>{label}</button>)}</div>
-    <form className={styles.mockForm} onSubmit={addNote}><select value={noteType} onChange={event => setNoteType(event.target.value)}><option value="note">Note</option><option value="call">Call</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="offer">Offer</option></select><textarea value={noteBody} onChange={event => setNoteBody(event.target.value)} placeholder="Add activity note, offer, call outcome or next step" required /><button className={styles.blueButton} disabled={Boolean(busy)}>{busy === "note" ? "Adding..." : "Add Note"}</button></form>
-    <details className={styles.outcomePanel}><summary>Lost / Return</summary><div><select value={lostReason} onChange={event => setLostReason(event.target.value)}>{lostReasons.map(reason => <option key={reason}>{reason}</option>)}</select>{lostReason === "Other" && <input value={lostReasonDetail} onChange={event => setLostReasonDetail(event.target.value)} placeholder="Brief reason" />}<button type="button" onClick={() => void updateStatus("lost", { lost_reason: lostReason, lost_reason_detail: lostReasonDetail })}>Mark Lost</button><button type="button" onClick={() => void updateStatus("returned_to_pool")}>Return to Pool</button></div></details>
+    {message && <p role={messageIsError ? "alert" : "status"} className={messageIsError ? styles.errorMessage : styles.successMessage}>{message}</p>}
+    <div className={styles.workflowChips}>{workStatuses.filter(([status]) => !marketplacePurchase || ["agreed_to_purchase", "collection_booked"].includes(status)).map(([status, label]) => <button className={lead.portal_claim_status === status ? styles.active : ""} aria-pressed={lead.portal_claim_status === status} type="button" disabled={Boolean(busy)} onClick={() => void updateStatus(status)} key={status}>{label}</button>)}</div>
+    <form className={styles.mockForm} onSubmit={addNote}><select aria-label="Activity type" value={noteType} onChange={event => setNoteType(event.target.value)}><option value="note">Note</option><option value="call">Call</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="offer">Offer</option></select><textarea aria-label="Activity note" value={noteBody} onChange={event => setNoteBody(event.target.value)} placeholder="Add activity note, offer, call outcome or next step" required /><button className={styles.blueButton} disabled={Boolean(busy)}>{busy === "note" ? "Adding..." : "Add Note"}</button></form>
+    <details className={styles.outcomePanel}><summary>{marketplacePurchase ? "Sale did not complete" : "Lost / Return"}</summary><div><select aria-label="Lost reason" value={lostReason} onChange={event => setLostReason(event.target.value)}>{lostReasons.map(reason => <option key={reason}>{reason}</option>)}</select>{lostReason === "Other" && <input aria-label="Other lost reason" value={lostReasonDetail} onChange={event => setLostReasonDetail(event.target.value)} placeholder="Brief reason" />}<button type="button" disabled={Boolean(busy)} onClick={() => void updateStatus("lost", { lost_reason: lostReason, lost_reason_detail: lostReasonDetail })}>{marketplacePurchase ? "Close sale as not completed" : "Mark Lost"}</button>{!marketplacePurchase && <button type="button" disabled={Boolean(busy)} onClick={() => void updateStatus("returned_to_pool")}>Return to Pool</button>}</div></details>
     <details className={styles.outcomePanel}><summary>Report Purchase</summary><form onSubmit={reportPurchase}>{marketplacePurchase && <div className={`${styles.offerCostBox} ${styles.fullField}`}><p><strong>Agreed motorcycle purchase:</strong> {formatGbp(agreedPurchase ?? 0)}</p><p><strong>MotorGeeks successful purchase fee:</strong> {formatGbp(marketplaceFee)}</p><p><strong>Total acquisition cost:</strong> {formatGbp((agreedPurchase ?? 0) + marketplaceFee)}</p><small>The MotorGeeks fee becomes payable only when you confirm the motorcycle was actually purchased.</small></div>}<Input label="Purchase price" value={purchase.purchase_price} set={value => setPurchase(current => ({ ...current, purchase_price: value }))} type="number" required /><Input label="Purchase date" value={purchase.purchase_date} set={value => setPurchase(current => ({ ...current, purchase_date: value }))} type="date" required /><Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" /><Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" /><label className={styles.fullField}><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} /></label>{marketplacePurchase && <label className={styles.fullField}><input type="checkbox" checked={purchase.confirmed_purchased} onChange={event => setPurchase(current => ({ ...current, confirmed_purchased: event.target.checked }))} required /> I confirm this motorcycle was actually purchased at the accepted offer amount.</label>}<button className={styles.blueButton} disabled={Boolean(busy) || (marketplacePurchase && !purchase.confirmed_purchased)}>{busy === "purchase" ? "Reporting..." : "Mark as Purchased"}</button></form></details>
   </Panel>;
 }
@@ -719,17 +728,20 @@ function WorkLeadPanel({ claimId, lead, onChanged }: { claimId: string; lead: De
 function PurchasedLaterPanel({ claimId, lead, onChanged }: { claimId: string; lead: DealerVisibleLead; onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
   const [purchase, setPurchase] = useState({ purchase_price: String(safeNumber(lead.price) ?? ""), purchase_date: new Date().toISOString().slice(0, 10), collection_date: "", mileage_at_purchase: String(safeNumber(lead.mileage) ?? ""), notes: "" });
   async function reportPurchase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
-    const response = await fetch(`/api/dealer-portal/claims/${claimId}/purchase`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(purchase) });
+    const response = await dealerPortalRequest(`/api/dealer-portal/claims/${claimId}/purchase`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(purchase) });
     const payload = await response.json();
+    setMessageIsError(!response.ok);
     if (!response.ok) setMessage(payload.error || "Unable to report later purchase.");
     else { setMessage("Purchased Later reported and Successful Purchase Fee created."); await onChanged(); }
     setBusy(false);
   }
-  return <Panel title="Customer Came Back - Purchased" link="Attribution workflow">{message && <p className={message.includes("Unable") ? styles.errorMessage : styles.successMessage}>{message}</p>}<form className={styles.mockForm} onSubmit={reportPurchase}><Input label="Purchase price" value={purchase.purchase_price} set={value => setPurchase(current => ({ ...current, purchase_price: value }))} type="number" required /><Input label="Purchase date" value={purchase.purchase_date} set={value => setPurchase(current => ({ ...current, purchase_date: value }))} type="date" required /><Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" required /><Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" required /><label className={styles.fullField}><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} required /></label><button className={styles.blueButton} disabled={busy}>{busy ? "Reporting..." : "Report Purchased Later"}</button></form></Panel>;
+  if (lead.opportunity_mode === "marketplace_offer") return <Panel title="Closed marketplace sale" link="MotorGeeks support"><p>If this sale is going ahead after all, contact MotorGeeks to reopen it before reporting the purchase.</p><Link href="/dealer-portal/support">Contact support</Link></Panel>;
+  return <Panel title="Customer Came Back - Purchased" link="Attribution workflow">{message && <p role={messageIsError ? "alert" : "status"} className={messageIsError ? styles.errorMessage : styles.successMessage}>{message}</p>}<form className={styles.mockForm} onSubmit={reportPurchase}><Input label="Purchase price" value={purchase.purchase_price} set={value => setPurchase(current => ({ ...current, purchase_price: value }))} type="number" required /><Input label="Purchase date" value={purchase.purchase_date} set={value => setPurchase(current => ({ ...current, purchase_date: value }))} type="date" required /><Input label="Collection date" value={purchase.collection_date} set={value => setPurchase(current => ({ ...current, collection_date: value }))} type="date" required /><Input label="Mileage" value={purchase.mileage_at_purchase} set={value => setPurchase(current => ({ ...current, mileage_at_purchase: value }))} type="number" required /><label className={styles.fullField}><span>Notes</span><textarea value={purchase.notes} onChange={event => setPurchase(current => ({ ...current, notes: event.target.value }))} required /></label><button className={styles.blueButton} disabled={busy}>{busy ? "Reporting..." : "Report Purchased Later"}</button></form></Panel>;
 }
 
 function PaymentsPanel() {
@@ -739,7 +751,7 @@ function PaymentsPanel() {
   useEffect(() => {
     let active = true;
     async function loadPayments() {
-      const response = await fetch("/api/dealer-portal/payments", { cache: "no-store" });
+      const response = await dealerPortalRequest("/api/dealer-portal/payments", { cache: "no-store" });
       const data = await response.json();
       if (!active) return;
       if (response.ok) setPayload({ fees: data.fees ?? [], ledger: data.ledger ?? [] });
@@ -767,10 +779,12 @@ function SettingsPanel({ dealer, role, onSaved }: { dealer: DealerPortalAccountW
   const [userRole, setUserRole] = useState<DealerPortalUserRole>("dealer_user");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
   useEffect(() => { if (canManage) void loadUsers(); }, [canManage]);
   async function loadUsers() {
-    const response = await fetch("/api/dealer-portal/users", { cache: "no-store" });
+    const response = await dealerPortalRequest("/api/dealer-portal/users", { cache: "no-store" });
     const payload = await response.json();
+    setMessageIsError(!response.ok);
     if (response.ok) setUsers(payload.users ?? []);
     else setMessage(payload.error || "Unable to load dealership users.");
   }
@@ -778,8 +792,9 @@ function SettingsPanel({ dealer, role, onSaved }: { dealer: DealerPortalAccountW
     event.preventDefault();
     if (!canManage) return setMessage("Dealer Admin access is required to update account settings.");
     setSaving(true);
-    const response = await fetch("/api/dealer-portal/account", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, buying_preferences: buying, geography_preferences: geography }) });
+    const response = await dealerPortalRequest("/api/dealer-portal/account", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, buying_preferences: buying, geography_preferences: geography }) });
     const payload = await response.json();
+    setMessageIsError(!response.ok);
     if (response.ok) { onSaved(payload.dealer); setMessage("Account preferences saved."); }
     else setMessage(payload.error || "Unable to save account preferences.");
     setSaving(false);
@@ -787,8 +802,9 @@ function SettingsPanel({ dealer, role, onSaved }: { dealer: DealerPortalAccountW
   async function inviteUser() {
     if (!canManage) return;
     setSaving(true);
-    const response = await fetch("/api/dealer-portal/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: userEmail, role: userRole }) });
+    const response = await dealerPortalRequest("/api/dealer-portal/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: userEmail, role: userRole }) });
     const payload = await response.json();
+    setMessageIsError(!response.ok);
     if (response.ok) { setUserEmail(""); setMessage(payload.invited ? "Dealer user invited." : "Dealer user linked."); await loadUsers(); }
     else setMessage(payload.error || "Unable to invite dealership user.");
     setSaving(false);
@@ -796,23 +812,46 @@ function SettingsPanel({ dealer, role, onSaved }: { dealer: DealerPortalAccountW
   async function updateUser(id: string, updates: Partial<Pick<DealerPortalUserSummary, "role" | "active">>) {
     if (!canManage) return;
     setSaving(true);
-    const response = await fetch(`/api/dealer-portal/users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) });
+    const response = await dealerPortalRequest(`/api/dealer-portal/users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) });
     const payload = await response.json();
+    setMessageIsError(!response.ok);
     if (response.ok) { setMessage("Dealer user updated."); await loadUsers(); }
     else setMessage(payload.error || "Unable to update dealership user.");
     setSaving(false);
   }
-  return <form className={styles.dashboard} onSubmit={save}><div className={styles.dashboardHeader}><div><h1>Account Settings</h1><p>{canManage ? "Buying preferences, geography and dealership user permissions." : "Your account and buying profile are read-only. Ask your Dealer Admin to update dealership settings."}</p></div>{canManage && <button className={styles.blueButton} disabled={saving}>{saving ? "Saving..." : "Save settings"}</button>}</div>{message && <p className={message.includes("Unable") || message.includes("required") ? styles.errorMessage : styles.successMessage}>{message}</p>}<section className={styles.settingsGrid}><Panel title="Company details" link={canManage ? "Dealer Admin editable" : "Read only"}><div className={styles.preferenceGrid}>{Object.entries(form).map(([key, value]) => <Input key={key} label={settingLabel(key)} value={value} set={next => setForm(current => ({ ...current, [key]: next }))} disabled={!canManage} />)}</div></Panel><Panel title="Buying preferences" link={canManage ? "Dealer Admin editable" : "Read only"}><div className={styles.preferenceGrid}><TextListInput label="Types" value={buying.motorcycle_types} set={value => setBuying(current => ({ ...current, motorcycle_types: value }))} disabled={!canManage} /><TextListInput label="Makes wanted" value={buying.makes_wanted} set={value => setBuying(current => ({ ...current, makes_wanted: value }))} disabled={!canManage} /><TextListInput label="Makes excluded" value={buying.makes_excluded} set={value => setBuying(current => ({ ...current, makes_excluded: value }))} disabled={!canManage} /><TextListInput label="Models wanted" value={buying.models_wanted} set={value => setBuying(current => ({ ...current, models_wanted: value }))} disabled={!canManage} /><NumberInput label="Minimum year" value={buying.minimum_year} set={value => setBuying(current => ({ ...current, minimum_year: value }))} disabled={!canManage} /><NumberInput label="Maximum age" value={buying.maximum_age_years} set={value => setBuying(current => ({ ...current, maximum_age_years: value }))} disabled={!canManage} /><NumberInput label="Maximum mileage" value={buying.maximum_mileage} set={value => setBuying(current => ({ ...current, maximum_mileage: value }))} disabled={!canManage} /><NumberInput label="Buying radius" value={geography.maximum_radius_miles} set={value => setGeography(current => ({ ...current, maximum_radius_miles: value }))} disabled={!canManage} /></div></Panel><Panel title="History and geography rules" link="Matching criteria"><div className={styles.checklistGrid}>{(["accepts_non_running", "accepts_insurance_category", "accepts_outstanding_finance", "accepts_imported", "accepts_modified"] as const).map(key => <Checkbox key={key} label={settingLabel(key)} checked={buying[key]} set={value => setBuying(current => ({ ...current, [key]: value }))} disabled={!canManage} />)}{(["england", "wales", "scotland", "northern_ireland", "republic_of_ireland"] as const).map(key => <Checkbox key={key} label={settingLabel(key)} checked={geography[key]} set={value => setGeography(current => ({ ...current, [key]: value }))} disabled={!canManage} />)}</div></Panel>{canManage && <Panel title="Dealer users" link="Role controlled"><div className={styles.userInvite}><Input label="Email" value={userEmail} set={setUserEmail} type="email" /><label><span>Role</span><select value={userRole} onChange={event => setUserRole(event.target.value === "dealer_admin" ? "dealer_admin" : "dealer_user")}><option value="dealer_user">Dealer User</option><option value="dealer_admin">Dealer Admin</option></select></label><button className={styles.blueButton} type="button" disabled={saving || !userEmail.trim()} onClick={() => void inviteUser()}>Invite user</button></div><SimpleTable compact headers={["Email", "Role", "Status", "Action"]} rows={users.map(user => [user.email || "Email unavailable", user.role === "dealer_admin" ? "Dealer Admin" : "Dealer User", user.active ? "Active" : "Inactive", user.active ? "Can deactivate below" : "Inactive"])} />{users.map(user => <button className={styles.outlineMini} type="button" disabled={saving || !user.active} onClick={() => void updateUser(user.id, { active: false })} key={user.id}>Deactivate {user.email}</button>)}</Panel>}</section></form>;
+  return <form className={styles.dashboard} onSubmit={save}><div className={styles.dashboardHeader}><div><h1>Account Settings</h1><p>{canManage ? "Buying preferences, geography and dealership user permissions." : "Your account and buying profile are read-only. Ask your Dealer Admin to update dealership settings."}</p></div>{canManage && <button className={styles.blueButton} disabled={saving}>{saving ? "Saving..." : "Save settings"}</button>}</div>{message && <p role={messageIsError ? "alert" : "status"} className={messageIsError ? styles.errorMessage : styles.successMessage}>{message}</p>}<section className={styles.settingsGrid}><Panel title="Company details" link={canManage ? "Dealer Admin editable" : "Read only"}><div className={styles.preferenceGrid}>{Object.entries(form).map(([key, value]) => <Input key={key} label={settingLabel(key)} value={value} set={next => setForm(current => ({ ...current, [key]: next }))} disabled={!canManage} />)}</div></Panel><Panel title="Buying preferences" link={canManage ? "Dealer Admin editable" : "Read only"}><div className={styles.preferenceGrid}><TextListInput label="Types" value={buying.motorcycle_types} set={value => setBuying(current => ({ ...current, motorcycle_types: value }))} disabled={!canManage} /><TextListInput label="Makes wanted" value={buying.makes_wanted} set={value => setBuying(current => ({ ...current, makes_wanted: value }))} disabled={!canManage} /><TextListInput label="Makes excluded" value={buying.makes_excluded} set={value => setBuying(current => ({ ...current, makes_excluded: value }))} disabled={!canManage} /><TextListInput label="Models wanted" value={buying.models_wanted} set={value => setBuying(current => ({ ...current, models_wanted: value }))} disabled={!canManage} /><NumberInput label="Minimum year" value={buying.minimum_year} set={value => setBuying(current => ({ ...current, minimum_year: value }))} disabled={!canManage} /><NumberInput label="Maximum age" value={buying.maximum_age_years} set={value => setBuying(current => ({ ...current, maximum_age_years: value }))} disabled={!canManage} /><NumberInput label="Maximum mileage" value={buying.maximum_mileage} set={value => setBuying(current => ({ ...current, maximum_mileage: value }))} disabled={!canManage} /><NumberInput label="Buying radius" value={geography.maximum_radius_miles} set={value => setGeography(current => ({ ...current, maximum_radius_miles: value }))} disabled={!canManage} /></div></Panel><Panel title="History and geography rules" link="Matching criteria"><div className={styles.checklistGrid}>{(["accepts_non_running", "accepts_insurance_category", "accepts_outstanding_finance", "accepts_imported", "accepts_modified"] as const).map(key => <Checkbox key={key} label={settingLabel(key)} checked={buying[key]} set={value => setBuying(current => ({ ...current, [key]: value }))} disabled={!canManage} />)}{(["england", "wales", "scotland", "northern_ireland", "republic_of_ireland"] as const).map(key => <Checkbox key={key} label={settingLabel(key)} checked={geography[key]} set={value => setGeography(current => ({ ...current, [key]: value }))} disabled={!canManage} />)}</div></Panel>{canManage && <Panel title="Dealer users" link="Role controlled"><div className={styles.userInvite}><Input label="Email" value={userEmail} set={setUserEmail} type="email" /><label><span>Role</span><select value={userRole} onChange={event => setUserRole(event.target.value === "dealer_admin" ? "dealer_admin" : "dealer_user")}><option value="dealer_user">Dealer User</option><option value="dealer_admin">Dealer Admin</option></select></label><button className={styles.blueButton} type="button" disabled={saving || !userEmail.trim()} onClick={() => void inviteUser()}>Invite user</button></div><SimpleTable compact headers={["Email", "Role", "Status", "Action"]} rows={users.map(user => [user.email || "Email unavailable", user.role === "dealer_admin" ? "Dealer Admin" : "Dealer User", user.active ? "Active" : "Inactive", user.active ? "Can deactivate below" : "Inactive"])} />{users.map(user => <button className={styles.outlineMini} type="button" disabled={saving || !user.active} onClick={() => void updateUser(user.id, { active: false })} key={user.id}>Deactivate {user.email}</button>)}</Panel>}</section></form>;
 }
 
 function SupportPanel() {
   return <section className={styles.dashboard}><div className={styles.dashboardHeader}><div><h1>Help & Support</h1><p>Support for using MotorGeeks opportunities and account tools.</p></div><Link className={styles.blueButton} href={motorgeeksWebsiteUrl}>Back to MotorGeeks</Link></div><section className={styles.supportGrid}>{["Claiming opportunities", "Working active leads", "Reporting a purchase", "Successful Purchase Fees", "Managing dealership users", "Buying preferences"].map(topic => <article className={styles.supportCard} key={topic}><HelpIcon /><h2>{topic}</h2><p>Contact MotorGeeks support for help with this area.</p></article>)}</section><article className={`${styles.panel} ${styles.supportContact}`}><h2>Contact MotorGeeks support</h2><p>Email support@motorgeeks.co.uk for help with your dealer account, opportunities or billing questions.</p></article></section>;
 }
 
-function DealerV4Shell({ dealer, section, counts, onSignOut, children }: { dealer: DealerPortalAccountWithPreferences; section: PortalSection; counts: { available: number; offerLeads: number; offers: number; active: number; purchased: number; lost: number }; onSignOut?: () => void; children: React.ReactNode }) {
+function DealerV4Shell({ dealer, section, counts, children }: { dealer: DealerPortalAccountWithPreferences; section: PortalSection; counts: { available: number; offerLeads: number; offers: number; active: number; purchased: number; lost: number }; children: React.ReactNode }) {
+  const router = useRouter();
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const selected = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (nav && selected && nav.scrollWidth > nav.clientWidth) {
+      nav.scrollLeft += selected.getBoundingClientRect().left - nav.getBoundingClientRect().left - (nav.clientWidth - selected.clientWidth) / 2;
+    }
+  }, [section]);
+  const [signOutError, setSignOutError] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
+  async function handleSignOut() {
+    setSigningOut(true);
+    setSignOutError("");
+    try {
+      const { error } = await createClient().auth.signOut();
+      if (error) throw error;
+      router.replace("/dealer-login");
+      router.refresh();
+    } catch { setSignOutError("Unable to sign out. Please try again."); }
+    finally { setSigningOut(false); }
+  }
   return <main className={styles.app}>
-    <aside className={styles.sidebar}><div className={`${styles.logo} ${styles.sidebarLogo}`}><img src="/brand/motorgeeks-original-transparent.png" alt="MotorGeeks" /></div><nav aria-label="Dealer Portal"><NavItem active={section === "dashboard"} href="/dealer-portal" icon={<HomeIcon />} label="Dashboard" /><NavItem active={section === "offer-leads"} href="/dealer-portal/offer-leads" icon={<DocIcon />} label="Offer Leads" badge={String(counts.offerLeads)} /><NavItem active={section === "my-offers"} href="/dealer-portal/my-offers" icon={<TagIcon />} label="My Offers" badge={String(counts.offers)} /><NavItem active={section === "opportunities"} href="/dealer-portal/opportunities" icon={<DocIcon />} label="Opportunities" badge={String(counts.available)} /><NavItem active={section === "active"} href="/dealer-portal/active" icon={<ClockIcon />} label="Active Leads" badge={String(counts.active)} /><NavItem active={section === "purchased"} href="/dealer-portal/purchased" icon={<CheckIcon />} label="Purchased" badge={String(counts.purchased)} /><NavItem active={section === "lost"} href="/dealer-portal/lost" icon={<ReturnIcon />} label="Lost / Returned" badge={String(counts.lost)} /><NavItem active={section === "payments"} href="/dealer-portal/payments" icon={<TagIcon />} label="Payments" /><NavItem active={section === "dealership"} href="/dealer-portal/dealership" icon={<BuildingIcon />} label="My Dealership" /><NavItem active={section === "settings"} href="/dealer-portal/settings" icon={<GearIcon />} label="Account Settings" /><NavItem active={section === "support"} href="/dealer-portal/support" icon={<HelpIcon />} label="Help & Support" /></nav><Link className={styles.sidebarBack} href={motorgeeksWebsiteUrl}>← Back to website</Link></aside>
-    <section className={styles.workspace}><header className={styles.topbar} data-dealer-topbar="true"><div className={styles.topbarBrand}><small>Dealer Portal</small></div><div className={styles.topActions}><span>Help</span><span className={styles.profile}>{dealerInitials(dealer.trading_name)}</span><span>{dealer.trading_name}</span>{onSignOut && <button type="button" onClick={onSignOut}>Sign out</button>}</div></header>{children}</section>
+    <aside className={styles.sidebar}><div className={`${styles.logo} ${styles.sidebarLogo}`}><img src="/brand/motorgeeks-original-transparent.png" alt="MotorGeeks" /></div><nav ref={navRef} aria-label="Dealer Portal"><NavItem active={section === "dashboard"} href="/dealer-portal" icon={<HomeIcon />} label="Dashboard" /><NavItem active={section === "offer-leads"} href="/dealer-portal/offer-leads" icon={<DocIcon />} label="Offer Leads" badge={String(counts.offerLeads)} /><NavItem active={section === "my-offers"} href="/dealer-portal/my-offers" icon={<TagIcon />} label="My Offers" badge={String(counts.offers)} /><NavItem active={section === "opportunities"} href="/dealer-portal/opportunities" icon={<DocIcon />} label="Opportunities" badge={String(counts.available)} /><NavItem active={section === "active"} href="/dealer-portal/active" icon={<ClockIcon />} label="Active Leads" badge={String(counts.active)} /><NavItem active={section === "purchased"} href="/dealer-portal/purchased" icon={<CheckIcon />} label="Purchased" badge={String(counts.purchased)} /><NavItem active={section === "lost"} href="/dealer-portal/lost" icon={<ReturnIcon />} label="Lost / Returned" badge={String(counts.lost)} /><NavItem active={section === "payments"} href="/dealer-portal/payments" icon={<TagIcon />} label="Payments" /><NavItem active={section === "dealership"} href="/dealer-portal/dealership" icon={<BuildingIcon />} label="My Dealership" /><NavItem active={section === "settings"} href="/dealer-portal/settings" icon={<GearIcon />} label="Account Settings" /><NavItem active={section === "support"} href="/dealer-portal/support" icon={<HelpIcon />} label="Help & Support" /></nav><Link className={styles.sidebarBack} href={motorgeeksWebsiteUrl}>← Back to website</Link></aside>
+    <section className={styles.workspace}><header className={styles.topbar} data-dealer-topbar="true"><div className={styles.topbarBrand}><small>Dealer Portal</small></div><div className={styles.topActions}><Link href="/dealer-portal/support">Help</Link><span className={styles.profile}>{dealerInitials(dealer.trading_name)}</span><span>{dealer.trading_name}</span><button type="button" disabled={signingOut} onClick={() => void handleSignOut()}>{signingOut ? "Signing out…" : "Sign out"}</button></div></header>{signOutError && <p className={styles.errorMessage} role="alert">{signOutError}</p>}{children}</section>
   </main>;
 }
 
@@ -825,11 +864,31 @@ function SimpleTable({ headers, rows, compact = false }: { headers: string[]; ro
 }
 
 function PhotoLightbox({ images, title, index, setIndex, onClose }: { images: string[]; title: string; index: number; setIndex: React.Dispatch<React.SetStateAction<number>>; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const buttons = Array.from(dialogRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []);
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", trapFocus);
+    return () => {
+      document.removeEventListener("keydown", trapFocus);
+      document.body.style.overflow = overflow;
+      previousFocus?.focus();
+    };
+  }, []);
   const previous = () => setIndex(current => (current + images.length - 1) % images.length);
   const next = () => setIndex(current => (current + 1) % images.length);
   if (typeof document === "undefined") return null;
   const hasMultiple = images.length > 1;
-  return createPortal(<div className={styles.lightbox} role="dialog" aria-modal="true" aria-label={`${title} photos`}><button className={styles.lightboxClose} type="button" onClick={onClose} aria-label="Close gallery"><CloseIcon /></button><button className={styles.lightboxNav} type="button" onClick={previous} aria-label="Previous photo" disabled={!hasMultiple}><ChevronIcon direction="left" /></button><figure><img src={images[index]} alt={`${title} large view`} /><figcaption>{title} · {index + 1} of {images.length}</figcaption></figure><button className={styles.lightboxNav} type="button" onClick={next} aria-label="Next photo" disabled={!hasMultiple}><ChevronIcon direction="right" /></button></div>, document.body);
+  return createPortal(<div ref={dialogRef} className={styles.lightbox} role="dialog" aria-modal="true" aria-label={`${title} photos`}><button className={styles.lightboxClose} type="button" onClick={onClose} aria-label="Close gallery"><CloseIcon /></button><button className={styles.lightboxNav} type="button" onClick={previous} aria-label="Previous photo" disabled={!hasMultiple}><ChevronIcon direction="left" /></button><figure><img src={images[index]} alt={`${title} large view`} /><figcaption>{title} · {index + 1} of {images.length}</figcaption></figure><button className={styles.lightboxNav} type="button" onClick={next} aria-label="Next photo" disabled={!hasMultiple}><ChevronIcon direction="right" /></button></div>, document.body);
 }
 
 function Metric({ icon, value, label, detail }: { icon: React.ReactNode; value: string; label: string; detail: string }) {
@@ -837,7 +896,7 @@ function Metric({ icon, value, label, detail }: { icon: React.ReactNode; value: 
 }
 
 function NavItem({ icon, label, badge, active, href }: { icon: React.ReactNode; label: string; badge?: string; active: boolean; href: string }) {
-  return <Link className={`${styles.navItem} ${active ? styles.active : ""}`} href={href}>{icon}<span>{label}</span>{badge && badge !== "0" && <b className={styles.navBadge}>{badge}</b>}</Link>;
+  return <Link className={`${styles.navItem} ${active ? styles.active : ""}`} href={href} aria-current={active ? "page" : undefined}>{icon}<span>{label}</span>{badge && badge !== "0" && <b className={styles.navBadge}>{badge}</b>}</Link>;
 }
 
 function Benefit({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -856,7 +915,7 @@ function V4Loading({ label }: { label: string }) {
   return <main className={styles.loadingApp}><div className={styles.loadingState} role="status" aria-live="polite"><span />{label}</div></main>;
 }
 
-function DealerUnavailable({ error, status }: { error?: string; status?: PortalStatus | null }) {
+function DealerUnavailable({ error, status, onRetry }: { error?: string; status?: PortalStatus | null; onRetry?: () => void }) {
   if (status?.accountStatus) {
     return <main className={styles.app}><section className={styles.workspace}><section className={styles.statusPage}>
       <MotorGeeksLogo variant="wordmarkDark" />
@@ -867,7 +926,7 @@ function DealerUnavailable({ error, status }: { error?: string; status?: PortalS
       <Link className={styles.outlineButton} href={motorgeeksWebsiteUrl}>Back to website</Link>
     </section></section></main>;
   }
-  return <main className={styles.app}><section className={styles.workspace}><section className={styles.dashboard}><EmptyPanel title="Dealer access unavailable" copy={error || "Sign in with a linked dealer login, or ask MotorGeeks to set up your dealer account."} /><Link className={styles.blueButton} href="/dealer-login">Go to Dealer Login</Link></section></section></main>;
+  return <main className={styles.app}><section className={styles.workspace}><section className={styles.dashboard}><EmptyPanel title="Dealer access unavailable" copy={error || "Sign in with a linked dealer login, or ask MotorGeeks to set up your dealer account."} />{onRetry && <button className={styles.blueButton} type="button" onClick={onRetry}>Try again</button>}<Link className={styles.outlineButton} href="/dealer-login">Go to Dealer Login</Link></section></section></main>;
 }
 
 function Input({ label, value, set, type = "text", required = false, disabled = false }: { label: string; value: string; set: (value: string) => void; type?: string; required?: boolean; disabled?: boolean }) {
@@ -967,7 +1026,7 @@ function moneyOrDash(value: string | number | null | undefined) { const amount =
 function displayEngine(value: string | number | null | undefined) { if (value == null || value === "") return ""; const text = String(value).trim(); return /\bcc\b/i.test(text) ? text : `${text}cc`; }
 function dealerInitials(name: string | null | undefined) { const parts = (name || "Dealer").trim().split(/\s+/).filter(Boolean); return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : parts[0]?.slice(0, 2) || "D").toUpperCase(); }
 function paymentLeadTitle(lead: DealerAccountFee["lead"]) { if (!lead) return "Motorcycle purchase"; return `#${lead.id} ${lead.reg || "No reg"} ${[lead.year, lead.make, lead.model].filter(Boolean).join(" ")}`.trim(); }
-function isSafeDealerNext(value: string | null) { return Boolean(value && (value === "/dealer-portal" || value.startsWith("/dealer-portal/"))); }
+function isSafeDealerNext(value: string | null) { return Boolean(value && safeAuthNext(value, "") === value && (value === "/dealer-portal" || value.startsWith("/dealer-portal/"))); }
 function isLeadTab(value: string | null): value is LeadTab { return value === "overview" || value === "vehicle-check" || value === "mot" || value === "location" || value === "customer"; }
 function formatMotDate(value: string | null | undefined) { if (!value) return "Date not returned"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }
 function formatReadableDate(value: string | number | null | undefined) { if (typeof value !== "string") return ""; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "" : parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }

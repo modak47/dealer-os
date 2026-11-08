@@ -106,7 +106,7 @@ describe("dealer roles and account management security", () => {
     assert.match(route, /in\.\(pending,active\)/);
     assert.doesNotMatch(route, /dealer_portal_users/);
     assert.match(form, /Application received/);
-    assert.match(form, /awaiting review/);
+    assert.match(form, /waiting for review/);
     assert.doesNotMatch(form, /does not automatically create a Dealer Portal account/);
   });
 
