@@ -8,16 +8,21 @@ for (const [width, height] of [[1440, 900], [1280, 800], [768, 1024], [390, 844]
   test(`homepage style cards, benefits, fallback and navigation at ${width} @visual`, async ({ page }) => {
     const errors: string[] = [], failed: string[] = [], expectedFailures: string[] = [];
     let brokenImage = false;
+    const isScooterImage = (url: string) => {
+      const parsed = new URL(url);
+      return parsed.pathname === "/images/style-categories/scooters.png" ||
+        (parsed.pathname === "/_next/image" && parsed.searchParams.get("url") === "/images/style-categories/scooters.png");
+    };
     page.on("pageerror", error => errors.push(error.message));
     page.on("console", message => {
       if (message.type() !== "error") return;
-      if (brokenImage && message.location().url.includes("/images/style-categories/scooters.png") && message.text().includes("404")) return;
+      if (brokenImage && isScooterImage(message.location().url || page.url()) && message.text().includes("404")) return;
       errors.push(message.text());
     });
     page.on("requestfailed", request => { if (request.failure()?.errorText !== "net::ERR_ABORTED") failed.push(request.url()); });
     page.on("response", response => {
       if (response.status() < 400) return;
-      if (brokenImage && response.status() === 404 && new URL(response.url()).pathname === "/images/style-categories/scooters.png") expectedFailures.push(response.url());
+      if (brokenImage && response.status() === 404 && isScooterImage(response.url())) expectedFailures.push(response.url());
       else failed.push(`${response.status()} ${response.url()}`);
     });
     await page.route("https://images.unsplash.com/**", route => route.fulfill({ contentType: "image/png", body: readFileSync("public/images/style-categories/roadster.png") }));
@@ -46,6 +51,22 @@ for (const [width, height] of [[1440, 900], [1280, 800], [768, 1024], [390, 844]
       await expect(cards.nth(index).getByRole("heading", { name: category, exact: true })).toBeVisible();
       await expect(cards.nth(index)).toHaveAttribute("href", `/stock?category=${encodeURIComponent(category)}`);
     }
+    // Fine bike details must stay unchanged during and after the hover effect.
+    const photo = cards.nth(2).locator(".style-card-image");
+    await photo.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    await expect(photo.locator("img")).toHaveJSProperty("complete", true);
+    expect(await photo.locator("img").evaluate((node: HTMLImageElement) => new URL(node.currentSrc).pathname)).toBe("/_next/image");
+    const bounds = (await photo.boundingBox())!;
+    const clip = { x: bounds.x + 5, y: bounds.y + 5, width: bounds.width - 10, height: bounds.height - 10 };
+    const resting = await page.screenshot({ clip, animations: "allow" });
+    await cards.nth(2).hover();
+    const duringHover = await page.screenshot({ clip, animations: "allow" });
+    await page.waitForTimeout(1200);
+    const settledHover = await page.screenshot({ clip, animations: "allow" });
+    expect(duringHover.equals(resting), "Bike pixels changed during hover").toBe(true);
+    expect(settledHover.equals(resting), "Bike pixels changed after hover settled").toBe(true);
+    await page.mouse.move(0, 0);
     const benefits = page.locator(".trust-bar article");
     await expect(benefits).toHaveCount(5);
     expect(await benefits.evaluateAll(nodes => nodes.every(node => {
@@ -68,12 +89,13 @@ for (const [width, height] of [[1440, 900], [1280, 800], [768, 1024], [390, 844]
 
     // Exercise the real image error handler without accepting other failures.
     brokenImage = true;
-    await page.route("**/images/style-categories/scooters.png", route => route.fulfill({ status: 404, body: "Expected missing-photo fixture" }));
+    await page.route(url => isScooterImage(url.href), route => route.fulfill({ status: 404, body: "Expected missing-photo fixture" }));
     await page.reload({ waitUntil: "networkidle" });
     await expect(cards.first().locator(".style-card-placeholder")).toBeVisible();
     await expect(cards.first().getByRole("heading", { name: "Scooters" })).toBeVisible();
     await section.screenshot({ path: `${out}/fallback-${width}.png` });
-    expect(expectedFailures).toHaveLength(1);
+    // next/image can retry its src after hydration; only this fixture may fail.
+    expect(new Set(expectedFailures).size).toBe(1);
     expect(errors).toEqual([]); expect(failed).toEqual([]);
     await cards.first().click();
     await expect(page).toHaveURL(/\/stock\?category=Scooters$/);

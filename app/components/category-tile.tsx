@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { useCallback, useState } from "react";
 import { Arrow } from "./icons";
 
@@ -27,7 +28,7 @@ export function CategoryTile({ category, image, count = 0 }: { category: string;
   return <Link className="style-card" href={`/stock?category=${encodeURIComponent(category)}`}>
     {failed
       ? <span className="style-card-image style-card-placeholder" aria-hidden="true"><span>{details.icon}</span></span>
-      : <span className="style-card-image"><img ref={checkImage} src={image} alt="" onError={() => setFailedImage(image)} /></span>}
+      : <span className="style-card-image"><Image ref={checkImage} src={image!} alt="" fill sizes="(max-width: 699px) calc((100vw - 40px) / 2), (max-width: 1279px) calc((100vw - 96px) / 3), (max-width: 1744px) calc((100vw - 144px) / 6), 267px" onError={() => setFailedImage(image)} /></span>}
     <div className="style-card-body">
       <h3>{category}</h3>
       <p>{details.copy}</p>
