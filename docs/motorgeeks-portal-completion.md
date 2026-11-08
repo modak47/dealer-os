@@ -1,6 +1,6 @@
 # MotorGeeks website and dealer portal completion — 8 November 2026
 
-This change fixes the outstanding accessibility and account/workflow issues found in the current source. Search Console is deferred. Production has not been migrated or deployed by this task.
+This change fixes the outstanding accessibility and account/workflow issues found in the current source. Search Console is deferred. This document records implementation and preflight; see [the production rollout record](motorgeeks-portal-rollout-20261108.md) for the subsequent migration, deployments and hosted verification.
 
 ## Result
 
