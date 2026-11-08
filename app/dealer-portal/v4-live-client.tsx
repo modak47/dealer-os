@@ -827,7 +827,6 @@ function SupportPanel() {
 }
 
 function DealerV4Shell({ dealer, section, counts, children }: { dealer: DealerPortalAccountWithPreferences; section: PortalSection; counts: { available: number; offerLeads: number; offers: number; active: number; purchased: number; lost: number }; children: React.ReactNode }) {
-  const router = useRouter();
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const nav = navRef.current;
@@ -844,8 +843,8 @@ function DealerV4Shell({ dealer, section, counts, children }: { dealer: DealerPo
     try {
       const { error } = await createClient().auth.signOut();
       if (error) throw error;
-      router.replace("/dealer-login");
-      router.refresh();
+      // A full navigation also discards authenticated prefetched router state.
+      window.location.replace("/dealer-login");
     } catch { setSignOutError("Unable to sign out. Please try again."); }
     finally { setSigningOut(false); }
   }
