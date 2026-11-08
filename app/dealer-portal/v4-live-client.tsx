@@ -1091,7 +1091,7 @@ function dealerStatusMessage(status: DealerPortalAccount["account_status"], trad
   return `${dealer} MotorGeeks Dealer Portal access is not currently active.`;
 }
 
-function MotorGeeksLogo({ variant = "lockup" }: { variant?: "lockup" | "wordmark" | "wordmarkDark" }) {
+export function MotorGeeksLogo({ variant = "lockup" }: { variant?: "lockup" | "wordmark" | "wordmarkDark" }) {
   const src = variant === "wordmark" ? "/brand/motorgeeks-wordmark-light.png" : variant === "wordmarkDark" ? "/brand/motorgeeks-wordmark-dark.png" : "/brand/motorgeeks-lockup-dark.png";
   return <div className={`${styles.logo} ${variant === "wordmark" || variant === "wordmarkDark" ? styles.logoWordmark : ""}`}><img src={src} alt="MotorGeeks" /></div>;
 }

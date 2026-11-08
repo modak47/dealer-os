@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { MotorGeeksLogo } from "../v4-live-client";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -47,7 +47,7 @@ export function DealerPasswordForm() {
   }
 
   return <main className={`${styles.loginPage} ${styles.passwordPage}`}><section className={styles.loginCard}>
-    <Image className={styles.logo} src="/brand/motorgeeks-lockup-dark.png" alt="MotorGeeks" width={220} height={42} />
+    <MotorGeeksLogo variant="wordmarkDark" />
     <h1>Set your password</h1>
     {checking ? <p role="status">Checking your secure link…</p> : ready ? <form onSubmit={submit}>
       <p>Choose a password for your MotorGeeks dealer login.</p>

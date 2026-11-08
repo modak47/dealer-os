@@ -251,6 +251,13 @@
   text-decoration: none;
 }
 
+.blueButton {
+  border: 0;
+  padding: 0 16px;
+  background: #0067bf;
+  color: #ffffff;
+}
+
 .orangeButton {
   width: 100%;
   border: 0;
