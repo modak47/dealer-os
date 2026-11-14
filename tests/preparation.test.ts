@@ -55,6 +55,10 @@ test("PostgreSQL task actions, stock status sync, guards and rollback use the ac
     assert.equal((await task("Workshop Preparation")).completed_at, done.completed_at);
     await act(w.id, "reopen");
     assert.equal((await task("Workshop Preparation")).completed_at, null);
+    await db.query<Record<string, unknown>>("select stock_workflow_finish_pdi('1',$1,$2)", [actor,w.id]);
+    assert.equal((await task("Workshop Preparation")).status, "completed");
+    assert.equal((await db.query<Record<string, unknown>>("select workshop_status from stock_bikes where id=1")).rows[0].workshop_status, "PDI complete");
+    await assert.rejects(db.query<Record<string, unknown>>("select stock_workflow_finish_pdi('4',$1,$2)", [actor,w.id]), /not found for this bike/);
     const wash = await task("Wash / Initial Valet"), final = await task("Final Valet");
     await act(wash.id, "complete");
     assert.equal((await db.query<Record<string, unknown>>("select valeting_status from stock_bikes where id=1")).rows[0].valeting_status, "In Progress");

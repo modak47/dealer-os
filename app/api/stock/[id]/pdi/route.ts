@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { SupabaseStockBike } from "@/lib/stock-bike-types";
 import { buildPdiPdf } from "@/lib/stock-pdi";
@@ -19,6 +19,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireStaffUser();
+  if (!user) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   try {
     const { id } = await params;
     const body = await request.json() as { checklist?: PdiChecklistItem[]; technicianName?: string; signatureDataUrl?: string; customerName?: string; customerSignatureDataUrl?: string; completionConfirmed?: boolean };
@@ -36,8 +38,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (bikeError) throw bikeError;
     if (!bike) return NextResponse.json({ error: "Stock bike not found." }, { status: 404 });
 
-    const supabase = await createClient();
-    const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
     const pdfBytes = await buildPdiPdf(bike as SupabaseStockBike, { checklist, technicianName, signatureDataUrl, customerName, customerSignatureDataUrl, completionConfirmed: true });
     const fileName = `PDI-${bike.registration || bike.id}-${new Date().toISOString().slice(0, 10)}.pdf`;
     const filePath = stockDocumentPath(id, fileName);
@@ -68,9 +68,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }).select("*").single();
     if (saved.error) throw saved.error;
 
-    const prepared = await db.from("stock_bikes").update({ workshop_status: "PDI complete" }).eq("id", id);
-    if (prepared.error) throw prepared.error;
-    const completed = await db.from("stock_workflow_tasks").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).eq("stock_bike_id", id).eq("department", "Workshop Preparation");
+    const completed = await db.rpc("stock_workflow_finish_pdi", { p_stock_bike_id: id, p_user_id: user?.id || null, p_task_id: null });
     if (completed.error) throw completed.error;
 
     return NextResponse.json({ pdi: saved.data, attachment: attachment.data });

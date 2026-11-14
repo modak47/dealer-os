@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getStockAttachments, isStockAttachmentType, stockDocumentPath, stockDocumentsBucket } from "@/lib/stock-attachments";
 import { inactivePreparationReason } from "@/lib/preparation-policy";
@@ -14,6 +14,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const user = await requireStaffUser();
+  if (!user) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   try {
     const form = await request.formData();
     const stockBikeId = String(form.get("stock_bike_id") || "").trim();
@@ -25,8 +27,6 @@ export async function POST(request: Request) {
     if (!isStockAttachmentType(attachmentType)) return NextResponse.json({ error: "Choose a valid attachment type." }, { status: 400 });
     if (!(file instanceof File)) return NextResponse.json({ error: "Choose a PDF or image to upload." }, { status: 400 });
 
-    const supabase = await createClient();
-    const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
     const db = getSupabaseAdmin();
     if (workflowTaskId) {
       if (attachmentType !== "PDI Form") return NextResponse.json({ error: "Only a completed PDI can finish workshop preparation." }, { status: 400 });
@@ -55,10 +55,7 @@ export async function POST(request: Request) {
     if (error) throw error;
 
     if (attachmentType === "PDI Form") {
-      const stock = await db.from("stock_bikes").update({ workshop_status: "PDI complete" }).eq("id", stockBikeId);
-      if (stock.error) throw stock.error;
-      const completed = await db.from("stock_workflow_tasks").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
-        .eq("stock_bike_id", stockBikeId).eq("department", "Workshop Preparation");
+      const completed = await db.rpc("stock_workflow_finish_pdi", { p_stock_bike_id: stockBikeId, p_user_id: user?.id || null, p_task_id: workflowTaskId || null });
       if (completed.error) throw completed.error;
     }
 

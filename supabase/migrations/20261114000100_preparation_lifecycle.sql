@@ -107,4 +107,22 @@ end;
 $$;
 revoke all on function public.stock_workflow_update_task(uuid,jsonb,uuid,timestamptz) from public, anon, authenticated;
 grant execute on function public.stock_workflow_update_task(uuid,jsonb,uuid,timestamptz) to service_role;
+
+create or replace function public.stock_workflow_finish_pdi(p_stock_bike_id text, p_user_id uuid, p_task_id uuid default null)
+returns jsonb language plpgsql security invoker set search_path = '' as $$
+declare v_id uuid; v_result jsonb;
+begin
+  -- The server calls this only after the PDI document has been stored successfully.
+  if p_task_id is null then perform public.stock_workflow_create_defaults(p_stock_bike_id); end if;
+  select id into v_id from public.stock_workflow_tasks
+    where stock_bike_id = p_stock_bike_id and department = 'Workshop Preparation'
+      and (p_task_id is null or id = p_task_id);
+  if not found then raise exception 'Workshop task not found for this bike' using errcode = 'P0002'; end if;
+  v_result := public.stock_workflow_update_task(v_id,'{"action":"complete"}'::jsonb,p_user_id);
+  update public.stock_bikes set workshop_status = 'PDI complete' where id::text = p_stock_bike_id;
+  return v_result;
+end;
+$$;
+revoke all on function public.stock_workflow_finish_pdi(text,uuid,uuid) from public, anon, authenticated;
+grant execute on function public.stock_workflow_finish_pdi(text,uuid,uuid) to service_role;
 commit;
