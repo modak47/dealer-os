@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { retailOfferFigures } from "../app/admin/retail-check/retail-display";
+import { retailComparableValues, retailOfferFigures } from "../app/admin/retail-check/retail-display";
 
 test("retail offer figures preserve supported profit and margin calculations", () => {
   assert.deepEqual(retailOfferFigures(4895, "3500"), { profit: 1395, margin: "28.5" });
@@ -16,4 +16,10 @@ test("missing or invalid retail values do not produce invented offer figures", (
   for (const offer of ["", " ", "invalid"]) {
     assert.deepEqual(retailOfferFigures(4895, offer), { profit: null, margin: null });
   }
+});
+
+test("legacy comparable summaries display currency and missing markers consistently", () => {
+  assert.deepEqual(retailComparableValues("GBP 7189 | 2019 | 4991 miles | None | DOM"), ["£7,189", "2019", "4,991 miles", "—", "—"]);
+  assert.deepEqual(retailComparableValues("£4,695 | 2020 | 9,250 miles | Red | 22 days"), ["£4,695", "2020", "9,250 miles", "Red", "22 days"]);
+  assert.deepEqual(retailComparableValues(" | | | | DOM: 12"), ["Not available", "—", "—", "—", "12"]);
 });

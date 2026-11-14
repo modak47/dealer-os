@@ -9,7 +9,7 @@ export const retailRecord: RetailFixture = {
   "Last Checked": "14/11/2026", createdTime: "2026-11-14T12:00:00Z", created_at: "2026-11-14T12:00:00Z",
   "Progress Percent": 100, "Progress Stage": "Complete", "Progress Message": "Retail check complete.",
   "Auto Trader MOT Data": { check: { hpiStatus: "Clear", writtenOff: false, stolen: false, outstandingFinance: false, motExpiry: "2027-06-12", motStatus: "Valid" } },
-  "Comparable Summary": "£4,695 | 2020 | 9,250 miles | Red | 22 days\nhttps://example.test/advert/1\n\n£4,995 | 2022 | 6,400 miles | Black | 15 days\nhttps://example.test/advert/2",
+  "Comparable Summary": "GBP 4695 | 2020 | 9250 miles | None | DOM\nhttps://example.test/advert/1\n\n£4,995 | 2022 | 6,400 miles | Black | 15 days\nhttps://example.test/advert/2",
 };
 
 export const missingRetailRecord: RetailFixture = {

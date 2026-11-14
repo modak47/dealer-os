@@ -9,7 +9,7 @@ import { normaliseVehicleCheck, vehicleCheckFieldRows, type VehicleCheckSummary 
 import buyingStyles from "../opportunities/opportunities.module.css";
 import { formatAdvertMoney, getValidAdvertUrl } from "../opportunities/opportunity-utils";
 import styles from "./retail-check.module.css";
-import { retailOfferFigures } from "./retail-display";
+import { retailComparableValues, retailOfferFigures } from "./retail-display";
 
 const retailTabs = [
   { id: "vehicle", label: "Vehicle" },
@@ -704,7 +704,7 @@ export default function RetailCheckPage() {
                   <div className={styles.sectionIntro}><div><h3>Comparable adverts</h3><p>{displayedValuation.Make} {displayedValuation.Model} · AutoTrader adverts used for this valuation</p></div><span className={styles.sourceTag}>{displayedValuation["Comparable Count"] ?? 0} comparables</span></div>
                   <div className={styles.comparableList}>
                     {String(displayedValuation["Comparable Summary"] || "").split("\n\n").filter(Boolean).map((item:string,index:number) => {
-                      const lines = item.split("\n"); const parts = (lines[0] || "").split("|"); const url = getValidAdvertUrl((lines[1] || "").trim());
+                      const lines = item.split("\n"); const parts = retailComparableValues(lines[0] || ""); const url = getValidAdvertUrl((lines[1] || "").trim());
                       return <article key={index} className={styles.comparableRow} aria-label={`Comparable advert ${index + 1}`}>
                         <dl>{["Price","Year","Mileage","Colour","Days live"].map((label,index) => <div key={label}><dt>{label}</dt><dd>{parts[index]?.trim() || "—"}</dd></div>)}</dl>
                         {url ? <a href={url} target="_blank" rel="noreferrer" className={styles.secondaryButton}>View advert <span aria-hidden="true">↗</span></a> : <span className={styles.helperMessage}>No advert link</span>}
