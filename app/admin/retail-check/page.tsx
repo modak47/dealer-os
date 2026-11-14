@@ -1,10 +1,23 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { normaliseVehicleCheck, vehicleCheckFieldRows, type VehicleCheckSummary } from "@/lib/autotrader-vehicle-check";
+
+import buyingStyles from "../opportunities/opportunities.module.css";
+import { formatAdvertMoney, getValidAdvertUrl } from "../opportunities/opportunity-utils";
+import styles from "./retail-check.module.css";
+import { retailOfferFigures } from "./retail-display";
+
+const retailTabs = [
+  { id: "vehicle", label: "Vehicle" },
+  { id: "vehicle-check", label: "Vehicle check" },
+  { id: "valuation", label: "Valuation" },
+  { id: "comparables", label: "Comparables" },
+  { id: "history", label: "History" },
+] as const;
 
 type RetailCheck = Record<string, any> & { id?: string | number; Status?: string };
 type LookupVehicle = {
@@ -81,7 +94,7 @@ function shown(value: unknown) {
 
 function FieldGrid({ fields }: { fields: Array<{ label: string; value: unknown }> }) {
   return (
-    <div className="retail-detail-grid">
+    <div className={styles.detailGrid}>
       {fields.map(field => (
         <div key={field.label}>
           <span>{field.label}</span>
@@ -104,14 +117,13 @@ function KPI({
   valueClass?: string;
 }) {
   return (
-    <div className="bg-black border border-zinc-800 rounded-2xl p-4">
-      <div className="text-zinc-500 text-xs uppercase tracking-wide">{title}</div>
-      <div className={`text-2xl font-bold mt-2 ${highlight ? "text-[#00E51D]" : ""}`}>
-        {value ?? "-"}
-      </div>
+    <div className={`${buyingStyles.kpi} ${styles.kpi} ${highlight ? buyingStyles.kpiAccent : ""}`}>
+      <p>{title}</p>
+      <strong className={valueClass}>{value ?? "—"}</strong>
     </div>
   );
 }
+
 
 export default function RetailCheckPage() {
   const router = useRouter();
@@ -145,6 +157,9 @@ export default function RetailCheckPage() {
   const [derivativeId, setDerivativeId] =
     useState("");
 
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
+  const [referenceError, setReferenceError] = useState("");
   const [historyRecords, setHistoryRecords] =
     useState<any[]>([]);
 
@@ -175,14 +190,20 @@ export default function RetailCheckPage() {
   }
 
   useEffect(() => {
+    let cancelled = false;
     async function loadData() {
-      const makesResponse = await fetch("/api/makes");
-      setMakes(await makesResponse.json());
-
-      const modelsResponse = await fetch("/api/models");
-      setModels(await modelsResponse.json());
+      try {
+        const [makesResponse, modelsResponse] = await Promise.all([fetch("/api/makes"), fetch("/api/models")]);
+        if (!makesResponse.ok || !modelsResponse.ok) throw new Error("Manual make and model lists are unavailable. You can still search by registration.");
+        const [nextMakes, nextModels] = await Promise.all([makesResponse.json(), modelsResponse.json()]);
+        if (!Array.isArray(nextMakes) || !Array.isArray(nextModels)) throw new Error("Manual make and model lists are unavailable. You can still search by registration.");
+        if (!cancelled) { setMakes(nextMakes); setModels(nextModels); }
+      } catch (error) {
+        if (!cancelled) setReferenceError(error instanceof Error ? error.message : "Unable to load manual search options.");
+      }
     }
-    loadData();
+    void loadData();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -207,23 +228,29 @@ export default function RetailCheckPage() {
     };
   }, [recordId]);
 
+  const loadHistory = useCallback(async () => {
+    const response = await fetch("/api/retail-history");
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data)) throw new Error(data?.error || "Unable to load previous valuations.");
+    return data;
+  }, []);
+
   useEffect(() => {
+    let cancelled = false;
+    void loadHistory()
+      .then(data => { if (!cancelled) setHistoryRecords(data); })
+      .catch(error => { if (!cancelled) setHistoryError(error instanceof Error ? error.message : "Unable to load previous valuations."); })
+      .finally(() => { if (!cancelled) setHistoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [loadHistory]);
 
-  async function loadHistory() {
-
-    const response =
-      await fetch("/api/retail-history");
-
-    const data =
-      await response.json();
-
-    setHistoryRecords(data);
-
+  async function retryHistory() {
+    setHistoryLoading(true);
+    setHistoryError("");
+    try { setHistoryRecords(await loadHistory()); }
+    catch (error) { setHistoryError(error instanceof Error ? error.message : "Unable to load previous valuations."); }
+    finally { setHistoryLoading(false); }
   }
-
-  loadHistory();
-
-}, []);
 
   useEffect(() => {
     if (!recordId) return;
@@ -409,40 +436,43 @@ export default function RetailCheckPage() {
   const displayedValuation =
   selectedHistoryRecord || valuation;
 
+  // A saved check must not inherit another bike's current lookup details.
+  const displayedVehicle = selectedHistoryRecord ? null : identifiedVehicle;
+
   const storedMotData = displayedValuation?.["Auto Trader MOT Data"];
   const storedMotObject = storedMotData && typeof storedMotData === "object" && !Array.isArray(storedMotData) ? storedMotData as Record<string, unknown> : null;
-  const currentVehicleCheck = identifiedVehicle?.vehicleCheck ?? (storedMotObject && Object.keys(storedMotObject).length ? normaliseVehicleCheck(storedMotObject.check ?? storedMotObject.history ?? storedMotObject, { motExpiry: identifiedVehicle?.motExpiry, previousOwners: identifiedVehicle?.previousOwners }) : null);
+  const currentVehicleCheck = displayedVehicle?.vehicleCheck ?? (storedMotObject && Object.keys(storedMotObject).length ? normaliseVehicleCheck(storedMotObject.check ?? storedMotObject.history ?? storedMotObject, { motExpiry: displayedVehicle?.motExpiry, previousOwners: displayedVehicle?.previousOwners }) : null);
   const currentVehicleCheckRows = vehicleCheckFieldRows(currentVehicleCheck);
   const vehicleDetailFields = [
-    { label: "Registration", value: identifiedVehicle?.registration || displayedValuation?.Registration || registration },
-    { label: "VIN", value: identifiedVehicle?.vin },
-    { label: "Engine number", value: identifiedVehicle?.engineNumber },
-    { label: "Make", value: identifiedVehicle?.make || displayedValuation?.Make || selectedMake },
-    { label: "Model", value: identifiedVehicle?.model || displayedValuation?.Model || selectedModel },
-    { label: "Derivative", value: identifiedVehicle?.derivative || derivative || displayedValuation?.Derivative },
-    { label: "Derivative ID", value: identifiedVehicle?.derivativeId || derivativeId || displayedValuation?.["Derivative ID"] },
-    { label: "AutoTrader vehicle ID", value: identifiedVehicle?.vehicleId || displayedValuation?.["Auto Trader Vehicle ID"] },
-    { label: "Year", value: identifiedVehicle?.year || displayedValuation?.Year || year },
-    { label: "Mileage", value: identifiedVehicle?.mileage || displayedValuation?.Mileage || mileage },
-    { label: "First registered", value: identifiedVehicle?.firstRegistrationDate },
-    { label: "Previous owners", value: identifiedVehicle?.previousOwners || currentVehicleCheck?.previousOwners },
-    { label: "Colour", value: identifiedVehicle?.colour },
-    { label: "Body type", value: identifiedVehicle?.bodyType },
-    { label: "Fuel", value: identifiedVehicle?.fuelType },
-    { label: "Transmission", value: identifiedVehicle?.transmission },
-    { label: "Engine", value: identifiedVehicle?.engineSize ? `${identifiedVehicle.engineSize}cc` : "" },
-    { label: "BHP", value: identifiedVehicle?.power },
-    { label: "PS", value: identifiedVehicle?.powerPs },
-    { label: "Torque", value: identifiedVehicle?.torque },
-    { label: "CO2", value: identifiedVehicle?.co2 },
-    { label: "Road tax", value: identifiedVehicle?.roadTax },
-    { label: "Top speed", value: identifiedVehicle?.topSpeed },
-    { label: "Gears", value: identifiedVehicle?.gears },
-    { label: "Length", value: identifiedVehicle?.lengthMm },
-    { label: "Width", value: identifiedVehicle?.widthMm },
-    { label: "Weight", value: identifiedVehicle?.weightKg },
-    { label: "Euro emissions", value: identifiedVehicle?.euroEmissions },
-    { label: "MOT expiry", value: identifiedVehicle?.motExpiry || currentVehicleCheck?.motExpiry },
+    { label: "Registration", value: displayedVehicle?.registration || displayedValuation?.Registration || registration },
+    { label: "VIN", value: displayedVehicle?.vin },
+    { label: "Engine number", value: displayedVehicle?.engineNumber },
+    { label: "Make", value: displayedVehicle?.make || displayedValuation?.Make || selectedMake },
+    { label: "Model", value: displayedVehicle?.model || displayedValuation?.Model || selectedModel },
+    { label: "Derivative", value: displayedVehicle?.derivative || displayedValuation?.Derivative || (!selectedHistoryRecord && derivative) },
+    { label: "Derivative ID", value: displayedVehicle?.derivativeId || displayedValuation?.["Derivative ID"] || (!selectedHistoryRecord && derivativeId) },
+    { label: "AutoTrader vehicle ID", value: displayedVehicle?.vehicleId || displayedValuation?.["Auto Trader Vehicle ID"] },
+    { label: "Year", value: displayedVehicle?.year || displayedValuation?.Year || year },
+    { label: "Mileage", value: displayedVehicle?.mileage || displayedValuation?.Mileage || mileage },
+    { label: "First registered", value: displayedVehicle?.firstRegistrationDate },
+    { label: "Previous owners", value: displayedVehicle?.previousOwners || currentVehicleCheck?.previousOwners },
+    { label: "Colour", value: displayedVehicle?.colour },
+    { label: "Body type", value: displayedVehicle?.bodyType },
+    { label: "Fuel", value: displayedVehicle?.fuelType },
+    { label: "Transmission", value: displayedVehicle?.transmission },
+    { label: "Engine", value: displayedVehicle?.engineSize ? `${displayedVehicle?.engineSize}cc` : "" },
+    { label: "BHP", value: displayedVehicle?.power },
+    { label: "PS", value: displayedVehicle?.powerPs },
+    { label: "Torque", value: displayedVehicle?.torque },
+    { label: "CO2", value: displayedVehicle?.co2 },
+    { label: "Road tax", value: displayedVehicle?.roadTax },
+    { label: "Top speed", value: displayedVehicle?.topSpeed },
+    { label: "Gears", value: displayedVehicle?.gears },
+    { label: "Length", value: displayedVehicle?.lengthMm },
+    { label: "Width", value: displayedVehicle?.widthMm },
+    { label: "Weight", value: displayedVehicle?.weightKg },
+    { label: "Euro emissions", value: displayedVehicle?.euroEmissions },
+    { label: "MOT expiry", value: displayedVehicle?.motExpiry || currentVehicleCheck?.motExpiry },
     { label: "HPI status", value: currentVehicleCheck?.status },
     { label: "Write-off category", value: currentVehicleCheck?.category },
   ];
@@ -465,14 +495,14 @@ export default function RetailCheckPage() {
   function bookIntoStock() {
     const purchase = offerPrice || String(displayedValuation?.["Suggested Offer"] || "");
     const retail = String(displayedValuation?.["Market Retail"] || askingPrice || "");
-    const vehicle = identifiedVehicle ?? {
-      registration,
-      make: selectedMake,
-      model: selectedModel,
-      derivative,
-      derivativeId,
-      year: year ? Number(year) : undefined,
-      mileage: mileage ? Number(mileage) : undefined,
+    const vehicle: LookupVehicle = displayedVehicle ?? {
+      registration: displayedValuation?.Registration || registration,
+      make: displayedValuation?.Make || selectedMake,
+      model: displayedValuation?.Model || selectedModel,
+      derivative: displayedValuation?.Derivative || (!selectedHistoryRecord ? derivative : ""),
+      derivativeId: displayedValuation?.["Derivative ID"] || (!selectedHistoryRecord ? derivativeId : ""),
+      year: displayedValuation?.Year || (year ? Number(year) : undefined),
+      mileage: displayedValuation?.Mileage ?? (mileage ? Number(mileage) : undefined),
       vehicleCheck: currentVehicleCheck ?? undefined,
       taxonomyData: displayedValuation?.["Auto Trader Taxonomy Data"] as Record<string, unknown> | undefined,
       history: storedMotObject?.history,
@@ -485,8 +515,8 @@ export default function RetailCheckPage() {
         registration: String(vehicle.registration || registration).toUpperCase().replace(/\s+/g, ""),
         make: String(vehicle.make || selectedMake || ""),
         model: String(vehicle.model || selectedModel || ""),
-        variant: String(vehicle.derivative || derivative || ""),
-        derivative_id: String(vehicle.derivativeId || derivativeId || ""),
+        variant: String(vehicle.derivative || (!selectedHistoryRecord ? derivative : "") || ""),
+        derivative_id: String(vehicle.derivativeId || (!selectedHistoryRecord ? derivativeId : "") || ""),
         autotrader_vehicle_id: String(vehicle.vehicleId || displayedValuation?.["Auto Trader Vehicle ID"] || ""),
         vin: String(vehicle.vin || ""),
         engine_number: String(vehicle.engineNumber || ""),
@@ -519,723 +549,183 @@ export default function RetailCheckPage() {
         hpi_check_required: currentVehicleCheck?.clear === true ? false : true,
       },
     }));
-    router.push(`/admin/stock/book-in?fromRetailCheck=${encodeURIComponent(String(recordId || requestId || registration || "lookup"))}`);
+    router.push(`/admin/stock/book-in?fromRetailCheck=${encodeURIComponent(String(displayedValuation?.id || recordId || requestId || vehicle.registration || registration || "lookup"))}`);
   }
 
-  const marketRetail =
-  Number(displayedValuation?.["Market Retail"]) || 0;
-
-  const hasOfferPrice =
-    offerPrice !== "";
-
-  const profit =
-    hasOfferPrice
-      ? marketRetail - Number(offerPrice)
-      : null;
-
-  const margin =
-    hasOfferPrice && marketRetail > 0
-      ? ((profit! / marketRetail) * 100).toFixed(1)
-      : null;
+  const { profit, margin } = retailOfferFigures(displayedValuation?.["Market Retail"], offerPrice);
 
   const bikeHistory =
-  historyRecords.sort(
+  [...historyRecords].sort(
     (a: any, b: any) =>
       new Date(b.createdTime).getTime() -
       new Date(a.createdTime).getTime()
   );
 
+  function viewHistoryRecord(record: RetailCheck) {
+    setSelectedHistoryRecord(record);
+    setActiveTab("valuation");
+  }
+
+  function moveTabFocus(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    let next = index;
+    if (event.key === "ArrowRight") next = (index + 1) % retailTabs.length;
+    else if (event.key === "ArrowLeft") next = (index - 1 + retailTabs.length) % retailTabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = retailTabs.length - 1;
+    else return;
+    event.preventDefault();
+    setActiveTab(retailTabs[next].id);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+  }
+
   return (
-    <main className="dealer-module retail-check-page min-h-screen text-white">
-      <div className="mx-auto max-w-[1500px] p-4 md:p-8">
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold">Retail Checker</h1>
-          <p className="text-zinc-400">AutoTrader / CAP Dealer Dashboard</p>
-        </div>
+    <main className={`${buyingStyles.page} ${styles.page}`}>
+      <div className={buyingStyles.container}>
+        <header className={buyingStyles.pageHeader}>
+          <div>
+            <p className={buyingStyles.eyebrow}>Buying tools <span>/</span> Retail checker</p>
+            <h1>Retail Checker</h1>
+            <p className={buyingStyles.subtitle}>Know the bike. Compare the market. Make a confident offer.</p>
+          </div>
+          <button type="button" className={styles.secondaryButton} onClick={() => setActiveTab("history")}>View previous valuations <span aria-hidden="true">↗</span></button>
+        </header>
 
-        <div className="grid grid-cols-12 gap-6">
-          <aside className="col-span-12 lg:col-span-3 bg-[#151515] border border-zinc-800 rounded-3xl p-6 h-fit lg:sticky lg:top-6">
-            <h2 className="font-bold text-xl mb-5">Bike Details</h2>
-
-            <div className="retail-search-panel mb-4">
-              <label className="retail-input-field">
-                <span>Registration</span>
-                <input
-                  type="text"
-                  placeholder="AB12 CDE"
-                  value={registration}
-                  onChange={(e) =>
-                    setRegistration(
-                      e.target.value.toUpperCase()
-                    )
-                  }
-                  className="flex-1 p-4 rounded-xl bg-black border border-zinc-700"
-                />
-              </label>
-
-              <label className="retail-input-field">
-                <span>Mileage</span>
-                <input
-                  type="number"
-                  placeholder="Mileage"
-                  value={mileage}
-                  onChange={(e)=>setMileage(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-black border border-zinc-700"
-                />
-              </label>
-
-              <button
-                type="button"
-                onClick={() => void lookupRegistration()}
-                disabled={lookupLoading || !registration.trim()}
-                className="w-full bg-zinc-900 border border-zinc-700 text-white font-bold py-3 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {lookupLoading ? "Searching Auto Trader..." : "Search Auto Trader"}
-              </button>
+        <div className={styles.workspace}>
+          <aside className={styles.searchPanel} aria-label="Bike details and retail check">
+            <div className={styles.panelHeading}><span className={buyingStyles.eyebrow}>Start a check</span><h2>Bike details</h2><p>Search a registration, then run a retail check using the current mileage.</p></div>
+            <div className={styles.searchFields}>
+              <label className={styles.field}><span>Registration</span><input className={styles.registrationInput} type="text" placeholder="AB12 CDE" value={registration} onChange={e => setRegistration(e.target.value.toUpperCase())} /></label>
+              <label className={styles.field}><span>Mileage</span><input type="number" placeholder="e.g. 8,500" value={mileage} onChange={e => setMileage(e.target.value)} /></label>
+              <button type="button" onClick={() => void lookupRegistration()} disabled={lookupLoading || !registration.trim()} className={styles.lookupButton}>{lookupLoading ? "Searching Auto Trader..." : "Search Auto Trader"}</button>
             </div>
 
-            {identifiedVehicle && (
-              <div className="retail-identified-card bg-black border border-zinc-800 rounded-xl p-4 mb-4">
-                <div className="retail-identified-head">
-                  <div>
-                    <span>{identifiedVehicle.registration || registration}</span>
-                    <b>{[identifiedVehicle.year, identifiedVehicle.make, identifiedVehicle.model].filter(Boolean).join(" ") || "Vehicle found"}</b>
-                    <small>{identifiedVehicle.derivative || "Derivative details not supplied"}</small>
-                  </div>
-                  {identifiedVehicle.vehicleCheck && <em className={identifiedVehicle.vehicleCheck.clear === false ? "danger" : ""}>{identifiedVehicle.vehicleCheck.status}</em>}
-                </div>
-                <div className="retail-identified-facts">
-                  <div><span>Engine</span><b>{identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "-"}</b></div>
-                  <div><span>Transmission</span><b>{identifiedVehicle.transmission || "-"}</b></div>
-                  <div><span>Fuel</span><b>{identifiedVehicle.fuelType || "-"}</b></div>
-                  <div><span>MOT</span><b>{identifiedVehicle.motExpiry || "-"}</b></div>
-                </div>
-                {identifiedVehicle.derivativeId && <div className="text-[#00E51D] text-xs font-bold uppercase tracking-wide mt-3">Derivative matched</div>}
-                <button type="button" onClick={bookIntoStock} className="mt-4 w-full bg-zinc-900 border border-[#00E51D] text-[#00E51D] font-bold py-3 rounded-xl">
-                  Book Into Stock
-                </button>
+            {identifiedVehicle && <div className={styles.identifiedCard}>
+              <span className={styles.registrationBadge}>{identifiedVehicle.registration || registration}</span>
+              <strong>{[identifiedVehicle.year, identifiedVehicle.make, identifiedVehicle.model].filter(Boolean).join(" ") || "Vehicle found"}</strong>
+              <p>{identifiedVehicle.derivative || "Derivative details not supplied"}</p>
+              {identifiedVehicle.vehicleCheck && <span className={styles.checkBadge} data-warning={identifiedVehicle.vehicleCheck.clear === false}>{identifiedVehicle.vehicleCheck.status}</span>}
+              <div className={styles.identifiedFacts}>
+                <span>Engine<b>{identifiedVehicle.engineSize ? `${identifiedVehicle.engineSize}cc` : "—"}</b></span>
+                <span>Transmission<b>{identifiedVehicle.transmission || "—"}</b></span>
+                <span>Fuel<b>{identifiedVehicle.fuelType || "—"}</b></span>
+                <span>MOT<b>{identifiedVehicle.motExpiry || "—"}</b></span>
               </div>
-            )}
+              {identifiedVehicle.derivativeId && <p className={styles.matched}>Derivative matched</p>}
+              <button type="button" onClick={bookIntoStock} className={styles.secondaryButton}>Book Into Stock</button>
+            </div>}
+            {lookupMessage && <p role="status" className={styles.helperMessage}>{lookupMessage}</p>}
+            {derivative && !identifiedVehicle && <p className={styles.helperMessage}>{derivative}</p>}
 
-            {lookupMessage && (
-              <div className="text-zinc-400 text-sm mb-4">
-                {lookupMessage}
-              </div>
-            )}
-
-            {derivative && (
-              <div className="text-green-400 text-sm mt-2">
-                {derivative}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowManualSearch(!showManualSearch)}
-              className="text-zinc-400 text-sm hover:text-white mb-4"
-            >
-              {showManualSearch
-                ? "Hide Manual Search ▲"
-                : "Manual Search ▼"}
-            </button>
-
-            
-            <div className={showManualSearch ? "space-y-4 mb-4" : "hidden"}>
-              <div className="grid grid-cols-2 gap-3">
-
-                <label className="retail-input-field">
-                  <span>Make</span>
-                <select
-                  value={selectedMake}
-                  onChange={(e)=>{
-                    setSelectedMake(e.target.value);
-                    setSelectedModel("");
-                  }}
-                  className="w-full p-4 rounded-xl bg-black border border-zinc-700"
-                >
-                  <option value="">Select Make</option>
-
-                  {makes
-                    .filter((m:any)=>m?.make)
-                    .sort((a:any,b:any)=>
-                      String(a.make).localeCompare(String(b.make))
-                    )
-                    .map((m:any)=>(
-                      <option key={m.make} value={m.make}>
-                        {m.make}
-                      </option>
-                    ))}
-                </select>
-                </label>
-
-                <label className="retail-input-field">
-                  <span>Model</span>
-                <select
-                  value={selectedModel}
-                  onChange={(e)=>setSelectedModel(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-black border border-zinc-700"
-                >
-                  <option value="">Select Model</option>
-
-                  {filteredModels.map((m:any)=>(
-                    <option
-                      key={`${m.make}-${m.model}`}
-                      value={m.model}
-                    >
-                      {m.model}
-                    </option>
-                  ))}
-                </select>
-                </label>
-
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-
-                <label className="retail-input-field">
-                  <span>Year</span>
-                <input
-                  type="number"
-                  placeholder="Year"
-                  value={year}
-                  onChange={(e)=>setYear(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-black border border-zinc-700"
-                />
-                </label>
-
-              </div>
-              
+            <button type="button" aria-expanded={showManualSearch} aria-controls="retail-manual-search" onClick={() => setShowManualSearch(!showManualSearch)} className={styles.manualToggle}>{showManualSearch ? "Hide Manual Search" : "Manual Search"}<span aria-hidden="true">{showManualSearch ? "−" : "+"}</span></button>
+            <div id="retail-manual-search" hidden={!showManualSearch} className={styles.manualFields}>
+              {referenceError && <p role="alert" className={styles.helperMessage}>{referenceError}</p>}
+              <label className={styles.field}><span>Make</span><select aria-label="Make" value={selectedMake} onChange={e => { setSelectedMake(e.target.value); setSelectedModel(""); }}>
+                <option value="">Select Make</option>{[...makes].filter((m:any) => m?.make).sort((a:any,b:any) => String(a.make).localeCompare(String(b.make))).map((m:any) => <option key={m.make} value={m.make}>{m.make}</option>)}
+              </select></label>
+              <label className={styles.field}><span>Model</span><select aria-label="Model" value={selectedModel} onChange={e => setSelectedModel(e.target.value)}><option value="">Select Model</option>{filteredModels.map((m:any) => <option key={`${m.make}-${m.model}`} value={m.model}>{m.model}</option>)}</select></label>
+              <label className={styles.field}><span>Year</span><input type="number" placeholder="e.g. 2021" value={year} onChange={e => setYear(e.target.value)} /></label>
             </div>
 
-            <div className="space-y-4">
-              <button onClick={checkMarket} disabled={runButtonDisabled} className="w-full bg-[#00E51D] text-black font-bold py-4 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed">
-                {loading ? "Starting Check..." : activeCheckRunning ? "Valuation Running..." : "Run Retail Check"}
-              </button>
-
-             {submitError && (
-              <div className="bg-red-950/40 border border-red-800 rounded-xl p-4 text-red-200 text-sm">
-                {submitError}
-              </div>
-             )}
-
-             {(status || valuation) && (
-              <div className="bg-black border border-zinc-800 rounded-xl p-4">
-
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <div>
-                    <div className="font-semibold text-white">
-                      {valuation?.Status || status}
-                    </div>
-                    <div className="text-zinc-500 text-xs">
-                      {valuation?.Registration || registration}
-                    </div>
-                  </div>
-                  {elapsed && (
-                    <div className="text-zinc-500 text-xs">
-                      {elapsed}
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-[#00E51D] text-xs font-bold uppercase tracking-wide mb-2">
-                  {valuation?.["Progress Stage"] || "Queued"}
-                </div>
-
-                <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
-                  <div
-                    className={`bg-[#00E51D] h-2 ${terminalStatuses.has(String(valuation?.Status)) ? "" : "animate-pulse"}`}
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-
-                <div className="text-zinc-400 text-sm mt-3">
-                  {progressMessage || "Waiting for market analysis..."}
-                </div>
-
-                {valuation?.Status === "Failed" && (
-                  <button type="button" onClick={retryCurrentCheck} disabled={loading} className="mt-4 w-full bg-[#00E51D] text-black font-bold py-3 rounded-xl">
-                    {loading ? "Retrying..." : "Retry Retail Check"}
-                  </button>
-                )}
-
-              </div>
-            )}
-            </div>
+            <button type="button" onClick={checkMarket} disabled={runButtonDisabled} className={`${buyingStyles.primaryButton} ${styles.runButton}`}>{loading ? "Starting Check..." : activeCheckRunning ? "Valuation Running..." : "Run Retail Check"}</button>
+            {submitError && <div role="alert" className={styles.errorState}>{submitError}</div>}
+            {(status || valuation) && <div className={styles.progressCard} aria-live="polite">
+              <div className={styles.progressHeading}><strong>{valuation?.Status || status}</strong><span>{elapsed}</span></div>
+              <p>{valuation?.Registration || registration}</p>
+              <span className={styles.progressStage}>{valuation?.["Progress Stage"] || "Queued"}</span>
+              <div className={styles.progressTrack} role="progressbar" aria-label="Retail check progress" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${progress}%` }} /></div>
+              <p>{progressMessage || "Waiting for market analysis..."}</p>
+              {valuation?.Status === "Failed" && <button type="button" onClick={retryCurrentCheck} disabled={loading} className={styles.secondaryButton}>{loading ? "Retrying..." : "Retry Retail Check"}</button>}
+            </div>}
           </aside>
 
-          <section className="col-span-12 lg:col-span-9">
-            {valuation && (
-              <div className="bg-[#151515] border border-zinc-800 rounded-3xl p-6 mb-6">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div>
-                    <h2 className="text-3xl font-bold">
-                      {displayedValuation.Make} {displayedValuation.Model}
-                    </h2>
+          <section className={styles.results} aria-label="Retail check results">
+            {displayedValuation && <div className={styles.vehicleSummary}>
+              <div><p className={buyingStyles.eyebrow}>{selectedHistoryRecord ? "Saved valuation" : "Your valuation"}</p><h2>{displayedValuation.Make} {displayedValuation.Model}</h2><p>{displayedValuation.Registration} <span>·</span> {displayedValuation.Year || "Year unknown"} <span>·</span> {displayedValuation.Mileage == null ? "Mileage unknown" : `${Number(displayedValuation.Mileage).toLocaleString()} miles`}</p></div>
+              <div className={styles.buyDecision} data-decision={String(displayedValuation["Buy Decision"] || "").toUpperCase()}><span>Buy decision</span><strong>{displayedValuation["Buy Decision"] || "Pending"}</strong></div>
+            </div>}
+            {selectedHistoryRecord && <div className={styles.historyBanner}><span>Viewing a saved valuation</span><button type="button" className={styles.textButton} onClick={() => setSelectedHistoryRecord(null)}>Return To Current Valuation <span aria-hidden="true">↗</span></button></div>}
 
-                    <p className="text-zinc-400">
-                      {displayedValuation.Year} • {displayedValuation.Mileage} miles
-                    </p>
-                  </div>
-
-                  <div className="bg-black border border-[#00E51D] rounded-2xl px-6 py-4">
-                    <div className="text-zinc-400 text-sm">Buy Decision</div>
-                    <div className="text-3xl font-bold text-[#00E51D]">
-                      {displayedValuation["Buy Decision"]}
-                    </div>
-                  </div>
-                </div>
+            <div className={styles.resultsPanel}>
+              <div className={styles.tabs} role="tablist" aria-label="Retail check sections">
+                {retailTabs.map((tab,index) => <button type="button" key={tab.id} id={`retail-tab-${tab.id}`} role="tab" aria-selected={activeTab === tab.id} aria-controls={`retail-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)} onKeyDown={event => moveTabFocus(event,index)}>{tab.label}{tab.id === "history" && <span>{historyRecords.length}</span>}</button>)}
               </div>
-            )}
+              <div className={styles.tabContent} role="tabpanel" id={`retail-panel-${activeTab}`} aria-labelledby={`retail-tab-${activeTab}`} tabIndex={0}>
+                {!displayedValuation && !identifiedVehicle && activeTab !== "history" && activeTab !== "vehicle-check" && <div className={styles.emptyState}>
+                  <span className={styles.emptyIcon} aria-hidden="true">↗</span><p className={buyingStyles.eyebrow}>Ready when you are</p><h2>Start with a registration</h2><p>Identify a bike and run a retail check to bring together market prices, vehicle details and your buying figures.</p>
+                  <div className={styles.emptySteps}><span><b>01</b>Identify the bike</span><span><b>02</b>Compare the market</span><span><b>03</b>Review your offer</span></div>
+                </div>}
 
-            <div className="bg-[#151515] border border-zinc-800 rounded-3xl overflow-hidden">
-              <div className="flex border-b border-zinc-800">
-                {["vehicle","vehicle-check","valuation","comparables","history"].map(tab=>(
-                  <button
-                    key={tab}
-                    onClick={()=>setActiveTab(tab)}
-                    className={`px-6 py-4 capitalize font-semibold ${activeTab===tab ? "text-[#00E51D] border-b-2 border-[#00E51D]" : "text-zinc-400"}`}
-                  >
-                    {tab.replace("-", " ")}
-                  </button>
-                ))}
-              </div>
-
-              <div className="p-6">
-                {!valuation && activeTab !== "history" && (
-                  <div className="text-zinc-400">
-                    
+                {displayedValuation && activeTab === "valuation" && <>
+                  <div className={styles.sectionIntro}><div><h3>Market valuation</h3><p>Compare current adverts with Percayso / CAP guide values.</p></div><span className={styles.sourceTag}>Two market perspectives</span></div>
+                  <div className={styles.markets}>
+                    <section className={styles.marketPanel} aria-label="AutoTrader Market"><div className={styles.marketTitle}><span className={styles.sourceDot} /><h3>AutoTrader Market</h3></div><div className={styles.metricGrid}>
+                      <KPI title="Market Retail" value={formatAdvertMoney(displayedValuation["Market Retail"], "Not available")} highlight />
+                      <KPI title="Fast Sale" value={formatAdvertMoney(displayedValuation["Fast Sale Retail"], "Not available")} />
+                      <KPI title="Premium Retail" value={formatAdvertMoney(displayedValuation["Premium Retail"], "Not available")} />
+                      <KPI title="Comparables" value={displayedValuation["Comparable Count"] ?? 0} />
+                      <KPI title="Confidence" value={displayedValuation["Confidence"] || "—"} />
+                      <KPI title="Opportunity Score" value={displayedValuation["Opportunity Score"] ?? 0} />
+                    </div></section>
+                    <section className={styles.marketPanel} aria-label="Percayso / CAP"><div className={styles.marketTitle}><span className={`${styles.sourceDot} ${styles.capDot}`} /><h3>Percayso / CAP</h3></div><div className={styles.metricGrid}>
+                      <KPI title="Retail" value={formatAdvertMoney(displayedValuation["Percayso Retail"], "Not available")} />
+                      <KPI title="Trade" value={formatAdvertMoney(displayedValuation["Percayso Trade"], "Not available")} />
+                      <KPI title="Independent" value={formatAdvertMoney(displayedValuation["Percayso Independent"], "Not available")} />
+                      <KPI title="Franchise" value={formatAdvertMoney(displayedValuation["Percayso Franchise"], "Not available")} />
+                      <KPI title="Days To Sale" value={displayedValuation["Percayso Days To Sale"] ?? "—"} />
+                    </div></section>
                   </div>
-                )}
+                  <section className={styles.buyingPanel} aria-label="Buying metrics">
+                    <div className={styles.sectionIntro}><div><h3>Buying metrics</h3><p>Enter your offer to review the potential return.</p></div><button type="button" onClick={bookIntoStock} className={styles.secondaryButton}>Book Into Stock</button></div>
+                    <label className={`${styles.field} ${styles.offerField}`}><span>Your offer price (£)</span><input type="number" placeholder="Enter an offer" value={offerPrice} onChange={e => setOfferPrice(e.target.value)} /></label>
+                    <div className={styles.buyingGrid}>
+                      <KPI title="Maximum Offer" value={formatAdvertMoney(displayedValuation["Suggested Offer"], "Not available")} highlight />
+                      <KPI title="Target Profit" value={formatAdvertMoney(displayedValuation["Target Profit"], "Not available")} />
+                      <KPI title="Days To Sale" value={displayedValuation["Percayso Days To Sale"] ?? "—"} />
+                      <KPI title="Buy Decision" value={displayedValuation["Opportunity Score"] >= 90 ? "BUY" : displayedValuation["Opportunity Score"] >= 75 ? "REVIEW" : "PASS"} valueClass={displayedValuation["Opportunity Score"] >= 90 ? styles.positive : displayedValuation["Opportunity Score"] >= 75 ? styles.warning : styles.negative} />
+                      <KPI title="Expected Profit" value={profit !== null ? formatAdvertMoney(profit) : "—"} />
+                      <KPI title="Margin" value={margin !== null ? `${margin}%` : "—"} />
+                    </div><p className={styles.estimateNote}>Potential returns are before preparation, fees and other costs.</p>
+                  </section>
+                </>}
+                {identifiedVehicle && !displayedValuation && activeTab === "valuation" && <div className={styles.emptyState}><h2>Your bike is ready to check</h2><p>Run a retail check to load market prices and buying figures.</p></div>}
 
-                {displayedValuation && activeTab==="valuation" && (
-                  <>
+                {(displayedValuation || identifiedVehicle) && activeTab === "vehicle" && <section>
+                  <div className={styles.sectionIntro}><div><span className={styles.registrationBadge}>{displayedVehicle?.registration || displayedValuation?.Registration || registration}</span><h3>{displayedVehicle?.make || displayedValuation?.Make} {displayedVehicle?.model || displayedValuation?.Model}</h3><p>{displayedVehicle?.derivative || displayedValuation?.Derivative || (!selectedHistoryRecord && derivative) || "Vehicle details"}</p></div><button type="button" onClick={bookIntoStock} className={styles.secondaryButton}>Book Into Stock</button></div>
+                  <FieldGrid fields={vehicleDetailFields} />
+                </section>}
 
+                {activeTab === "vehicle-check" && <section>
+                  <div className={styles.sectionIntro}><div><p className={buyingStyles.eyebrow}>HPI & MOT</p><h3 className={currentVehicleCheck?.clear === false ? styles.warning : ""}>{currentVehicleCheck?.status || "No vehicle check loaded"}</h3><p>{registration || displayedValuation?.Registration || "Search Auto Trader to load HPI and MOT markers."}</p></div>{(identifiedVehicle || displayedValuation) && <button type="button" onClick={bookIntoStock} className={styles.secondaryButton}>Book Into Stock</button>}</div>
+                  {currentVehicleCheckRows.length ? <FieldGrid fields={currentVehicleCheckRows} /> : <div className={styles.inlineEmpty}>Search Auto Trader first, then the HPI and MOT status will show here.</div>}
+                  {currentVehicleCheck?.reportUrl && <a className={styles.reportLink} href={`/api/autotrader/vehicle-check-report?url=${encodeURIComponent(currentVehicleCheck.reportUrl)}`} target="_blank" rel="noreferrer">Open AutoTrader vehicle check report <span aria-hidden="true">↗</span></a>}
+                </section>}
 
-                  {selectedHistoryRecord && (
-
-                    <button
-                      onClick={() =>
-                        setSelectedHistoryRecord(null)
-                      }
-                      className="
-                        mb-4
-                        bg-[#00E51D]
-                        text-black
-                        px-4
-                        py-2
-                        rounded-lg
-                        font-bold
-                      "
-                    >
-
-                      Return To Current Valuation
-
-                    </button>
-
-                  )}
-                    <div className="grid lg:grid-cols-2 gap-6 mb-6">
-
-                      <div className="bg-black border border-zinc-800 rounded-2xl p-5">
-                        <h3 className="text-xl font-bold mb-4 text-[#00E51D]">
-                          AutoTrader Market
-                        </h3>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <KPI
-                            title="Market Retail"
-                            value={`£${displayedValuation["Market Retail"] || 0}`}
-                          />
-
-                          <KPI
-                            title="Fast Sale"
-                            value={`£${displayedValuation["Fast Sale Retail"] || 0}`}
-                          />
-
-                          <KPI
-                            title="Premium Retail"
-                            value={`£${displayedValuation["Premium Retail"] || 0}`}
-                          />
-
-                          <KPI
-                            title="Comparables"
-                            value={displayedValuation["Comparable Count"] || 0}
-                          />
-
-                          <KPI
-                            title="Confidence"
-                            value={displayedValuation["Confidence"] || "-"}
-                          />
-
-                          <KPI
-                            title="Opportunity Score"
-                            value={displayedValuation["Opportunity Score"] || 0}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="bg-black border border-zinc-800 rounded-2xl p-5">
-                        <h3 className="text-xl font-bold mb-4 text-blue-400">
-                          Percayso / CAP
-                        </h3>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <KPI
-                            title="Retail"
-                            value={`£${displayedValuation["Percayso Retail"] || 0}`}
-                          />
-
-                          <KPI
-                            title="Trade"
-                            value={`£${displayedValuation["Percayso Trade"] || 0}`}
-                          />
-
-                          <KPI
-                            title="Independent"
-                            value={`£${displayedValuation["Percayso Independent"] || 0}`}
-                          />
-
-                          <KPI
-                            title="Franchise"
-                            value={`£${displayedValuation["Percayso Franchise"] || 0}`}
-                          />
-
-                          <KPI
-                            title="Days To Sale"
-                            value={displayedValuation["Percayso Days To Sale"] || "-"}
-                          />
-
-                        </div>
-                      </div>
-
-                    </div>
-
-                    <div className="bg-black border border-zinc-800 rounded-2xl p-5">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-                        <h3 className="text-xl font-bold">
-                          Buying Metrics
-                        </h3>
-                        <button type="button" onClick={bookIntoStock} className="bg-[#00E51D] text-black px-4 py-3 rounded-xl font-bold">
-                          Book Into Stock
-                        </button>
-                      </div>
-
-                      <div className="mb-4">
-                        <input
-                          type="number"
-                          placeholder="Offer Price"
-                          value={offerPrice}
-                          onChange={(e) => setOfferPrice(e.target.value)}
-                          className="w-full p-4 rounded-xl bg-[#111] border border-zinc-700"
-                        />
-                      </div>
-
-                      <div className="grid md:grid-cols-6 gap-4">
-                        <KPI
-                          title="Maximum Offer"
-                          value={`£${displayedValuation["Suggested Offer"] || 0}`}
-                          highlight
-                        />
-
-                        <KPI
-                          title="Target Profit"
-                          value={`£${displayedValuation["Target Profit"] || 0}`}
-                          highlight
-                        />
-
-                        <KPI
-                          title="Days To Sale"
-                          value={displayedValuation["Percayso Days To Sale"] || "-"}
-                        />
-
-                        <KPI
-                          title="Buy Decision"
-                          value={
-                            displayedValuation["Opportunity Score"] >= 90
-                              ? "BUY"
-                              : displayedValuation["Opportunity Score"] >= 75
-                              ? "REVIEW"
-                              : "PASS"
-
-                          }
-
-                          valueClass={
-                            displayedValuation["Opportunity Score"] >= 90
-                              ? "text-green-400"
-                              : displayedValuation["Opportunity Score"] >= 75
-                              ? "text-yellow-400"
-                              : "text-red-400"
-                          }    
-                        />
-
-                       <KPI
-                          title="Expected Profit"
-                          value={
-                            profit !== null
-                              ? `£${profit.toLocaleString()}`
-                              : "-"
-                          }
-                        />
-
-                        <KPI
-                          title="Margin"
-                          value={
-                            margin !== null
-                              ? `${margin}%`
-                              : "-"
-                          }
-                        /> 
-                      </div>
-                    </div>
-
-                    
-                  </>
-                )}
-
-                {displayedValuation && activeTab==="vehicle" && (
-                  <div className="rounded-2xl border border-zinc-800 bg-black p-5">
-                    <div className="retail-tab-header">
-                      <div>
-                        <div className="retail-reg">{displayedValuation.Registration}</div>
-                        <h3>{displayedValuation.Make} {displayedValuation.Model}</h3>
-                        <p>{identifiedVehicle?.derivative || derivative || displayedValuation.Derivative || "Vehicle details"}</p>
-                      </div>
-                      <button type="button" onClick={bookIntoStock}>Book Into Stock</button>
-                    </div>
-                    <FieldGrid fields={vehicleDetailFields} />
+                {displayedValuation && activeTab === "comparables" && <section>
+                  <div className={styles.sectionIntro}><div><h3>Comparable adverts</h3><p>{displayedValuation.Make} {displayedValuation.Model} · AutoTrader adverts used for this valuation</p></div><span className={styles.sourceTag}>{displayedValuation["Comparable Count"] ?? 0} comparables</span></div>
+                  <div className={styles.comparableList}>
+                    {String(displayedValuation["Comparable Summary"] || "").split("\n\n").filter(Boolean).map((item:string,index:number) => {
+                      const lines = item.split("\n"); const parts = (lines[0] || "").split("|"); const url = getValidAdvertUrl((lines[1] || "").trim());
+                      return <article key={index} className={styles.comparableRow} aria-label={`Comparable advert ${index + 1}`}>
+                        <dl>{["Price","Year","Mileage","Colour","Days live"].map((label,index) => <div key={label}><dt>{label}</dt><dd>{parts[index]?.trim() || "—"}</dd></div>)}</dl>
+                        {url ? <a href={url} target="_blank" rel="noreferrer" className={styles.secondaryButton}>View advert <span aria-hidden="true">↗</span></a> : <span className={styles.helperMessage}>No advert link</span>}
+                      </article>;
+                    })}
+                    {!String(displayedValuation["Comparable Summary"] || "").trim() && <div className={styles.inlineEmpty}>No comparable advert details were stored for this valuation.</div>}
                   </div>
-                )}
-                {activeTab==="vehicle-check" && (
-                  <div className="rounded-2xl border border-zinc-800 bg-black p-5">
-                    <div className="retail-tab-header">
-                      <div>
-                        <div className={currentVehicleCheck?.clear === false ? "retail-check-status danger" : "retail-check-status"}>
-                          {currentVehicleCheck?.status || "No vehicle check loaded"}
-                        </div>
-                        <p>
-                          {registration || displayedValuation?.Registration || "Search Auto Trader to load HPI and MOT markers."}
-                        </p>
-                      </div>
-                      {(identifiedVehicle || displayedValuation) && (
-                        <button type="button" onClick={bookIntoStock}>
-                          Book Into Stock
-                        </button>
-                      )}
-                    </div>
-                    {currentVehicleCheckRows.length > 0 ? (
-                      <FieldGrid fields={currentVehicleCheckRows} />
-                    ) : (
-                      <div className="text-zinc-400">Search Auto Trader first, then the HPI and MOT status will show here.</div>
-                    )}
-                    {currentVehicleCheck?.reportUrl && <a className="retail-report-link" href={`/api/autotrader/vehicle-check-report?url=${encodeURIComponent(currentVehicleCheck.reportUrl)}`} target="_blank" rel="noreferrer">Open AutoTrader vehicle check report</a>}
-                  </div>
-                )}
-                {displayedValuation && activeTab==="comparables" && (
-                  <>
-                    <div className="mb-4">
-                      <h3 className="text-2xl font-bold">
-                        {displayedValuation.Make} {displayedValuation.Model}
-                      </h3>
+                </section>}
+                {identifiedVehicle && !displayedValuation && activeTab === "comparables" && <div className={styles.inlineEmpty}>Run a retail check to load the adverts used for this valuation.</div>}
 
-                      <p className="text-zinc-400">
-                        Comparable AutoTrader adverts used for valuation
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-6 px-4 py-2 text-xs uppercase text-zinc-500 border-b border-zinc-800 mb-2">
-                      <div className="w-24">Price</div>
-                      <div className="w-16">Year</div>
-                      <div className="w-32">Mileage</div>
-                      <div className="w-24">Colour</div>
-                      <div className="w-16">DOM</div>
-                      <div className="w-20">Link</div>
-                    </div>
-
-
-                    <div className="space-y-3">
-                      {String(displayedValuation["Comparable Summary"] || "")
-                        .split("\n\n")
-                        .filter(Boolean)
-                        .map((item:string,index:number) => {
-
-                          const lines = item.split("\n");
-                          const details = lines[0] || "";
-                          const url = lines[1] || "";
-
-                          const parts = details.split("|");
-
-                          const price = parts[0]?.trim() || "";
-                          const year = parts[1]?.trim() || "";
-                          const mileage = parts[2]?.trim() || "";
-                          const colour = parts[3]?.trim() || "";
-                          const dom = parts[4]?.trim() || "";
-
-                          return (
-                            <div
-                              key={index}
-                              className="bg-black border-b border-zinc-800 px-4 py-3"
-                            >
-                              <div className="flex items-center gap-6">
-
-                                <div className="w-24 font-bold text-green-400">
-                                  {price}
-                                </div>
-
-                                <div className="w-16">
-                                  {year}
-                                </div>
-
-                                <div className="w-32">
-                                  {mileage}
-                                </div>
-
-                                <div className="w-24">
-                                  {colour || "-"}
-                                </div>
-
-                                <div className="w-16">
-                                  {dom}
-                                </div>
-
-                                <div className="w-20">
-                                  {url && (
-                                    <a
-                                      href={url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-[#00E51D] hover:underline"
-                                    >
-                                      View →
-                                    </a>
-                                  )}
-                                </div>
-
-                              </div>
-                            </div>
-                          ); 
-                        })}
-                    </div>
-                
-                  </>
-                )}
-
-                {activeTab==="history" && (
-
-
-                
-
-  <div className="space-y-4">
-
-    <div className="flex items-center justify-between">
-      <h3 className="text-xl font-bold">
-        Previous Valuations
-      </h3>
-
-      <div className="text-sm text-zinc-400">
-        {bikeHistory.length} records found
-      </div>
-    </div>
-
-    <div className="overflow-hidden rounded-2xl border border-zinc-800">
-
-      <table className="w-full">
-
-        <thead>
-
-          <tr className="bg-black">
-
-            <th className="text-left p-4">
-              Date
-            </th>
-
-              <th className="text-left p-4">
-                Bike
-              </th>
-
-            <th className="text-left p-4">
-              Retail
-            </th>
-
-            <th className="text-left p-4">
-              Margin
-            </th>
-
-            <th className="text-left p-4">
-              Score
-            </th>
-
-          </tr>
-
-        </thead>
-
-        <tbody>
-
-          {bikeHistory.map((record: any) => (
-
-            <tr
-              key={record.id}
-              onClick={() => {
-
-                setSelectedHistoryRecord(
-                  record
-                );
-
-                setActiveTab(
-                  "valuation"
-                );
-
-              }}
-              className="
-                border-t
-                border-zinc-800
-                cursor-pointer
-                hover:bg-zinc-900
-              "
-            >
-
-              <td className="p-4">
-                {record["Last Checked"]}
-              </td>
-
-              <td className="p-4">
-
-                <div className="font-semibold">
-                  {record.Registration}
-                </div>
-
-                <div className="text-zinc-300">
-                  {record.Make}
-                </div>
-
-                <div className="text-zinc-500 text-sm">
-                  {record.Model}
-                </div>
-
-              </td>
-
-              <td className="p-4">
-                £{record["Market Retail"]}
-              </td>
-
-              <td className="p-4 text-[#00E51D]">
-                £{record["Available Margin"]}
-              </td>
-
-              <td className="p-4">
-                {record["Opportunity Score"]}
-              </td>
-
-            </tr>
-
-          ))}
-
-        </tbody>
-
-      </table>
-
-    </div>
-
-  </div>
-)}
+                {activeTab === "history" && <section>
+                  <div className={styles.sectionIntro}><div><h3>Previous valuations</h3><p>Open a saved check to review its market figures and vehicle details.</p></div><span className={styles.sourceTag}>{bikeHistory.length} records found</span></div>
+                  {historyLoading ? <div role="status" className={styles.inlineEmpty}>Loading previous valuations...</div> : historyError ? <div role="alert" className={styles.errorState}><p>{historyError}</p><button type="button" className={styles.secondaryButton} onClick={() => void retryHistory()}>Try again</button></div> : !bikeHistory.length ? <div className={styles.inlineEmpty}>No previous valuations yet. Run your first retail check to start a history.</div> : <table className={styles.historyTable}>
+                    <caption className={styles.visuallyHidden}>Saved retail valuations</caption><thead><tr><th scope="col">Date</th><th scope="col">Bike</th><th scope="col">Retail</th><th scope="col">Margin</th><th scope="col">Score</th></tr></thead>
+                    <tbody>{bikeHistory.map((record:any) => <tr key={record.id} onClick={() => viewHistoryRecord(record)}>
+                      <td data-label="Date">{record["Last Checked"] || "—"}</td>
+                      <td data-label="Bike"><button type="button" onClick={event => { event.stopPropagation(); viewHistoryRecord(record); }} aria-label={`View valuation for ${record.Registration}`} className={styles.historyBike}><strong>{record.Registration}</strong><span>{record.Make} {record.Model}</span></button></td>
+                      <td data-label="Retail">{formatAdvertMoney(record["Market Retail"], "Not available")}</td><td data-label="Margin" className={styles.positive}>{formatAdvertMoney(record["Available Margin"], "Not available")}</td><td data-label="Score"><span className={styles.scoreBadge}>{record["Opportunity Score"] ?? "—"}</span></td>
+                    </tr>)}</tbody>
+                  </table>}
+                </section>}
               </div>
             </div>
           </section>

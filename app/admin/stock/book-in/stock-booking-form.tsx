@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { vehicleCheckFieldRows, type VehicleCheckSummary } from "@/lib/autotrader-vehicle-check";
 
 type BookingResult = { stock_bike_id: number; stock_number: string; purchase_id?: string; existing?: boolean };
@@ -47,7 +47,8 @@ const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "curren
 
 export function StockBookingForm() {
   const router = useRouter();
-  const [bookingPrefill] = useState<BookingPrefill | null>(() => readBookingPrefill());
+  const searchParams = useSearchParams();
+  const [bookingPrefill] = useState<BookingPrefill | null>(() => readBookingPrefill(searchParams.has("fromRetailCheck")));
   const [lookupReg, setLookupReg] = useState(typeof bookingPrefill?.form?.registration === "string" ? bookingPrefill.form.registration : "");
   const [lookupMessage, setLookupMessage] = useState(bookingPrefill?.message ?? "");
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -75,6 +76,11 @@ export function StockBookingForm() {
     purchase_date: new Date().toISOString().slice(0, 10),
     ...(bookingPrefill?.form ?? {}),
   }));
+
+  // Initializers can run more than once. Consume the handoff only after it mounts.
+  useEffect(() => {
+    if (bookingPrefill) sessionStorage.removeItem("dealeros.stockBookingPrefill");
+  }, [bookingPrefill]);
 
   const purchase = numberValue(form.purchase_price);
   const prep = numberValue(form.expected_preparation_cost);
@@ -313,12 +319,10 @@ function Select({ name, label, form, update, options }: { name: string; label: s
   return <label><span>{label}</span><select name={name} value={String(form[name] ?? "")} onChange={event => update(name, event.target.value)}>{options.map(option => <option value={option} key={option}>{option.replaceAll("_", " ")}</option>)}</select></label>;
 }
 
-function readBookingPrefill(): BookingPrefill | null {
-  if (typeof window === "undefined") return null;
-  if (!new URLSearchParams(window.location.search).has("fromRetailCheck")) return null;
+function readBookingPrefill(fromRetailCheck: boolean): BookingPrefill | null {
+  if (typeof window === "undefined" || !fromRetailCheck) return null;
   const raw = sessionStorage.getItem("dealeros.stockBookingPrefill");
   if (!raw) return null;
-  sessionStorage.removeItem("dealeros.stockBookingPrefill");
   try {
     const prefill = JSON.parse(raw) as BookingPrefill;
     return { ...prefill, message: "Retail check details loaded. Confirm seller and purchase details before booking." };
