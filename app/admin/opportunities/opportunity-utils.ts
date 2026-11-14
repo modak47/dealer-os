@@ -17,13 +17,22 @@ export function formatMoney(value: number): string {
   }).format(value);
 }
 
-export function formatRelativeConfirmed(value: string | null | undefined): string {
+// Keep an unavailable benchmark distinct from a genuine zero-pound value.
+export function formatAdvertMoney(value: string | number | null | undefined, unavailable = "—"): string {
+  if (value === null || value === undefined || String(value).trim() === "") return unavailable;
+  const numeric = String(value).replace(/[£,\s]/g, "");
+  if (!numeric) return unavailable;
+  const amount = Number(numeric);
+  return Number.isFinite(amount) ? formatMoney(amount) : unavailable;
+}
+
+export function formatRelativeConfirmed(value: string | null | undefined, now = Date.now()): string {
   if (!value) return "Unknown";
 
   const timestamp = new Date(value).getTime();
   if (Number.isNaN(timestamp)) return "Unknown";
 
-  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  const elapsedSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
   if (elapsedSeconds < 60) return "Confirmed just now";
 
   const minutes = Math.floor(elapsedSeconds / 60);

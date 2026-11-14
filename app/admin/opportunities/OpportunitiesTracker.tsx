@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import OpportunityCard, { AdvertLink, OpportunityNotes } from "./OpportunityCard";
 import {
+  formatAdvertMoney,
   formatDaysLive,
   formatListingDate,
   formatMoney,
@@ -23,20 +24,27 @@ import {
   type SortOption,
 } from "./types";
 
+import styles from "./opportunities.module.css";
+import { useDialogFocus } from "./useDialogFocus";
+
 type OpportunitiesTrackerProps = {
   initialOpportunities: Opportunity[];
   initialScannerStatus: ScannerStatus | null;
   initialError: string | null;
+  initialRenderTime: number;
 };
 
 export default function OpportunitiesTracker({
   initialOpportunities,
   initialScannerStatus,
   initialError,
+  initialRenderTime,
 }: OpportunitiesTrackerProps) {
   const [opportunities, setOpportunities] = useState(initialOpportunities);
   const [scannerStatus, setScannerStatus] = useState(initialScannerStatus);
   const [error, setError] = useState<string | null>(initialError);
+  // Share the server's clock for the first render, including across minute boundaries.
+  const [confirmedAtTime, setConfirmedAtTime] = useState(initialRenderTime);
   const [scanning, setScanning] = useState(false);
   const [selectedListingId, setSelectedListingId] = useState<number | null>(null);
   const [activities, setActivities] = useState<OpportunityActivity[]>([]);
@@ -125,6 +133,7 @@ export default function OpportunitiesTracker({
 
     const nextOpportunities = (await opportunitiesResponse.json()) as Opportunity[];
     setOpportunities(nextOpportunities);
+    setConfirmedAtTime(Date.now());
 
     if (statusResponse.ok) {
       setScannerStatus((await statusResponse.json()) as ScannerStatus);
@@ -325,29 +334,20 @@ export default function OpportunitiesTracker({
     : "Unknown";
 
   return (
-    <main className="dealer-module min-h-screen text-white">
-      <div className="mx-auto max-w-[1500px] p-4 md:p-8">
-        <header className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-start">
+    <main className={styles.page}>
+      <div className={styles.container}>
+        <header className={styles.pageHeader}>
           <div>
-            <h1 className="text-3xl font-bold md:text-4xl">Buying Opportunities</h1>
-            {scannerStatus && (
-              <p className="mt-2 text-sm text-gray-400">
-                Last Scan: {lastFinished ? new Date(lastFinished).toLocaleString("en-GB") : "Unknown"} •{" "}
-                {scannerStatus.opportunity_count} Opportunities
-              </p>
-            )}
-            <p className="mt-2 text-gray-400">
-              Source profitable bikes and manage every lead from research to purchase.
-            </p>
+            <p className={styles.eyebrow}>Buying tools <span>/</span> Opportunities</p>
+            <h1>Buying Opportunities</h1>
+            <p className={styles.subtitle}>Find the right stock. Research the market. Make your next move.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => void runScan()}
-            disabled={scanning}
-            className="rounded-xl bg-[#00E51D] px-5 py-3 font-bold text-black transition hover:bg-[#00c418] disabled:cursor-wait disabled:opacity-60"
-          >
-            {scanning ? "Scanner running..." : "Run opportunity scan"}
-          </button>
+          <div className={styles.scanAction}>
+            <button type="button" onClick={() => void runScan()} disabled={scanning} className={styles.primaryButton}>
+              <span aria-hidden="true">↻</span>{scanning ? "Scanner running..." : "Run opportunity scan"}
+            </button>
+            <span>{opportunities.length.toLocaleString()} opportunities in your workspace</span>
+          </div>
         </header>
 
         {error && (
@@ -357,57 +357,57 @@ export default function OpportunitiesTracker({
           </div>
         )}
 
-        <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="Opportunity summary">
-          <KpiCard title="Hot Leads" value={String(stats.hotLeads)} />
-          <KpiCard title="Avg Margin" value={formatMoney(stats.avgMargin)} />
-          <KpiCard title="Best Margin" value={formatMoney(stats.bestMargin)} />
-          <KpiCard title="Avg Score" value={stats.avgScore.toFixed(0)} />
-          <KpiCard title="Total Potential Profit" value={formatMoney(stats.totalProfit)} />
+        <section className={styles.summary} aria-label="Opportunity summary">
+          <KpiCard title="Hot leads" value={String(stats.hotLeads)} hint="Score of 80 or above" accent />
+          <KpiCard title="Average margin" value={formatMoney(stats.avgMargin)} hint="Across these results" />
+          <KpiCard title="Best margin" value={formatMoney(stats.bestMargin)} hint="Highest potential return" />
+          <KpiCard title="Average score" value={stats.avgScore.toFixed(0)} hint="Out of 100" />
+          <KpiCard title="Total potential profit" value={formatMoney(stats.totalProfit)} hint="Before costs and preparation" accent />
         </section>
 
         {scannerStatus && (
-          <section className="mb-6 grid gap-3 rounded-xl border border-gray-800 bg-[#111111] p-4 md:grid-cols-4" aria-label="Opportunity scanner status">
-            <KpiCard title="Scanner Status" value={statusLabel} />
-            <KpiCard title="Last Started" value={lastStarted ? new Date(lastStarted).toLocaleString("en-GB") : "Unknown"} />
-            <KpiCard title="Last Finished" value={lastFinished ? new Date(lastFinished).toLocaleString("en-GB") : "Unknown"} />
-            <KpiCard title="Duration" value={durationSeconds} />
-            {scannerStatus.last_error && (
-              <p className="md:col-span-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-                {scannerStatus.last_error}
-              </p>
-            )}
+          <section className={styles.scanner} aria-label="Opportunity scanner status">
+            <div className={styles.scanState} data-state={scanning ? "running" : scannerStatus.status}>
+              <i aria-hidden="true" /><span>Scanner <strong>{scanning ? "Running" : statusLabel}</strong></span>
+            </div>
+            <div><span>Last started</span><strong>{lastStarted ? new Date(lastStarted).toLocaleString("en-GB") : "Unknown"}</strong></div>
+            <div><span>Last finished</span><strong>{lastFinished ? new Date(lastFinished).toLocaleString("en-GB") : "Unknown"}</strong></div>
+            <div><span>Duration</span><strong>{durationSeconds}</strong></div>
+            {scannerStatus.last_error && <p role="alert" className={styles.scanError}>{scannerStatus.last_error}</p>}
           </section>
         )}
 
-        <section className="mb-8 rounded-xl border border-gray-800 bg-[#111111] p-4" aria-label="Opportunity filters">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search opportunities..." className={inputClasses} />
-            <input type="number" value={minScore} onChange={(event) => setMinScore(event.target.value)} placeholder="Minimum Score" className={inputClasses} />
-            <input type="number" value={minMargin} onChange={(event) => setMinMargin(event.target.value)} placeholder="Minimum Margin (£)" className={inputClasses} />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as OpportunityStatus | "all")} className={inputClasses}>
+        <section className={styles.filters} aria-label="Opportunity filters">
+          <div className={styles.filterFields}>
+            <label className={styles.searchField}><span>Search opportunities</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Make, model, notes or listing ID" className={inputClasses} /></label>
+            <label><span>Minimum score</span><input type="number" value={minScore} onChange={(event) => setMinScore(event.target.value)} placeholder="Any score" className={inputClasses} /></label>
+            <label><span>Minimum margin (£)</span><input type="number" value={minMargin} onChange={(event) => setMinMargin(event.target.value)} placeholder="Any margin" className={inputClasses} /></label>
+            <label><span>Workflow status</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as OpportunityStatus | "all")} className={inputClasses}>
               <option value="all">All statuses</option>
               {OPPORTUNITY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-            </select>
-            <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortOption)} className={inputClasses}>
-              <option value="score">Sort by Score</option>
-              <option value="margin">Sort by Potential Margin</option>
-              <option value="newest">Sort by Newest</option>
-              <option value="oldest">Sort by Oldest</option>
-              <option value="daysLive">Sort by Days Live</option>
-            </select>
-            <FilterCheckbox label="Hide Seen" checked={hideSeen} onChange={setHideSeen} />
-            <FilterCheckbox label="Hide Hidden" checked={hideHidden} onChange={setHideHidden} />
-            <FilterCheckbox label="Only Favourites" checked={onlyFavourites} onChange={setOnlyFavourites} />
+            </select></label>
+          </div>
+          <div className={styles.filterOptions}>
+            <div className={styles.checkboxes}>
+              <FilterCheckbox label="Hide Seen" checked={hideSeen} onChange={setHideSeen} />
+              <FilterCheckbox label="Hide Hidden" checked={hideHidden} onChange={setHideHidden} />
+              <FilterCheckbox label="Only Favourites" checked={onlyFavourites} onChange={setOnlyFavourites} />
+            </div>
+            <label className={styles.sortField}><span>Sort by</span><select aria-label="Sort by" value={sortBy} onChange={(event) => setSortBy(event.target.value as SortOption)} className={inputClasses}>
+              <option value="score">Highest score</option><option value="margin">Highest margin</option>
+              <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="daysLive">Days live</option>
+            </select></label>
           </div>
         </section>
 
-        <p className="mb-4 text-gray-400">Showing {filteredOpportunities.length} opportunities</p>
+        <div className={styles.resultsHeading}><h2>Your opportunities <span>{filteredOpportunities.length}</span></h2><p>Showing {filteredOpportunities.length} of {opportunities.length} opportunities</p></div>
 
-        <section className="grid gap-5" aria-label="Opportunities">
+        <section className={styles.opportunities} aria-label="Opportunities">
           {filteredOpportunities.map((opportunity) => (
             <OpportunityCard
               key={opportunity["Listing ID"]}
               opportunity={opportunity}
+              confirmedAtTime={confirmedAtTime}
               onOpen={(selected, section) => void openOpportunity(selected, section)}
               onUpdate={updateOpportunity}
             />
@@ -415,7 +415,7 @@ export default function OpportunitiesTracker({
         </section>
 
         {filteredOpportunities.length === 0 && (
-          <div className="py-20 text-center text-gray-500">No opportunities match these filters.</div>
+          <div className={styles.emptyState}><h3>No opportunities match these filters.</h3><p>Try a different search or lower your minimum score and margin.</p></div>
         )}
 
         {selectedOpportunity && (
@@ -438,7 +438,7 @@ export default function OpportunitiesTracker({
 }
 
 const inputClasses =
-  "w-full rounded-lg border border-gray-700 bg-black px-4 py-3 text-white outline-none placeholder:text-gray-600 focus:border-[#00E51D]";
+  styles.input;
 
 function FilterCheckbox({
   label,
@@ -450,20 +450,15 @@ function FilterCheckbox({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center gap-3 rounded-lg border border-gray-800 bg-black px-4 py-3 text-sm font-medium">
+    <label className={styles.checkbox}>
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 accent-[#00E51D]" />
       {label}
     </label>
   );
 }
 
-function KpiCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-gray-800 bg-[#111111] p-4">
-      <p className="text-sm text-gray-400">{title}</p>
-      <p className="mt-1 text-xl font-bold text-[#00E51D] md:text-2xl">{value}</p>
-    </div>
-  );
+function KpiCard({ title, value, hint, accent = false }: { title: string; value: string; hint: string; accent?: boolean }) {
+  return <div className={`${styles.kpi} ${accent ? styles.kpiAccent : ""}`}><p>{title}</p><strong>{value}</strong><small>{hint}</small></div>;
 }
 
 function OpportunityModal({
@@ -489,20 +484,8 @@ function OpportunityModal({
   onUpdate: (listingId: number, patch: OpportunityPatch) => Promise<boolean>;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [onClose]);
+  const dialogRef = useDialogFocus(onClose);
+  const [imageFailed, setImageFailed] = useState(false);
 
   const details = [
     ["Year", String(opportunity["Year"])],
@@ -520,44 +503,47 @@ function OpportunityModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="opportunity-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-0 backdrop-blur-md sm:p-5"
+      className={styles.modalBackdrop}
       onMouseDown={onClose}
     >
       <section
-        className="h-full w-full max-w-7xl overflow-y-auto border-gray-800 bg-[#111111] shadow-2xl motion-safe:animate-[vehicle-in_.25s_ease-out] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:border"
+        ref={dialogRef}
+        tabIndex={-1}
+        className={styles.modal}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-gray-800 bg-[#111111]/95 p-5 backdrop-blur-md sm:p-6">
+        <div className={styles.modalHeader}>
           <div>
             <h2 id="opportunity-title" className="text-2xl font-bold">{opportunity["Make"]} {opportunity["Model"]}</h2>
-            <p className="text-gray-400">Listing ID: {opportunity["Listing ID"]}</p>
+            <p>{opportunity["Year"]} · {opportunity["Mileage"] == null ? "Mileage unknown" : `${opportunity["Mileage"].toLocaleString()} miles`} · Listing {listingId}</p>
           </div>
           <div className="flex items-center gap-3">
-            <button type="button" onClick={onClose} className="text-2xl text-gray-400 hover:text-white" aria-label="Close details">×</button>
+            <button type="button" onClick={onClose} className={styles.closeButton} aria-label="Close details">×</button>
           </div>
         </div>
 
-        <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.85fr)_minmax(310px,1fr)]">
-          <div className="min-w-0 border-gray-800 lg:border-r">
-            <div className="relative aspect-[16/8] overflow-hidden border-b border-gray-800 bg-black">
-              {imageUrl ? (
+        <div className={styles.modalLayout}>
+          <div className={styles.modalMain}>
+            <div className={styles.heroImage}>
+              {imageUrl && !imageFailed ? (
                 // Advert image hosts vary, so this intentionally bypasses next/image host allowlists.
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageUrl} alt={`${opportunity["Make"]} ${opportunity["Model"]}`} className="h-full w-full object-contain" />
+                <img src={imageUrl} alt={`${opportunity["Make"]} ${opportunity["Model"]}`} onError={() => setImageFailed(true)} className="h-full w-full object-contain" />
               ) : (
                 <div className="grid h-full place-items-center bg-[radial-gradient(circle_at_center,#173d20,transparent_38%)] text-center text-gray-500">
                   <div><span className="block text-5xl font-black text-white/10">YM</span><small>No advert image available</small></div>
                 </div>
               )}
-              <span className="absolute left-4 top-4 rounded bg-[#00E51D] px-3 py-1 text-xs font-black uppercase text-black">Score {opportunity["Score"]}</span>
+              <div className={styles.heroBadges}><span>Score {opportunity["Score"]}</span>{opportunity["HPI Category"] && <span className={styles.categoryBadge}>{opportunity["HPI Category"]}</span>}</div>
             </div>
 
-        <nav className="flex overflow-x-auto border-b border-gray-800 px-2 sm:px-6" aria-label="Opportunity details">
+        <nav className={styles.detailTabs} aria-label="Opportunity details">
           {(["overview", "comparables", "activity"] as const).map((section) => (
             <button
               key={section}
               type="button"
               onClick={() => onSectionChange(section)}
+              aria-current={activeSection === section ? "page" : undefined}
               className={`border-b-2 px-3 py-4 text-sm font-semibold capitalize transition sm:px-5 ${
                 activeSection === section
                   ? "border-[#00E51D] text-[#00E51D]"
@@ -570,7 +556,7 @@ function OpportunityModal({
           ))}
         </nav>
 
-        <div className="p-4 sm:p-6">
+        <div className={styles.modalContent}>
           {activeSection === "overview" && (
             <section aria-label="Opportunity overview">
               <div className="mb-5">
@@ -583,7 +569,7 @@ function OpportunityModal({
                 <button
                   type="button"
                   onClick={() => onSectionChange("comparables")}
-                  className="rounded-xl border border-[#00E51D]/30 bg-black p-4 text-left transition hover:bg-[#00E51D]/5"
+                  className={`${styles.detailItem} ${styles.comparableButton}`}
                 >
                   <span className="text-xs uppercase text-gray-500">Comparable Count</span>
                   <span className="mt-2 block font-medium text-[#00E51D] underline decoration-[#00E51D]/40 underline-offset-4">
@@ -657,19 +643,21 @@ function OpportunityModal({
         </div>
           </div>
 
-          <aside className="self-start bg-[#0d1317] p-5 lg:sticky lg:top-[89px] lg:p-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-[#00E51D]">Deal assessment</p>
+          <aside className={styles.assessment}>
+            <p className={styles.eyebrow}>Deal assessment</p><h3 className={styles.assessmentTitle}>The numbers at a glance</h3>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <ModalMetric label="Score" value={String(opportunity["Score"])} accent />
-              <ModalMetric label="Potential Profit" value={opportunity["Potential Margin"]} accent />
-              <ModalMetric label="Dealer Median" value={opportunity["Dealer Median"]} />
-              <ModalMetric label="Asking Price" value={opportunity["Asking Price"]} />
+              <ModalMetric label="Potential profit" value={formatAdvertMoney(opportunity["Potential Margin"], "Not enough data")} accent />
+              <ModalMetric label="Dealer median" value={formatAdvertMoney(opportunity["Dealer Median"], "Not enough data")} />
+              <ModalMetric label="Asking price" value={formatAdvertMoney(opportunity["Asking Price"])} />
               <ModalMetric label="Margin %" value={opportunity["Margin %"]} />
               <ModalMetric label="Comparables" value={String(opportunity["Comparable Count"] ?? 0)} />
               <ModalMetric label="Days Live" value={formatDaysLive(opportunity.listingDaysLive)} />
               <ModalMetric label="Listing ID" value={String(listingId)} />
             </div>
 
+            {opportunity["HPI Category"] && <p className={styles.categoryNotice}><strong>{opportunity["HPI Category"]} recorded</strong>Valuations require at least five comparable bikes in the same category. Clean bikes are excluded.</p>}
+            <p className={styles.estimateNote}>Potential profit is an estimate before preparation, fees and other costs.</p>
             <label className="mt-5 block text-xs font-bold uppercase tracking-wider text-gray-400">
               Workflow status
               <select
@@ -712,7 +700,7 @@ function ComparableAdvert({ comparable }: { comparable: OpportunityComparable })
   const imageUrl = getValidAdvertUrl(comparable.image_url);
 
   return (
-    <article className="rounded-xl border border-gray-800 bg-black p-4">
+    <article className={styles.comparableCard}>
       <div className={`grid gap-4 ${imageUrl ? "grid-cols-[5rem_minmax(0,1fr)] sm:grid-cols-[6rem_minmax(0,1fr)]" : "grid-cols-1"}`}>
         {imageUrl && (
           // Scanner image hosts vary, so these thumbnails intentionally bypass next/image host allowlists.
@@ -735,7 +723,7 @@ function ComparableAdvert({ comparable }: { comparable: OpportunityComparable })
                 {comparable.year ?? "Year unknown"} • {comparable.mileage === null ? "Mileage unknown" : `${comparable.mileage.toLocaleString()} miles`}
               </p>
             </div>
-            <p className="shrink-0 text-xl font-bold text-[#00E51D]">{comparable.price ?? "Price unavailable"}</p>
+            <p className="shrink-0 text-xl font-bold text-[#00E51D]">{formatAdvertMoney(comparable.price, "Price unavailable")}</p>
           </div>
 
           <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
@@ -762,7 +750,7 @@ function ComparableDetail({ label, value }: { label: string; value: string | nul
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-gray-800 bg-black p-4">
+    <div className={styles.detailItem}>
       <p className="text-xs uppercase text-gray-500">{label}</p>
       <p className="mt-2 break-words font-medium">{value}</p>
     </div>
@@ -771,7 +759,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 
 function ModalMetric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="rounded border border-gray-800 bg-black p-3">
+    <div className={`${styles.modalMetric} ${accent ? styles.metricAccent : ""}`}>
       <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">{label}</p>
       <p className={`mt-1 break-words text-base font-bold ${accent ? "text-[#00E51D]" : "text-white"}`}>{value || "—"}</p>
     </div>

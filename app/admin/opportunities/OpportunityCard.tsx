@@ -4,10 +4,9 @@ import { memo, useEffect, useRef, useState } from "react";
 import {
   displayStatus,
   formatDaysLive,
-  formatMoney,
+  formatAdvertMoney,
   formatRelativeConfirmed,
   getValidAdvertUrl,
-  parseMoney,
   scoreColour,
   statusColour,
 } from "./opportunity-utils";
@@ -19,180 +18,110 @@ import {
   type OpportunityStatus,
 } from "./types";
 
+import styles from "./opportunities.module.css";
+import { useDialogFocus } from "./useDialogFocus";
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 type OpportunityCardProps = {
   opportunity: Opportunity;
+  confirmedAtTime: number;
   onOpen: (opportunity: Opportunity, section?: OpportunityDrawerSection) => void;
   onUpdate: (listingId: number, patch: OpportunityPatch) => Promise<boolean>;
 };
 
-export default function OpportunityCard({ opportunity, onOpen, onUpdate }: OpportunityCardProps) {
+export default function OpportunityCard({ opportunity, confirmedAtTime, onOpen, onUpdate }: OpportunityCardProps) {
   const listingId = opportunity["Listing ID"];
   const status = displayStatus(opportunity);
-  const statusLabel = status === "New" ? "Not reviewed" : status;
   const [showImage, setShowImage] = useState(false);
+  const [failedImage, setFailedImage] = useState<string | null>(null);
+  const imageUrl = getValidAdvertUrl(opportunity.primary_image_url);
+  const hasImage = Boolean(imageUrl && failedImage !== imageUrl);
+  const title = `${opportunity["Make"]} ${opportunity["Model"]}`;
 
   return (
-    <article
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(opportunity)}
-      onKeyDown={(event) => {
-        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          onOpen(opportunity);
-        }
-      }}
-      className="cursor-pointer rounded-2xl border border-gray-800 bg-[#111111] p-5 transition hover:border-[#00E51D]/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00E51D] md:p-6"
-    >
-    
-                <div className="flex flex-col gap-5">
+    <article className={styles.card} onClick={() => onOpen(opportunity)} aria-label={title}>
+      <div className={styles.cardMain}>
+        <button
+          type="button"
+          className={styles.thumbnail}
+          disabled={!hasImage}
+          aria-label={hasImage ? `Enlarge photo of ${title}` : `No photo available for ${title}`}
+          onClick={(event) => { event.stopPropagation(); setShowImage(true); }}
+        >
+          {hasImage ? (
+            // Advert image hosts vary, so these images intentionally bypass host allowlists.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl!} alt={title} loading="lazy" onError={() => setFailedImage(imageUrl)} />
+          ) : <span className={styles.noPhoto}><span aria-hidden="true">◇</span>No photo available</span>}
+          {hasImage && <span className={styles.photoHint}>View photo ↗</span>}
+        </button>
 
-                  <div className="grid gap-4 lg:grid-cols-[150px_minmax(0,1fr)]">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setShowImage(true);
-                      }}
-                      className="group overflow-hidden rounded-2xl border border-gray-800 bg-black"
-                    >
-                      {opportunity.primary_image_url ? (
-                        <img
-                          src={opportunity.primary_image_url}
-                          alt={`${opportunity["Make"]} ${opportunity["Model"]}`}
-                          className="h-[150px] w-full object-cover transition duration-200 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="flex h-[150px] w-full items-center justify-center text-sm text-gray-500">
-                          No photo
-                        </div>
-                      )}
-                    </button>
-
-                    <div className="min-w-0">
-                      <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
-                        <div>
-                          <h2 className="text-xl font-bold hover:text-[#00E51D]">
-                            {opportunity["Make"]} {opportunity["Model"]}
-                          </h2>
-                          <p className="mt-1 text-gray-400">
-                            {opportunity["Year"]} • {opportunity["Mileage"]?.toLocaleString()} miles
-                          </p>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${statusColour(status)}`}>
-                            {statusLabel}
-                          </span>
-                          {opportunity.isNewListing && (
-                            <span className="rounded-full border border-[#00E51D]/40 bg-[#00E51D]/15 px-3 py-1 text-sm font-semibold text-[#00E51D]">
-                              New
-                            </span>
-                          )}
-                          <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${scoreColour(Number(opportunity["Score"]))}`}>
-                            Score {opportunity["Score"]}
-                          </span>
-                          {opportunity["HPI Category"] && (
-                            <span className="rounded-full border border-zinc-600 bg-zinc-700 px-3 py-1 text-sm font-bold text-zinc-300">
-                              {opportunity["HPI Category"]}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-3 border-y border-gray-800 py-3 text-sm md:grid-cols-4 xl:grid-cols-7">
-                        <InfoLabel label="Asking" value={formatMoney(parseMoney(opportunity["Asking Price"]))} />
-                        <InfoLabel label="Dealer Median" value={formatMoney(parseMoney(opportunity["Dealer Median"]))} />
-                        <div className="rounded-xl border border-[#00E51D]/30 bg-[#00E51D]/10 px-3 py-2">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-green-300">Profit</p>
-                          <p className="mt-1 text-lg font-bold text-[#00E51D]">
-                            {formatMoney(parseMoney(opportunity["Potential Margin"]))}
-                          </p>
-                        </div>
-                        <ComparableCount
-                          count={Number(opportunity["Comparable Count"] ?? 0)}
-                          onClick={() => onOpen(opportunity, "comparables")}
-                        />
-                        <InfoLabel label="Days Live" value={formatDaysLive(opportunity.listingDaysLive)} />
-                        <InfoLabel label="Seller" value={opportunity["Seller Type"]} />
-                        <InfoLabel label="Last Confirmed" value={formatRelativeConfirmed(opportunity.listingLastConfirmedAt)} />
-                      </div>
-                    </div>
-                  </div>
-
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          <OpportunityNotes listingId={listingId} initialNotes={opportunity.notes ?? ""} onSave={onUpdate} />
-
-          <div className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <label className="block" onClick={(event) => event.stopPropagation()}>
-              <span className="mb-2 block text-sm font-medium text-gray-300">Workflow status</span>
-              <select
-                value={opportunity.status ?? "New"}
-                onChange={(event) => void onUpdate(listingId, { status: event.target.value as OpportunityStatus })}
-                className="w-full rounded-xl border border-gray-700 bg-black px-4 py-3 text-white outline-none focus:border-[#00E51D]"
-              >
-                {OPPORTUNITY_STATUSES.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void onUpdate(listingId, { favourite: !opportunity.favourite });
-                }}
-                className={`rounded-xl border px-4 py-3 font-semibold transition ${
-                  opportunity.favourite
-                    ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-400"
-                    : "border-gray-700 bg-black text-gray-300 hover:border-yellow-500/50 hover:text-yellow-400"
-                }`}
-                aria-pressed={opportunity.favourite}
-                aria-label={opportunity.favourite ? "Remove from favourites" : "Add to favourites"}
-              >
-                {opportunity.favourite ? "★ Favourite" : "☆ Favourite"}
-              </button>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void onUpdate(listingId, { hidden: !opportunity.hidden });
-                }}
-                className="rounded-xl border border-gray-700 bg-black px-4 py-3 font-semibold text-gray-300 transition hover:border-gray-500 hover:text-white"
-              >
-                {opportunity.hidden ? "Restore" : "Hide"}
-              </button>
+        <div className={styles.cardBody}>
+          <div className={styles.cardHeading}>
+            <div>
+              <h2><button type="button" className={styles.titleButton} onClick={(event) => { event.stopPropagation(); onOpen(opportunity); }}>{title}</button></h2>
+              <p className={styles.vehicleMeta}>{opportunity["Year"] || "Year unknown"}<span>•</span>{opportunity["Mileage"] == null ? "Mileage unknown" : `${opportunity["Mileage"].toLocaleString()} miles`}</p>
             </div>
+            <div className={styles.badges}>
+              <span className={`${styles.badge} ${statusColour(status)}`}>{status === "New" ? "Not reviewed" : status}</span>
+              {opportunity.isNewListing && <span className={`${styles.badge} ${styles.newBadge}`}>New listing</span>}
+              {opportunity["HPI Category"] && <span className={`${styles.badge} ${styles.categoryBadge}`}>{opportunity["HPI Category"]}</span>}
+              <span className={`${styles.badge} ${scoreColour(Number(opportunity["Score"]))}`}>Score {opportunity["Score"]}</span>
+            </div>
+          </div>
 
-            <AdvertLink url={opportunity["Advert URL"]} className="sm:col-span-2 lg:col-span-1" />
+          <div className={styles.financials}>
+            <InfoLabel label="Asking price" value={formatAdvertMoney(opportunity["Asking Price"])} />
+            <InfoLabel label="Dealer median" value={formatAdvertMoney(opportunity["Dealer Median"], "Not enough data")} />
+            <div className={styles.profit}>
+              <span>Potential profit</span>
+              <strong>{formatAdvertMoney(opportunity["Potential Margin"], "Not enough data")}</strong>
+            </div>
+          </div>
+          <div className={styles.cardFacts}>
+            <ComparableCount count={Number(opportunity["Comparable Count"] ?? 0)} onClick={() => onOpen(opportunity, "comparables")} />
+            <InfoLabel label="Days live" value={formatDaysLive(opportunity.listingDaysLive)} />
+            <InfoLabel label="Seller" value={opportunity["Seller Type"] || "Unknown"} />
+            <InfoLabel label="Last confirmed" value={formatRelativeConfirmed(opportunity.listingLastConfirmedAt, confirmedAtTime)} />
           </div>
         </div>
       </div>
 
-      {showImage && opportunity.primary_image_url && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6"
-          onClick={(event) => {
-            event.stopPropagation();
-            setShowImage(false);
-          }}
-        >
-          <img
-            src={opportunity.primary_image_url}
-            alt={`${opportunity["Make"]} ${opportunity["Model"]}`}
-            className="max-h-full max-w-full rounded-2xl object-contain"
-          />
+      <div className={styles.cardFooter}>
+        <OpportunityNotes listingId={listingId} initialNotes={opportunity.notes ?? ""} onSave={onUpdate} />
+        <div className={styles.cardActions}>
+          <label className={styles.workflow} onClick={(event) => event.stopPropagation()}>
+            <span>Workflow status</span>
+            <select value={opportunity.status ?? "New"} onChange={(event) => void onUpdate(listingId, { status: event.target.value as OpportunityStatus })}>
+              {OPPORTUNITY_STATUSES.map(option => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <div className={styles.actionButtons}>
+            <button type="button" className={styles.secondaryButton} aria-pressed={opportunity.favourite} aria-label={opportunity.favourite ? "Remove from favourites" : "Add to favourites"}
+              onClick={(event) => { event.stopPropagation(); void onUpdate(listingId, { favourite: !opportunity.favourite }); }}>
+              {opportunity.favourite ? "★ Favourite" : "☆ Favourite"}
+            </button>
+            <button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); void onUpdate(listingId, { hidden: !opportunity.hidden }); }}>{opportunity.hidden ? "Restore" : "Hide"}</button>
+            <button type="button" className={styles.secondaryButton} onClick={(event) => { event.stopPropagation(); onOpen(opportunity); }}>View details ↗</button>
+            <AdvertLink url={opportunity["Advert URL"]} />
+          </div>
         </div>
-      )}
-
-
+      </div>
+      {showImage && hasImage && <PhotoPreview url={imageUrl!} title={title} onClose={() => setShowImage(false)} />}
     </article>
   );
+}
+
+function PhotoPreview({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
+  const dialogRef = useDialogFocus(onClose);
+  return <div className={styles.photoBackdrop} onClick={event => { event.stopPropagation(); onClose(); }}>
+    <section ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Photo of ${title}`} tabIndex={-1} className={styles.photoDialog} onClick={event => event.stopPropagation()}>
+      <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close photo">×</button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={title} />
+    </section>
+  </div>;
 }
 
 export const OpportunityNotes = memo(function OpportunityNotes({
@@ -239,7 +168,7 @@ export const OpportunityNotes = memo(function OpportunityNotes({
   }
 
   return (
-    <label className="block" onClick={(event) => event.stopPropagation()}>
+    <label className={styles.notes} onClick={(event) => event.stopPropagation()}>
       <span className="mb-2 flex min-h-5 items-center justify-between text-sm font-medium text-gray-300">
         Notes
         <span className="text-xs text-gray-500" aria-live="polite">
@@ -252,7 +181,7 @@ export const OpportunityNotes = memo(function OpportunityNotes({
         defaultValue={initialNotes}
         onChange={(event) => scheduleSave(event.currentTarget.value)}
         placeholder="Add research, seller details, or next steps..."
-        rows={5}
+        rows={2}
         className="w-full resize-y rounded-xl border border-gray-700 bg-black px-4 py-3 text-white outline-none transition placeholder:text-gray-600 focus:border-[#00E51D]"
       />
     </label>
@@ -263,7 +192,7 @@ export const OpportunityNotes = memo(function OpportunityNotes({
 
 export function AdvertLink({ url, className = "" }: { url: string | null | undefined; className?: string }) {
   const validUrl = getValidAdvertUrl(url);
-  const classes = `inline-flex items-center justify-center rounded-xl border px-4 py-3 font-semibold transition ${className}`;
+  const classes = `${styles.advertLink} ${className}`;
 
   if (!validUrl) {
     return (
@@ -288,10 +217,7 @@ export function AdvertLink({ url, className = "" }: { url: string | null | undef
 
 function InfoLabel({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-xs uppercase text-gray-500">{label}</p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
-    </div>
+    <div className={styles.fact}><span>{label}</span><strong>{value}</strong></div>
   );
 }
 
@@ -303,7 +229,7 @@ function ComparableCount({ count, onClick }: { count: number; onClick: () => voi
         event.stopPropagation();
         onClick();
       }}
-      className="text-left rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#00E51D]"
+      className={`${styles.fact} ${styles.comparableButton}`}
       aria-label={`View ${count} comparable advert${count === 1 ? "" : "s"}`}
     >
       <span className="block text-xs uppercase text-gray-500">Comparables</span>
