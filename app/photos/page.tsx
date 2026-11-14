@@ -7,7 +7,7 @@ import { WorkflowBoard } from "@/app/workflow/workflow-board";
 export const dynamic = "force-dynamic";
 
 export default async function PhotosPage() {
-  const [identity, result] = await Promise.all([getAdminIdentity(), getStockWorkflowTasks({ departments: ["Photos"], includeCompleted: true })]);
+  const [identity, result] = await Promise.all([getAdminIdentity(), getStockWorkflowTasks({ departments: ["Photos"], includeCompleted: true, view: "all" })]);
   return <AdminShell identity={identity}>
     <AdminPage title="Photos" sub="Bikes waiting for advert photography, image review and publication readiness." hint="Department view: Photos">
       <WorkflowBoard mode="photos" initialTasks={result.tasks} migrationReady={result.migrationReady} initialError={result.error} />

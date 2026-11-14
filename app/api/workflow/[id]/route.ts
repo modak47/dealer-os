@@ -1,54 +1,34 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireStaffUser } from "@/lib/auth/require-staff";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isWorkflowStatus } from "@/lib/stock-workflow";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireStaffUser();
+  if (!user) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   try {
     const { id } = await params;
+    if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)) return NextResponse.json({ error: "Valid task ID required." }, { status: 400 });
     const body = await request.json() as Record<string, unknown>;
-    const action = typeof body.action === "string" ? body.action : "";
+    if (!body || Array.isArray(body)) return NextResponse.json({ error: "Invalid workflow update." }, { status: 400 });
+    if (body.action && !["start", "complete", "block", "reopen"].includes(String(body.action))) return NextResponse.json({ error: "Unknown workflow action." }, { status: 400 });
+    if (body.status && !isWorkflowStatus(body.status)) return NextResponse.json({ error: "Invalid workflow status." }, { status: 400 });
     const updates: Record<string, unknown> = {};
-    const supabase = await createClient();
-    const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
-    const userId = user?.id || null;
-
-    if (typeof body.notes === "string") updates.notes = body.notes.trim() || null;
-    if (typeof body.assigned_to === "string") updates.assigned_to = body.assigned_to.trim() || null;
-
-    if (action === "start") {
-      updates.status = "in_progress";
-      updates.started_at = new Date().toISOString();
-      updates.completed_at = null;
-      updates.completed_by = null;
-    } else if (action === "complete") {
-      updates.status = "completed";
-      updates.started_at = body.started_at || new Date().toISOString();
-      updates.completed_at = new Date().toISOString();
-      updates.completed_by = userId;
-    } else if (action === "block") {
-      updates.status = "blocked";
-      updates.completed_at = null;
-      updates.completed_by = null;
-    } else if (action === "reopen") {
-      updates.status = "pending";
-      updates.started_at = null;
-      updates.completed_at = null;
-      updates.completed_by = null;
-    } else if (body.status && isWorkflowStatus(body.status)) {
-      updates.status = body.status;
+    for (const key of ["action", "status", "notes", "assigned_to"]) {
+      if (typeof body[key] === "string") updates[key] = body[key];
     }
-
     if (!Object.keys(updates).length) return NextResponse.json({ error: "No workflow updates supplied." }, { status: 400 });
-    const { data, error } = await getSupabaseAdmin().from("stock_workflow_tasks").update(updates).eq("id", id).select("*").maybeSingle();
+    const expected = typeof body.updated_at === "string" ? body.updated_at : null;
+    if (expected && Number.isNaN(Date.parse(expected))) return NextResponse.json({ error: "Invalid task version." }, { status: 400 });
+    const { data, error } = await getSupabaseAdmin().rpc("stock_workflow_update_task", {
+      p_task_id: id, p_updates: updates, p_user_id: user.id, p_expected_updated_at: expected,
+    });
     if (error) {
-      console.error("Unable to update workflow task", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      const status = error.code === "P0002" ? 404 : ["55000", "40001"].includes(error.code) ? 409 : error.code === "22023" ? 400 : error.code === "42501" ? 403 : 500;
+      return NextResponse.json({ error: status === 500 ? "Unable to save preparation. Try again." : error.message }, { status });
     }
-    if (!data) return NextResponse.json({ error: "Workflow task not found." }, { status: 404 });
     return NextResponse.json({ task: data });
-  } catch (error) {
-    console.error("Invalid workflow update", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid workflow update." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "Invalid workflow update." }, { status: 400 });
   }
 }

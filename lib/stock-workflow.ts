@@ -3,6 +3,7 @@ import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { SupabaseStockBike } from "@/lib/stock-bike-types";
 import { normalizeSupabaseStockBike } from "@/lib/supabase-stock";
+import { inactivePreparationReason, preparationView, type PreparationView } from "@/lib/preparation-policy";
 
 export const workflowDepartments = ["Workshop Preparation", "Wash / Initial Valet", "Final Valet", "Photos"] as const;
 export const workflowStatuses = ["pending", "in_progress", "completed", "blocked"] as const;
@@ -33,10 +34,13 @@ export interface WorkflowBikeSummary {
   year: number | null;
   status: string;
   image: string;
+  stockNumber?: string;
 }
 
 export interface StockWorkflowRow extends StockWorkflowTask {
   bike: WorkflowBikeSummary | null;
+  view?: PreparationView;
+  readOnlyReason?: string | null;
 }
 
 export interface WorkflowFilters {
@@ -44,9 +48,10 @@ export interface WorkflowFilters {
   status?: WorkflowStatus | "";
   q?: string;
   includeCompleted?: boolean;
+  view?: PreparationView | "all";
 }
 
-const stockFields = "id,registration,make,model,variant,year,status,image_urls,primary_image_url,is_test_record";
+const stockFields = "id,stock_number,registration,make,model,variant,year,status,image_urls,primary_image_url,is_test_record";
 const migrationMissingCodes = new Set(["42P01", "PGRST205"]);
 
 export function isWorkflowDepartment(value: unknown): value is WorkflowDepartment {
@@ -65,10 +70,11 @@ function bikeSummary(bike: SupabaseStockBike | null | undefined): WorkflowBikeSu
     make: normalized.make || "Make missing",
     model: normalized.model || "Model missing",
     variant: normalized.variant || "",
-    registration: normalized.registration || "Registration pending",
+    registration: normalized.registration || "",
     year: normalized.year,
     status: normalized.status || "Unknown",
     image: normalized.image_urls[0] || normalized.primary_image_url || "/bike-placeholder.svg",
+    stockNumber: String(bike.stock_number || bike.id),
   };
 }
 
@@ -90,24 +96,26 @@ function normalizeTask(row: Record<string, unknown>): StockWorkflowTask {
 
 export async function getStockWorkflowTasks(filters: WorkflowFilters = {}): Promise<{ tasks: StockWorkflowRow[]; migrationReady: boolean; error?: string }> {
   const db = getSupabaseAdmin();
-  let query = db.from("stock_workflow_tasks").select("*").order("updated_at", { ascending: false });
-  if (filters.departments?.length) query = query.in("department", filters.departments);
-  if (filters.status) query = query.eq("status", filters.status);
-  else if (!filters.includeCompleted) query = query.neq("status", "completed");
-
-  const { data, error } = await query;
-  if (error) {
-    if (migrationMissingCodes.has(error.code)) return { tasks: [], migrationReady: false, error: "Run the stock preparation workflow migration in Supabase." };
-    console.error("Unable to load stock workflow tasks", error);
-    return { tasks: [], migrationReady: true, error: "Unable to load workflow tasks." };
+  const tasks: StockWorkflowTask[] = [];
+  // PostgREST caps each response. Read every page before classifying the queue.
+  for (let offset = 0; ; offset += 500) {
+    let query = db.from("stock_workflow_tasks").select("*").order("id").range(offset, offset + 499);
+    if (filters.departments?.length) query = query.in("department", filters.departments);
+    const { data, error } = await query;
+    if (error) {
+      if (migrationMissingCodes.has(error.code)) return { tasks: [], migrationReady: false, error: "Run the stock preparation workflow migration in Supabase." };
+      console.error("Unable to load stock workflow tasks", error);
+      return { tasks: [], migrationReady: true, error: "Unable to load workflow tasks." };
+    }
+    tasks.push(...(data || []).map(row => normalizeTask(row as Record<string, unknown>)));
+    if (!data || data.length < 500) break;
   }
-
-  const tasks = (data || []).map((row) => normalizeTask(row as Record<string, unknown>));
+  tasks.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const ids = Array.from(new Set(tasks.map((task) => task.stock_bike_id).filter(Boolean)));
   const bikesById = new Map<string, WorkflowBikeSummary>();
   const hiddenBikeIds = new Set<string>();
-  if (ids.length) {
-    const bikes = await db.from("stock_bikes").select(stockFields).in("id", ids);
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    const bikes = await db.from("stock_bikes").select(stockFields).in("id", ids.slice(offset, offset + 100));
     if (!bikes.error) {
       for (const bike of bikes.data || []) {
         if (Boolean((bike as { is_test_record?: boolean }).is_test_record)) {
@@ -119,14 +127,19 @@ export async function getStockWorkflowTasks(filters: WorkflowFilters = {}): Prom
       }
     } else {
       console.warn("Unable to load workflow linked bikes", bikes.error.message);
+      return { tasks: [], migrationReady: true, error: "Unable to load linked stock records. Refresh to try again." };
     }
   }
 
   const q = filters.q?.trim().toLowerCase();
   const liveTasks = tasks.filter((task) => !hiddenBikeIds.has(task.stock_bike_id));
-  const withBikes = liveTasks.map((task) => ({ ...task, bike: bikesById.get(task.stock_bike_id) || null }));
+  const withBikes = liveTasks.map((task) => {
+    const bike = bikesById.get(task.stock_bike_id) || null;
+    return { ...task, bike, view: preparationView({ ...task, bike }), readOnlyReason: inactivePreparationReason(bike) };
+  }).filter(task => (!filters.view || filters.view === "active" ? task.view === "active" : filters.view === "all" || task.view === filters.view)
+    && (!filters.status || task.status === filters.status));
   const filtered = q ? withBikes.filter((task) => {
-    const haystack = `${task.department} ${task.status} ${task.notes || ""} ${task.bike?.make || ""} ${task.bike?.model || ""} ${task.bike?.variant || ""} ${task.bike?.registration || ""} ${task.bike?.year || ""}`.toLowerCase();
+    const haystack = `${task.stock_bike_id} ${task.department} ${task.status} ${task.notes || ""} ${task.bike?.stockNumber || ""} ${task.bike?.make || ""} ${task.bike?.model || ""} ${task.bike?.variant || ""} ${task.bike?.registration || ""} ${task.bike?.year || ""}`.toLowerCase();
     return haystack.includes(q);
   }) : withBikes;
 

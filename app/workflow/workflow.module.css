@@ -1,0 +1,23 @@
+.board { min-width: 0; }
+.views { display: flex; flex-wrap: wrap; gap: 8px; }
+.views button, .more, .save { min-height: 42px; padding: 10px 14px; border: 1px solid #344047; border-radius: 6px; background: #10191e; color: #dce1e4; cursor: pointer; font-weight: 700; }
+.views button[aria-pressed="true"] { border-color: var(--green); background: #13281b; color: #92f2a0; }
+.views span { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 12px; background: #253038; font-size: 12px; color: #fff; }
+.explanation, .summary { margin: 0; color: #b1c0ca; font-size: 13px; line-height: 1.6; }
+.board .columns { grid-template-columns: repeat(auto-fit,minmax(min(100%,290px),1fr)); }
+.board :global(.workflow-column) > div { max-height: 1000px; overflow-y: auto; scrollbar-width: thin; }
+.board :global(.workflow-bike) { grid-template-columns: 64px minmax(0,1fr); }
+.board :global(.workflow-bike img) { width: 64px; height: 58px; }
+.board :global(.workflow-bike h3) { line-height: 1.2; overflow-wrap: anywhere; }
+.board :global(.workflow-bike small), .readonly { overflow-wrap: anywhere; line-height: 1.5; }
+.board :global(.workflow-filters input), .board :global(.workflow-filters select) { min-width: 0; }
+.board :global(.workflow-notes textarea) { min-height: 74px; }
+.board :global(.workflow-empty) { color: #b1c0ca; }
+.readonly { margin: 0; padding: 10px; border: 1px solid #4d4141; border-radius: 5px; background: #241e20; color: #e9c8c8; font-size: 12px; }
+.save { justify-self: start; }
+.save:disabled { opacity: .45; cursor: default; }
+.more { width: 100%; }
+.board :global(.workflow-pdi-upload input) { min-width: 0; max-width: 100%; }
+.board :global(.workflow-pdi-upload p) { color: #ffc3c9; font-size: 12px; }
+.board button:focus-visible, .board a:focus-visible, .board textarea:focus-visible, .board input:focus-visible, .board select:focus-visible { outline: 2px solid #9bf3a6; outline-offset: 3px; }
+@media(max-width:700px) { .views { display: grid; grid-template-columns: 1fr; } .board :global(.workflow-column) > div { max-height: none; } }

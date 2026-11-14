@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getStockAttachments, isStockAttachmentType, stockDocumentPath, stockDocumentsBucket } from "@/lib/stock-attachments";
+import { inactivePreparationReason } from "@/lib/preparation-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,15 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
     const db = getSupabaseAdmin();
+    if (workflowTaskId) {
+      if (attachmentType !== "PDI Form") return NextResponse.json({ error: "Only a completed PDI can finish workshop preparation." }, { status: 400 });
+      const task = await db.from("stock_workflow_tasks").select("stock_bike_id,department").eq("id", workflowTaskId).maybeSingle();
+      if (task.error) throw task.error;
+      if (!task.data || task.data.stock_bike_id !== stockBikeId || task.data.department !== "Workshop Preparation") return NextResponse.json({ error: "The PDI task does not belong to this stock bike." }, { status: 400 });
+      const bike = await db.from("stock_bikes").select("status,is_test_record").eq("id", stockBikeId).maybeSingle();
+      if (bike.error) throw bike.error;
+      if (inactivePreparationReason(bike.data)) return NextResponse.json({ error: "This bike is no longer in active preparation." }, { status: 409 });
+    }
     const filePath = stockDocumentPath(stockBikeId, file.name);
     const buffer = Buffer.from(await file.arrayBuffer());
     const upload = await db.storage.from(stockDocumentsBucket).upload(filePath, buffer, { contentType: file.type || "application/octet-stream", upsert: false });
@@ -45,10 +55,11 @@ export async function POST(request: Request) {
     if (error) throw error;
 
     if (attachmentType === "PDI Form") {
-      await db.from("stock_bikes").update({ workshop_status: "PDI complete" }).eq("id", stockBikeId);
-      if (workflowTaskId) {
-        await db.from("stock_workflow_tasks").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).eq("id", workflowTaskId);
-      }
+      const stock = await db.from("stock_bikes").update({ workshop_status: "PDI complete" }).eq("id", stockBikeId);
+      if (stock.error) throw stock.error;
+      const completed = await db.from("stock_workflow_tasks").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
+        .eq("stock_bike_id", stockBikeId).eq("department", "Workshop Preparation");
+      if (completed.error) throw completed.error;
     }
 
     return NextResponse.json({ attachment: data }, { status: 201 });

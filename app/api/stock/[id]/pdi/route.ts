@@ -68,8 +68,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }).select("*").single();
     if (saved.error) throw saved.error;
 
-    await db.from("stock_bikes").update({ workshop_status: "PDI complete" }).eq("id", id);
-    await db.from("stock_workflow_tasks").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).eq("stock_bike_id", id).eq("department", "Workshop Preparation");
+    const prepared = await db.from("stock_bikes").update({ workshop_status: "PDI complete" }).eq("id", id);
+    if (prepared.error) throw prepared.error;
+    const completed = await db.from("stock_workflow_tasks").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).eq("stock_bike_id", id).eq("department", "Workshop Preparation");
+    if (completed.error) throw completed.error;
 
     return NextResponse.json({ pdi: saved.data, attachment: attachment.data });
   } catch (error) {
