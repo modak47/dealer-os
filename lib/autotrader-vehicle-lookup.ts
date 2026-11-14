@@ -48,6 +48,7 @@ export type DealerOsVehicle = {
 
 type AutotraderVehicleResponse = {
   vehicle?: unknown;
+  results?: unknown;
   message?: unknown;
   error?: unknown;
 };
@@ -87,9 +88,29 @@ async function requestVehicleByVrm(vrmInput: string, fullCheck: boolean): Promis
     throw new AutotraderVehicleLookupError(`Auto Trader vehicle lookup failed (${response.status}): ${errorMessage(payload, response.statusText)}`, response.status, "autotrader_error");
   }
 
-  const vehicle = objectValue(payload.vehicle);
+  const result = vehicleResult(payload, vrm);
+  const vehicle = objectValue(result?.vehicle);
   if (!vehicle) throw new AutotraderVehicleLookupError("Auto Trader did not return a vehicle object for that VRM.", 404, "not_found");
-  return normaliseAutotraderVehicle(vehicle, payload);
+  return normaliseAutotraderVehicle(vehicle, result!);
+}
+
+// Vehicles API results contain the vehicle and its own MOT/history/check data.
+// Keep that envelope together so provenance can never come from another result.
+function vehicleResult(payload: AutotraderVehicleResponse, vrm: string): Record<string, unknown> | null {
+  const candidates = Array.isArray(payload.results)
+    ? payload.results.map(objectValue).filter((value): value is Record<string, unknown> => value !== null)
+    : [payload];
+  const matches = candidates.filter(candidate => {
+    const vehicle = objectValue(candidate.vehicle);
+    return vehicle && normaliseRegistration(text(vehicle.registration)) === vrm;
+  });
+  if (matches.length === 1) return matches[0];
+  // Partial taxonomy responses can omit registration, but must be unambiguous.
+  if (matches.length === 0 && candidates.length === 1) {
+    const vehicle = objectValue(candidates[0].vehicle);
+    if (vehicle && !text(vehicle.registration)) return candidates[0];
+  }
+  return null;
 }
 
 export function normaliseAutotraderVehicle(vehicle: Record<string, unknown>, payload: Record<string, unknown> = { vehicle }): DealerOsVehicle {
@@ -123,7 +144,7 @@ export function normaliseAutotraderVehicle(vehicle: Record<string, unknown>, pay
   setNumber(result, "widthMm", vehicle.widthMM);
   setNumber(result, "weightKg", vehicle.minimumKerbWeightKG ?? vehicle.payloadWeightKG ?? vehicle.grossVehicleWeightKG);
   setText(result, "euroEmissions", vehicle.emissionClass);
-  setNumber(result, "previousOwners", vehicle.owners ?? objectValue(vehicle.history)?.previousOwners);
+  setNumber(result, "previousOwners", vehicle.owners ?? objectValue(vehicle.history)?.previousOwners ?? objectValue(payload.history)?.previousOwners);
   setText(result, "manufacturer", vehicle.manufacturer ?? objectText(vehicle.oem, "make"));
   setText(result, "modelRange", vehicle.modelRange);
   setText(result, "generation", vehicle.generation);

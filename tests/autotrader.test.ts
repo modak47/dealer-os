@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { clearAutotraderTokenCache, testAutotraderConnection } from "../lib/autotrader";
 import { normaliseVehicleCheck } from "../lib/autotrader-vehicle-check";
-import { lookupBasicVehicleByVrm, lookupVehicleByVrm, normaliseAutotraderVehicle } from "../lib/autotrader-vehicle-lookup";
+import { AutotraderVehicleLookupError, lookupBasicVehicleByVrm, lookupVehicleByVrm, normaliseAutotraderVehicle } from "../lib/autotrader-vehicle-lookup";
 
 const originalEnv = { ...process.env };
 const originalFetch = globalThis.fetch;
@@ -250,7 +250,71 @@ describe("Auto Trader Connect client", () => {
     assert.equal(vehicle.motExpiry, "2027-02-03");
     assert.equal(requests.length, 2);
   });
+
+  it("reads the Vehicles API results envelope with the matching bike's provenance", async () => {
+    mockVehicleLookup({ results: [
+      { vehicle: { registration: "ZZ99ZZZ", make: "Honda" }, check: { insuranceWriteoffCategory: "N" } },
+      {
+        vehicle: { registration: "FG69OKR", make: "Triumph", model: "Speed Twin 1200", firstRegistrationDate: "2020-01-01" },
+        history: { previousOwners: 2 },
+        check: { insuranceWriteoffCategory: "S", report: "https://example.test/report" },
+        motTests: [{ expiryDate: "2027-01-02" }],
+      },
+    ], totalResults: 2 });
+    const vehicle = await lookupVehicleByVrm("fg69 okr");
+    assert.equal(vehicle.make, "Triumph");
+    assert.equal(vehicle.year, 2020);
+    assert.equal(vehicle.previousOwners, 2);
+    assert.equal(vehicle.motExpiry, "2027-01-02");
+    assert.equal(vehicle.vehicleCheck?.category, "S");
+    assert.equal(vehicle.vehicleCheck?.clear, false);
+    assert.deepEqual(vehicle.history, { previousOwners: 2 });
+    assert.equal((vehicle.taxonomyData?.vehicle as Record<string, unknown>).registration, "FG69OKR");
+    assert.equal(vehicle.taxonomyData?.results, undefined);
+  });
+
+  it("accepts a single partial vehicle result without inventing a clean check", async () => {
+    mockVehicleLookup({ results: [{ vehicle: { make: "Triumph", model: "Speed Twin 1200" } }], totalResults: 1 });
+    const vehicle = await lookupBasicVehicleByVrm("FG69OKR");
+    assert.equal(vehicle.model, "Speed Twin 1200");
+    assert.equal(vehicle.vehicleCheck?.clear, null);
+  });
+
+  it("rejects empty, mismatched and ambiguous results rather than using another bike", async () => {
+    for (const payload of [
+      { results: [], totalResults: 0 },
+      { results: [{ vehicle: { registration: "ZZ99ZZZ" } }] },
+      { results: [{ vehicle: { make: "Triumph" } }, { vehicle: { make: "Honda" } }] },
+      { results: [{ vehicle: { registration: "FG69OKR" } }, { vehicle: { registration: "FG69OKR" } }] },
+    ]) {
+      mockVehicleLookup(payload);
+      await assert.rejects(() => lookupVehicleByVrm("FG69OKR"), error => error instanceof AutotraderVehicleLookupError && error.code === "not_found");
+    }
+  });
+
+  it("preserves provider failures without retrying a forbidden check", async () => {
+    for (const status of [403, 404, 503]) {
+      const calls = mockVehicleLookup({ message: "Provider response" }, status);
+      await assert.rejects(() => lookupVehicleByVrm("FG69OKR"), error => error instanceof AutotraderVehicleLookupError && error.status === status);
+      assert.equal(calls(), 1);
+    }
+  });
 });
+
+function mockVehicleLookup(payload: unknown, status = 200) {
+  clearAutotraderTokenCache();
+  process.env.AUTOTRADER_API_KEY = "sandbox-key";
+  process.env.AUTOTRADER_API_SECRET = "sandbox-secret";
+  process.env.AUTOTRADER_ADVERTISER_ID = "10014506";
+  process.env.AUTOTRADER_API_URL = "https://api-sandbox.autotrader.co.uk";
+  let calls = 0;
+  globalThis.fetch = async input => {
+    if (String(input).endsWith("/authenticate")) return jsonResponse({ access_token: "test-token", expires_at: "2099-01-01T00:00:00Z" });
+    calls++;
+    return jsonResponse(payload, { status });
+  };
+  return () => calls;
+}
 
 function jsonResponse(body: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(body), {
